@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https:
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +10,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http:
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package de.florianmichael.vialoadingbase.platform;
@@ -38,9 +35,9 @@ import java.util.concurrent.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-public class ViaVersionPlatformImpl implements ViaPlatform<UUID> {
+public class ViaVersionPlatformImpl implements ViaPlatform<UserConnection> {
 
-  private final ViaAPI<UUID> api = new VLBViaAPIWrapper();
+  private final ViaAPI<UserConnection> api = new VLBViaAPIWrapper();
 
   private final Logger logger;
   private final VLBViaConfig config;
@@ -56,10 +53,7 @@ public class ViaVersionPlatformImpl implements ViaPlatform<UUID> {
     final List<ProtocolVersion> versions =
         new ArrayList<>(ProtocolVersion.getProtocols())
             .stream()
-                .filter(
-                    protocolVersion ->
-                        protocolVersion != ProtocolVersion.unknown
-                            && ProtocolVersion.getProtocols().indexOf(protocolVersion) >= 7)
+                .filter(version -> version.newerThanOrEqualTo(ProtocolVersion.v1_8))
                 .collect(Collectors.toList());
     Collections.reverse(versions);
     return versions;
@@ -137,7 +131,7 @@ public class ViaVersionPlatformImpl implements ViaPlatform<UUID> {
   }
 
   @Override
-  public ViaAPI<UUID> getApi() {
+  public ViaAPI<UserConnection> getApi() {
     return api;
   }
 
@@ -153,7 +147,7 @@ public class ViaVersionPlatformImpl implements ViaPlatform<UUID> {
 
   @Override
   public String getPlatformName() {
-    return "ViaLoadingBase by FlorianMichael";
+    return "ViaLoadingBase";
   }
 
   @Override

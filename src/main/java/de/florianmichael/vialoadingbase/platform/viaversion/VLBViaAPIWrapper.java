@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https://github.com/FlorianMichael/ViaLoadingBase
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -19,6 +16,19 @@
 package de.florianmichael.vialoadingbase.platform.viaversion;
 
 import com.viaversion.viaversion.ViaAPIBase;
-import java.util.UUID;
+import com.viaversion.viaversion.api.connection.UserConnection;
+import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
+import io.netty.buffer.ByteBuf;
 
-public class VLBViaAPIWrapper extends ViaAPIBase<UUID> {}
+public class VLBViaAPIWrapper extends ViaAPIBase<UserConnection> {
+
+  @Override
+  public ProtocolVersion getPlayerProtocolVersion(UserConnection player) {
+    return player.getProtocolInfo().protocolVersion();
+  }
+
+  @Override
+  public void sendRawPacket(UserConnection player, ByteBuf packet) {
+    player.scheduleSendRawPacket(packet);
+  }
+}

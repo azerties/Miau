@@ -91,9 +91,9 @@ dependencies {
     }
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT")
     // ViaVersion / ViaMCP (multi-version protocol support)
-    shadowImpl("com.viaversion:viaversion:4.9.3-SNAPSHOT") { isTransitive = false }
-    shadowImpl("com.viaversion:viabackwards:4.9.2-SNAPSHOT") { isTransitive = false }
-    shadowImpl("com.viaversion:viarewind-common:3.0.6-SNAPSHOT") { isTransitive = false }
+    shadowImpl("com.viaversion:viaversion:4.10.0") { isTransitive = false }
+    shadowImpl("com.viaversion:viabackwards:4.10.0") { isTransitive = false }
+    shadowImpl("com.viaversion:viarewind-common:3.1.2") { isTransitive = false }
     shadowImpl("org.yaml:snakeyaml:2.2")
     // If you don't want to log in with your real minecraft account, remove this line
     runtimeOnly("me.djtheredstoner:DevAuth-forge-legacy:1.2.1")

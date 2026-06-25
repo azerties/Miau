@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https:
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +10,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http:
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package de.florianmichael.vialoadingbase.netty.handler;
@@ -63,7 +60,9 @@ public class VLBViaDecodeHandler extends MessageToMessageDecoder<ByteBuf> {
     if (PipelineUtil.containsCause(cause, CancelCodecException.class)) return;
 
     if ((PipelineUtil.containsCause(cause, InformativeException.class)
-            && user.getProtocolInfo().getState() != State.HANDSHAKE)
-        || Via.getManager().debugHandler().enabled()) {}
+            && user.getProtocolInfo().getServerState() != State.HANDSHAKE)
+        || Via.getManager().debugHandler().enabled()) {
+      cause.printStackTrace();
+    }
   }
 }

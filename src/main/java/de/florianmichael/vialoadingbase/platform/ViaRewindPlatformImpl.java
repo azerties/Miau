@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https:
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +10,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http:
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package de.florianmichael.vialoadingbase.platform;
@@ -25,11 +22,10 @@ import java.util.logging.Logger;
 
 public class ViaRewindPlatformImpl implements ViaRewindPlatform {
 
-  private final File dir;
+  private final File directory;
 
-  public ViaRewindPlatformImpl(File dir) {
-    this.dir = dir;
-    init(new File(dir, "viarewind.yml"));
+  public ViaRewindPlatformImpl(final File directory) {
+    this.init(new File(this.directory = directory, "viarewind.yml"));
   }
 
   @Override
@@ -39,6 +35,6 @@ public class ViaRewindPlatformImpl implements ViaRewindPlatform {
 
   @Override
   public File getDataFolder() {
-    return dir;
+    return this.directory;
   }
 }

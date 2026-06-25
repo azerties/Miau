@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaMCP - https:
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,13 +10,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http:
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package de.florianmichael.viamcp.gui;
 
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import de.florianmichael.vialoadingbase.ViaLoadingBase;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -29,10 +27,8 @@ import net.minecraft.util.MathHelper;
 
 public class AsyncVersionSlider extends GuiButton {
   private float dragValue =
-      (float)
-              (ViaLoadingBase.getProtocols().size()
-                  - ViaLoadingBase.getInstance().getTargetVersion().getIndex())
-          / ViaLoadingBase.getProtocols().size();
+      (float) ViaLoadingBase.PROTOCOLS.indexOf(ViaLoadingBase.getInstance().getTargetVersion())
+          / ViaLoadingBase.PROTOCOLS.size();
 
   private final List<ProtocolVersion> values;
   private float sliderValue;
@@ -40,7 +36,7 @@ public class AsyncVersionSlider extends GuiButton {
 
   public AsyncVersionSlider(int buttonId, int x, int y, int widthIn, int heightIn) {
     super(buttonId, x, y, Math.max(widthIn, 110), heightIn, "");
-    this.values = ViaLoadingBase.getProtocols();
+    this.values = new ArrayList<>(ViaLoadingBase.PROTOCOLS);
     Collections.reverse(values);
     this.sliderValue = dragValue;
     this.displayString = values.get((int) (this.sliderValue * (values.size() - 1))).getName();
@@ -120,10 +116,7 @@ public class AsyncVersionSlider extends GuiButton {
 
   public void setVersion(int protocol) {
     this.dragValue =
-        (float)
-                (ViaLoadingBase.getProtocols().size()
-                    - ViaLoadingBase.fromProtocolId(protocol).getIndex())
-            / ViaLoadingBase.getProtocols().size();
+        (float) this.values.indexOf(ProtocolVersion.getProtocol(protocol)) / this.values.size();
     this.sliderValue = this.dragValue;
     this.displayString = values.get((int) (this.sliderValue * (values.size() - 1))).getName();
   }

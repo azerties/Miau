@@ -7,7 +7,6 @@ import myau.event.EventManager;
 import myau.event.impl.PickEvent;
 import myau.event.impl.RaytraceEvent;
 import myau.event.impl.Render3DEvent;
-import myau.module.modules.*;
 import myau.module.modules.combat.*;
 import myau.module.modules.latency.*;
 import myau.module.modules.misc.*;

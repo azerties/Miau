@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https://github.com/FlorianMichael/ViaLoadingBase
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -20,10 +17,10 @@ package de.florianmichael.vialoadingbase.platform.viaversion;
 
 import com.viaversion.viaversion.api.platform.ViaInjector;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
-import com.viaversion.viaversion.libs.fastutil.ints.IntLinkedOpenHashSet;
-import com.viaversion.viaversion.libs.fastutil.ints.IntSortedSet;
+import com.viaversion.viaversion.libs.fastutil.objects.ObjectLinkedOpenHashSet;
 import com.viaversion.viaversion.libs.gson.JsonObject;
 import de.florianmichael.vialoadingbase.netty.VLBPipeline;
+import java.util.SortedSet;
 
 public class VLBViaInjector implements ViaInjector {
 
@@ -44,20 +41,15 @@ public class VLBViaInjector implements ViaInjector {
   }
 
   @Override
-  public IntSortedSet getServerProtocolVersions() {
-    final IntSortedSet versions = new IntLinkedOpenHashSet();
-    for (ProtocolVersion value : ProtocolVersion.getProtocols()) {
-      if (value.getVersion() >= ProtocolVersion.v1_7_1.getVersion()) {
-        versions.add(value.getVersion());
-      }
-    }
-
+  public SortedSet<ProtocolVersion> getServerProtocolVersions() {
+    final SortedSet<ProtocolVersion> versions = new ObjectLinkedOpenHashSet<>();
+    versions.addAll(ProtocolVersion.getProtocols());
     return versions;
   }
 
   @Override
-  public int getServerProtocolVersion() {
-    return this.getServerProtocolVersions().firstInt();
+  public ProtocolVersion getServerProtocolVersion() {
+    return this.getServerProtocolVersions().first();
   }
 
   @Override

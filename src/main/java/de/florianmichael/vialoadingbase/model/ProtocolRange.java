@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https:
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,25 +10,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http:
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package de.florianmichael.vialoadingbase.model;
 
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
-import de.florianmichael.vialoadingbase.ViaLoadingBase;
 
+@Deprecated
 public class ProtocolRange {
-  private final ComparableProtocolVersion lowerBound;
-  private final ComparableProtocolVersion upperBound;
+  private final ProtocolVersion lowerBound;
+  private final ProtocolVersion upperBound;
 
   public ProtocolRange(ProtocolVersion lowerBound, ProtocolVersion upperBound) {
-    this(
-        ViaLoadingBase.fromProtocolVersion(lowerBound),
-        ViaLoadingBase.fromProtocolVersion(upperBound));
-  }
-
-  public ProtocolRange(ComparableProtocolVersion lowerBound, ComparableProtocolVersion upperBound) {
     if (lowerBound == null && upperBound == null) {
       throw new RuntimeException("Invalid protocol range");
     }
@@ -51,10 +42,10 @@ public class ProtocolRange {
     return new ProtocolRange(version, null);
   }
 
-  public boolean contains(final ComparableProtocolVersion protocolVersion) {
-    if (this.lowerBound != null && protocolVersion.getIndex() < lowerBound.getIndex()) return false;
+  public boolean contains(final ProtocolVersion protocolVersion) {
+    if (this.lowerBound != null && protocolVersion.olderThan(lowerBound)) return false;
 
-    return this.upperBound == null || protocolVersion.getIndex() <= upperBound.getIndex();
+    return this.upperBound == null || protocolVersion.olderThanOrEqualTo(upperBound);
   }
 
   @Override

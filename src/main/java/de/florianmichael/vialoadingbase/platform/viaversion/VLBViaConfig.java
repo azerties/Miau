@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https://github.com/FlorianMichael/ViaLoadingBase
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -27,6 +24,7 @@ import java.util.Map;
 
 public class VLBViaConfig extends AbstractViaConfig {
 
+  // Stolen from Sponge
   private static final List<String> UNSUPPORTED =
       Arrays.asList(
           "anti-xray-patch",
@@ -56,7 +54,9 @@ public class VLBViaConfig extends AbstractViaConfig {
   }
 
   @Override
-  protected void handleConfig(Map<String, Object> config) {}
+  protected void handleConfig(Map<String, Object> config) {
+    // Nothing Currently
+  }
 
   @Override
   public List<String> getUnsupportedOptions() {

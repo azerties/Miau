@@ -1,7 +1,4 @@
 /*
- * This file is part of ViaLoadingBase - https://github.com/FlorianMichael/ViaLoadingBase
- * Copyright (C) 2020-2024 FlorianMichael/EnZaXD <florian.michael07@gmail.com> and contributors
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -19,16 +16,5 @@
 package de.florianmichael.vialoadingbase.platform.viaversion;
 
 import com.viaversion.viaversion.commands.ViaCommandHandler;
-import de.florianmichael.vialoadingbase.command.impl.LeakDetectSubCommand;
 
-public class VLBViaCommandHandler extends ViaCommandHandler {
-
-  public VLBViaCommandHandler() {
-    super();
-    this.registerVLBDefaults();
-  }
-
-  public void registerVLBDefaults() {
-    this.registerSubCommand(new LeakDetectSubCommand());
-  }
-}
+public class VLBViaCommandHandler extends ViaCommandHandler {}

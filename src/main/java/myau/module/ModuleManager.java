@@ -19,6 +19,7 @@ public class ModuleManager {
 
   static {
     CATEGORY_NAMES.put("combat", "Combat");
+    CATEGORY_NAMES.put("ghost", "Ghost");
     CATEGORY_NAMES.put("movement", "Movement");
     CATEGORY_NAMES.put("render", "Render");
     CATEGORY_NAMES.put("player", "Player");

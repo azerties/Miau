@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Map;
 
 public class MyauAPI {
+
   public static final String APIBASE = "https://api.rinbounce.wtf/";
   public static final String BRANCH = "myau";
 
@@ -43,7 +44,7 @@ public class MyauAPI {
   }
 
   public static String encode(String value) throws Exception {
-    return URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+    return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20");
   }
 
   private static String clientPath(String path) throws Exception {
@@ -51,7 +52,7 @@ public class MyauAPI {
   }
 
   private static String get(String url, String userAgent) throws Exception {
-    return request("GET", url, null, userAgent, Collections.<String, String>emptyMap());
+    return request("GET", url, null, userAgent, Collections.emptyMap());
   }
 
   private static String request(
@@ -63,11 +64,13 @@ public class MyauAPI {
       connection.setConnectTimeout(TIMEOUT_MS);
       connection.setReadTimeout(TIMEOUT_MS);
       connection.setRequestProperty("User-Agent", userAgent);
+
       if (extraHeaders != null) {
         for (Map.Entry<String, String> entry : extraHeaders.entrySet()) {
           connection.setRequestProperty(entry.getKey(), entry.getValue());
         }
       }
+
       if (body != null) {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         connection.setDoOutput(true);
@@ -77,13 +80,17 @@ public class MyauAPI {
           outputStream.write(bytes);
         }
       }
+
       int code = connection.getResponseCode();
       String response =
           read(
               code >= 200 && code < 300
                   ? connection.getInputStream()
                   : connection.getErrorStream());
-      if (code < 200 || code >= 300) throw new Exception(formatError(code, response));
+
+      if (code < 200 || code >= 300) {
+        throw new Exception(formatError(code, response));
+      }
       return response;
     } finally {
       connection.disconnect();
@@ -96,21 +103,26 @@ public class MyauAPI {
         new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
       StringBuilder builder = new StringBuilder();
       String line;
-      while ((line = reader.readLine()) != null) builder.append(line).append('\n');
+      while ((line = reader.readLine()) != null) {
+        builder.append(line).append('\n');
+      }
       return builder.toString();
     }
   }
 
   private static String formatError(int code, String body) {
+    if (body == null || body.isEmpty()) return "HTTP " + code;
+
     String text =
-        body == null
-            ? ""
-            : body.replaceAll("(?is)<style.*?</style>", " ")
-                .replaceAll("(?is)<script.*?</script>", " ")
-                .replaceAll("(?is)<[^>]+>", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    if (text.length() > 180) text = text.substring(0, 180) + "...";
+        body.replaceAll("(?is)<style.*?</style>", " ")
+            .replaceAll("(?is)<script.*?</script>", " ")
+            .replaceAll("(?is)<[^>]+>", " ")
+            .replaceAll("\\s+", " ")
+            .trim();
+
+    if (text.length() > 180) {
+      text = text.substring(0, 180) + "...";
+    }
     return text.isEmpty() ? "HTTP " + code : "HTTP " + code + ": " + text;
   }
 }
