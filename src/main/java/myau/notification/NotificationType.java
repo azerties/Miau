@@ -1,10 +1,10 @@
 package myau.notification;
 
 public enum NotificationType {
-  SUCCESS("\ue86c", 0xFF2ECC71),
-  ERROR("\ue5c9", 0xFFE74C3C),
-  WARN("\ue002", 0xFFFDD235),
-  INFO("\ue88e", 0xFF7097CF);
+  SUCCESS("\ue86c", 0xFF40FD3E),
+  ERROR("\ue5c9", 0xFFFD3F3F),
+  WARN("\ue002", 0xFFFEFE3E),
+  INFO("\ue88e", 0xFF3D40FF);
 
   private final String icon;
   private final int color;

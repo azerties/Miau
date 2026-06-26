@@ -16,7 +16,6 @@ import myau.property.properties.PercentProperty;
 import myau.util.player.RotationUtil;
 import myau.util.player.TeamUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -157,7 +156,7 @@ public class Tracers extends Module {
             RenderUtil.lerpDouble(player.posY, player.lastTickPosY, event.getPartialTicks())
                 - (player.isSneaking() ? 0.125 : 0.0);
         double z = RenderUtil.lerpDouble(player.posZ, player.lastTickPosZ, event.getPartialTicks());
-        ShapeUtil.drawLine3D(
+        RenderUtil.drawLine3D(
             position,
             x,
             y + (double) player.getEyeHeight(),
@@ -212,7 +211,7 @@ public class Tracers extends Module {
         GlStateManager.pushMatrix();
         GlStateManager.translate(55.0F * arrowDirX + 1.0F, 55.0F * arrowDirY + 1.0F, -100.0F);
         RenderUtil.enableRenderState();
-        ShapeUtil.drawTriangle(
+        RenderUtil.drawTriangle(
             0.0F,
             0.0F,
             (float) (Math.atan2(arrowDirY, arrowDirX) + Math.PI),

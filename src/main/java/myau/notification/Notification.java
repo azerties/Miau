@@ -7,6 +7,7 @@ public class Notification {
   private final int duration;
   private final long startTime;
 
+  // Animation fields
   public float x;
   public float y;
   public float targetY;

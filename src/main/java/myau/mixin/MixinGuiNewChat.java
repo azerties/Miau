@@ -2,10 +2,12 @@ package myau.mixin;
 
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.util.IChatComponent;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(
@@ -16,6 +18,23 @@ public abstract class MixinGuiNewChat {
   private String openMyauLastMessage = null;
   private int openMyauDuplicateCount = 1;
   private boolean openMyauReplacingDuplicate = false;
+
+  @Shadow @Final private net.minecraft.client.Minecraft mc;
+  @Shadow @Final private java.util.List<net.minecraft.client.gui.ChatLine> drawnChatLines;
+  @Shadow private int scrollPos;
+  @Shadow private boolean isScrolled;
+
+  @Shadow
+  public abstract int getLineCount();
+
+  @Shadow
+  public abstract boolean getChatOpen();
+
+  @Shadow
+  public abstract float getChatScale();
+
+  @Shadow
+  public abstract int getChatWidth();
 
   @Shadow
   public abstract void deleteChatLine(int id);
@@ -62,7 +81,7 @@ public abstract class MixinGuiNewChat {
 
   private myau.module.modules.render.HUD openMyauCachedHud;
 
-  @org.spongepowered.asm.mixin.injection.Redirect(
+  @Redirect(
       method = "drawChat",
       at =
           @At(
@@ -108,5 +127,45 @@ public abstract class MixinGuiNewChat {
       }
     }
     return fontRenderer.drawStringWithShadow(text, x, y, color);
+  }
+
+  /**
+   * Redirect the first GlStateManager.translate call in drawChat to apply the opening animation Y
+   * offset (Tenacity style).
+   */
+  @Redirect(
+      method = "drawChat",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/renderer/GlStateManager;translate(FFF)V",
+              ordinal = 0))
+  private void redirectChatTranslate(float x, float y, float z) {
+    float animY = 17.0F;
+    try {
+      if (myau.util.client.ChatUtil.openingAnimation != null) {
+        animY =
+            17.0F - (16.0F * myau.util.client.ChatUtil.openingAnimation.getOutput().floatValue());
+      }
+    } catch (Exception e) {
+      animY = 17.0F;
+    }
+    net.minecraft.client.renderer.GlStateManager.translate(x, animY, z);
+  }
+
+  /** Before drawChat renders, push matrix and set up blur if needed. */
+  @Inject(method = "drawChat", at = @At("HEAD"))
+  private void onDrawChatPre(int updateCounter, CallbackInfo ci) {
+    try {
+      if (mc.theWorld == null || mc.thePlayer == null) return;
+
+      if (openMyauCachedHud == null) {
+        openMyauCachedHud =
+            (myau.module.modules.render.HUD)
+                myau.Myau.moduleManager.getModule(myau.module.modules.render.HUD.class);
+      }
+    } catch (Exception e) {
+      // silently ignore - don't break the render pipeline
+    }
   }
 }

@@ -9,9 +9,11 @@ import myau.event.impl.*;
 import myau.mixin.IAccessorEntity;
 import myau.module.Module;
 import myau.module.modules.combat.velocity.*;
-import myau.property.Property;
 import myau.property.properties.BooleanProperty;
+import myau.property.properties.FloatProperty;
+import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
+import myau.property.properties.PercentProperty;
 import net.minecraft.client.Minecraft;
 
 public class Velocity extends Module {
@@ -32,27 +34,101 @@ public class Velocity extends Module {
   public int intaveTick = 0;
   public int intaveDamageTick = 0;
 
-  public final BooleanProperty onSwing = new BooleanProperty("on-swing", false);
-
-  public final List<VelocityMode> modes = new ArrayList<>();
-
   public final ModeProperty mode =
       new ModeProperty(
           "Mode",
           0,
           new String[] {
-            register(new VanillaVelocity("Vanilla", this)),
-            register(new LegitVelocity("Legit", this)),
-            register(new IntaveReduceVelocity("IntaveReduce", this)),
-            register(new JumpResetVelocity("JumpReset", this)),
-            register(new WatchdogPredictionVelocity("WatchdogPrediction", this)),
-            register(new GrimReduceVelocity("GrimReduce", this))
+            "OMDelay",
+            "Reverse",
+            "LegitTest",
+            "LegitSmart",
+            "IntaveReduce",
+            "Grimtest",
+            "JumpReset",
+            "Standard",
+            "AAC",
+            "Bounce",
+            "BufferAbuse",
+            "Delay",
+            "Grim",
+            "GrimReduce",
+            "Ground",
+            "Intave",
+            "Karhu",
+            "Legit",
+            "MMC",
+            "Matrix",
+            "Redesky",
+            "Tick",
+            "UniversoCraft",
+            "Vulcan",
+            "WatchdogPrediction",
+            "Watchdog"
           });
 
-  private String register(VelocityMode m) {
-    this.modes.add(m);
-    return m.getName();
-  }
+  public final IntProperty delayTicks =
+      new IntProperty("delay-ticks", 3, 1, 20, () -> mode.getModeString().equals("OMDelay"));
+  public final PercentProperty delayChance =
+      new PercentProperty("delay-chance", 100, () -> mode.getModeString().equals("OMDelay"));
+  public final IntProperty legitSmartJumpLimit =
+      new IntProperty(
+          "legit-smart-jump-limit", 2, 1, 5, () -> mode.getModeString().equals("LegitSmart"));
+  public final FloatProperty intaveReduceFactor =
+      new FloatProperty(
+          "intave-reduce-factor",
+          0.6F,
+          0.6F,
+          1.0F,
+          () -> mode.getModeString().equals("IntaveReduce"));
+  public final IntProperty intaveReduceHurtTime =
+      new IntProperty(
+          "intave-reduce-hurt-time", 9, 1, 10, () -> mode.getModeString().equals("IntaveReduce"));
+  public final PercentProperty chance =
+      new PercentProperty(
+          "chance",
+          100,
+          () ->
+              mode.getModeString().equals("Legit")
+                  || mode.getModeString().equals("LegitTest")
+                  || mode.getModeString().equals("LegitSmart"));
+  public final PercentProperty horizontal =
+      new PercentProperty(
+          "horizontal",
+          0,
+          () -> {
+            String m = mode.getModeString();
+            return m.equals("Standard")
+                || m.equals("BufferAbuse")
+                || m.equals("Redesky")
+                || m.equals("Vulcan");
+          });
+  public final PercentProperty vertical =
+      new PercentProperty(
+          "vertical",
+          100,
+          () -> {
+            String m = mode.getModeString();
+            return m.equals("Standard")
+                || m.equals("BufferAbuse")
+                || m.equals("Redesky")
+                || m.equals("Vulcan");
+          });
+  public final PercentProperty explosionHorizontal =
+      new PercentProperty(
+          "explosions-horizontal", 100, () -> mode.getModeString().equals("Standard"));
+  public final PercentProperty explosionVertical =
+      new PercentProperty(
+          "explosions-vertical", 100, () -> mode.getModeString().equals("Standard"));
+  public final IntProperty grimReduceJumpLimit =
+      new IntProperty(
+          "grim-reduce-jump-limit", 2, 1, 5, () -> mode.getModeString().equals("Grimtest"));
+  public final BooleanProperty fakeCheck = new BooleanProperty("fake-check", true);
+  public final BooleanProperty debugLog = new BooleanProperty("debug-log", false);
+
+  public final BooleanProperty onSwing = new BooleanProperty("on-swing", false);
+
+  public final List<VelocityMode> modes = new ArrayList<>();
 
   public boolean isInLiquidOrWeb() {
     return mc.thePlayer.isInWater()
@@ -67,28 +143,36 @@ public class Velocity extends Module {
 
   public Velocity() {
     super("Velocity", false);
-  }
 
-  @Override
-  public List<Property<?>> getAdditionalProperties() {
-    List<Property<?>> props = new ArrayList<>();
-    for (VelocityMode m : modes) {
-      for (java.lang.reflect.Field field : m.getClass().getDeclaredFields()) {
-        field.setAccessible(true);
-        try {
-          Object obj = field.get(m);
-          if (obj instanceof Property<?>) {
-            Property<?> prop = (Property<?>) obj;
-            java.util.function.BooleanSupplier original = prop.getVisibleChecker();
-            prop.setVisibleChecker(
-                () -> this.getActiveMode() == m && (original == null || original.getAsBoolean()));
-            props.add(prop);
-          }
-        } catch (Exception e) {
-        }
-      }
-    }
-    return props;
+    // OM Legacy Modes
+    modes.add(new OMDelayVelocity("OMDelay", this));
+    modes.add(new ReverseVelocity("Reverse", this));
+    modes.add(new LegitTestVelocity("LegitTest", this));
+    modes.add(new LegitSmartVelocity("LegitSmart", this));
+    modes.add(new IntaveReduceVelocity("IntaveReduce", this));
+    modes.add(new GrimTestVelocity("Grimtest", this));
+    modes.add(new JumpResetVelocity("JumpReset", this));
+
+    // Rise Modes
+    modes.add(new StandardVelocity("Standard", this));
+    modes.add(new AACVelocity("AAC", this));
+    modes.add(new BounceVelocity("Bounce", this));
+    modes.add(new BufferAbuseVelocity("BufferAbuse", this));
+    modes.add(new DelayVelocity("Delay", this));
+    modes.add(new GrimVelocity("Grim", this));
+    modes.add(new GrimReduceVelocity("GrimReduce", this));
+    modes.add(new GroundVelocity("Ground", this));
+    modes.add(new IntaveVelocity("Intave", this));
+    modes.add(new KarhuVelocity("Karhu", this));
+    modes.add(new LegitVelocity("Legit", this));
+    modes.add(new MMCVelocity("MMC", this));
+    modes.add(new MatrixVelocity("Matrix", this));
+    modes.add(new RedeskyVelocity("Redesky", this));
+    modes.add(new TickVelocity("Tick", this));
+    modes.add(new UniversoCraftVelocity("UniversoCraft", this));
+    modes.add(new VulcanVelocity("Vulcan", this));
+    modes.add(new WatchdogPredictionVelocity("WatchdogPrediction", this));
+    modes.add(new WatchdogVelocity("Watchdog", this));
   }
 
   public VelocityMode getActiveMode() {

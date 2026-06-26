@@ -1,20 +1,31 @@
 package myau.util.shader;
 
-/**
- * Compatibility facade for modules that optionally draw blur/bloom regions.
- *
- * <p>The shader pipeline in this tree is implemented under {@code impl.rise}; older modules still
- * call this utility name. These methods intentionally no-op instead of failing compilation when the
- * optional post-processing bridge is unavailable.
- */
-public final class BlurUtils {
-  private BlurUtils() {}
+import myau.util.render.RenderUtil;
+import net.minecraft.client.shader.Framebuffer;
 
-  public static void prepareBlur() {}
+public class BlurUtils {
+  private static Framebuffer stencilFrameBufferBlur = new Framebuffer(1, 1, false);
+  private static Framebuffer stencilFrameBufferBloom = new Framebuffer(1, 1, false);
 
-  public static void blurEnd(int passes, float radius) {}
+  public static void prepareBlur() {
+    stencilFrameBufferBlur = RenderUtil.createFrameBuffer(stencilFrameBufferBlur);
+    stencilFrameBufferBlur.framebufferClear();
+    stencilFrameBufferBlur.bindFramebuffer(false);
+  }
 
-  public static void prepareBloom() {}
+  public static void prepareBloom() {
+    stencilFrameBufferBloom = RenderUtil.createFrameBuffer(stencilFrameBufferBloom);
+    stencilFrameBufferBloom.framebufferClear();
+    stencilFrameBufferBloom.bindFramebuffer(false);
+  }
 
-  public static void bloomEnd(int passes, float radius) {}
+  public static void blurEnd(int passes, float radius) {
+    stencilFrameBufferBlur.unbindFramebuffer();
+    KawaseBlur.renderBlur(stencilFrameBufferBlur.framebufferTexture, passes, radius);
+  }
+
+  public static void bloomEnd(int passes, float radius) {
+    stencilFrameBufferBloom.unbindFramebuffer();
+    KawaseBloom.renderBlur(stencilFrameBufferBloom.framebufferTexture, passes, radius);
+  }
 }

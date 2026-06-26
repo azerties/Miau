@@ -1,14 +1,5 @@
 package myau.util.shader;
 
-import myau.util.animation.*;
-import myau.util.client.*;
-import myau.util.math.*;
-import myau.util.misc.*;
-import myau.util.network.*;
-import myau.util.player.*;
-import myau.util.render.*;
-import myau.util.time.*;
-import myau.util.world.*;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL20;
 
@@ -27,7 +18,7 @@ public class OutlineShader extends OutlineESPShader {
           + "      vec4 n = texture2D(tex, gl_TexCoord[0].xy + vec2(dx, dy) * texelSize);\n"
           + "      if (n.a > 0.0) gl_FragColor = n;\n"
           + "    }\n"
-          + "}";
+          + "}\n";
 
   public OutlineShader() {
     super(FRAG);

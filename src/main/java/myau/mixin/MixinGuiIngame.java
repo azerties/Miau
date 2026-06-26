@@ -25,7 +25,7 @@ public abstract class MixinGuiIngame {
                   "Lnet/minecraft/entity/player/InventoryPlayer;getCurrentItem()Lnet/minecraft/item/ItemStack;"))
   private ItemStack updateTick(InventoryPlayer inventoryPlayer) {
     AutoBlockIn autoBlockIn = (AutoBlockIn) Myau.moduleManager.modules.get(AutoBlockIn.class);
-    if (autoBlockIn.itemSpoof.getValue() && autoBlockIn.isEnabled()) {
+    if (autoBlockIn != null && autoBlockIn.itemSpoof.getValue() && autoBlockIn.isEnabled()) {
       int slot = autoBlockIn.getSlot();
       if (slot >= 0) {
         return inventoryPlayer.getStackInSlot(slot);

@@ -36,7 +36,7 @@ public class IOUtility {
           break;
         }
         if (buffer.remaining() == 0) {
-
+          // Buffer is full, need to resize
           ByteBuffer newBuffer = ByteBuffer.allocateDirect(buffer.capacity() * 2);
           ((java.nio.Buffer) buffer).flip();
           newBuffer.put(buffer);

@@ -7,22 +7,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import myau.Myau;
+import myau.clientanticheat.AntiCheatAlertStyle;
 import myau.clientanticheat.CheckDataManager;
-import myau.clientanticheat.ClickSpeedCheck;
 import myau.clientanticheat.ClientAntiCheatContext;
 import myau.clientanticheat.PlayerCheckData;
 import myau.clientanticheat.combat.autoblock.AutoBlockCheck;
+import myau.clientanticheat.combat.autoclicker.ClickSpeedCheck;
 import myau.clientanticheat.combat.killaura.KillAuraAngleSnap;
 import myau.clientanticheat.combat.killaura.KillAuraHeuristicsCheck;
 import myau.clientanticheat.combat.killaura.KillAuraLatencyCheck;
 import myau.clientanticheat.combat.killaura.KillAuraRotationSpeed;
 import myau.clientanticheat.combat.reach.HitboxRaytraceCheck;
 import myau.clientanticheat.movement.blink.BlinkCheck;
-import myau.clientanticheat.movement.blink.FakeLagCheck;
-import myau.clientanticheat.movement.blink.MicroBlinkCheck;
 import myau.clientanticheat.movement.noslow.NoSlowCheck;
-import myau.clientanticheat.movement.sprint.ActionSprintCheck;
-import myau.clientanticheat.movement.sprint.OmniSprintCheck;
 import myau.clientanticheat.movement.velocity.VelocityCheck;
 import myau.clientanticheat.player.scaffold.ScaffoldPlacementCheck;
 import myau.clientanticheat.player.scaffold.ScaffoldRotationCheck;
@@ -32,10 +29,8 @@ import myau.event.impl.TickEvent;
 import myau.event.types.EventType;
 import myau.module.Module;
 import myau.property.properties.BooleanProperty;
-import myau.util.client.ChatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 public class HackerDetector extends Module implements ClientAntiCheatContext {
@@ -50,33 +45,24 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
   public final BooleanProperty blink = new BooleanProperty("blink", true);
   public final BooleanProperty reach = new BooleanProperty("reach", true);
   public final BooleanProperty velocity = new BooleanProperty("velocity", true);
-  public final BooleanProperty sprint = new BooleanProperty("sprint", true);
   public final BooleanProperty autoClicker = new BooleanProperty("autoclicker", true);
   public final BooleanProperty addTarget = new BooleanProperty("add-target", true);
   public final BooleanProperty sound = new BooleanProperty("sound", true);
 
-  private final ScaffoldPlacementCheck scaffoldPlacementCheck = new ScaffoldPlacementCheck();
+  // ── Sub-checks: imported directly from sub-packages ──
   private final ScaffoldSneakCheck scaffoldSneakCheck = new ScaffoldSneakCheck();
   private final ScaffoldRotationCheck scaffoldRotationCheck = new ScaffoldRotationCheck();
-
-  private final KillAuraAngleSnap killAuraAngleSnap = new KillAuraAngleSnap();
-  private final KillAuraRotationSpeed killAuraRotationSpeed = new KillAuraRotationSpeed();
-  private final KillAuraHeuristicsCheck killAuraHeuristicsCheck = new KillAuraHeuristicsCheck();
-  private final KillAuraLatencyCheck killAuraLatencyCheck = new KillAuraLatencyCheck();
-
-  private final HitboxRaytraceCheck hitboxRaytraceCheck = new HitboxRaytraceCheck();
+  private final ScaffoldPlacementCheck scaffoldPlacementCheck = new ScaffoldPlacementCheck();
+  private final KillAuraHeuristicsCheck kaHeuristicsCheck = new KillAuraHeuristicsCheck();
+  private final KillAuraAngleSnap kaAngleSnap = new KillAuraAngleSnap();
+  private final KillAuraLatencyCheck kaLatencyCheck = new KillAuraLatencyCheck();
+  private final KillAuraRotationSpeed kaRotationSpeed = new KillAuraRotationSpeed();
   private final AutoBlockCheck autoBlockCheck = new AutoBlockCheck();
-
   private final NoSlowCheck noSlowCheck = new NoSlowCheck();
-  private final VelocityCheck velocityCheck = new VelocityCheck();
   private final BlinkCheck blinkCheck = new BlinkCheck();
-  private final MicroBlinkCheck microBlinkCheck = new MicroBlinkCheck();
-  private final FakeLagCheck fakeLagCheck = new FakeLagCheck();
-  private final OmniSprintCheck omniSprintCheck = new OmniSprintCheck();
-  private final ActionSprintCheck actionSprintCheck = new ActionSprintCheck();
-
+  private final HitboxRaytraceCheck reachCheck = new HitboxRaytraceCheck();
+  private final VelocityCheck velocityCheck = new VelocityCheck();
   private final ClickSpeedCheck clickSpeedCheck = new ClickSpeedCheck();
-
   private final CheckDataManager checkDataManager = new CheckDataManager();
   private final Map<String, int[]> flagMap = new HashMap<>();
   private final Map<String, Integer> alertCooldowns = new HashMap<>();
@@ -104,15 +90,15 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
       }
       PlayerCheckData data = this.checkDataManager.get(player);
       if (this.scaffold.getValue()) {
-        this.scaffoldPlacementCheck.check(player, world, data, this);
         this.scaffoldSneakCheck.check(player, world, data, this);
         this.scaffoldRotationCheck.check(player, world, data, this);
+        this.scaffoldPlacementCheck.check(player, world, data, this);
       }
       if (this.killAura.getValue()) {
-        this.killAuraAngleSnap.check(player, data, this);
-        this.killAuraRotationSpeed.check(player, world, data, currentTick, this);
-        this.killAuraHeuristicsCheck.check(player, data, this);
-        this.killAuraLatencyCheck.check(player, data, this);
+        this.kaHeuristicsCheck.check(player, data, this);
+        this.kaAngleSnap.check(player, data, this);
+        this.kaLatencyCheck.check(player, data, this);
+        this.kaRotationSpeed.check(player, world, data, currentTick, this);
       }
       if (this.autoBlock.getValue()) {
         this.autoBlockCheck.check(player, data, currentTick, this);
@@ -122,18 +108,12 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
       }
       if (this.blink.getValue()) {
         this.blinkCheck.check(player, data, this);
-        this.microBlinkCheck.check(player, data, this);
-        this.fakeLagCheck.check(player, data, this);
       }
       if (this.reach.getValue()) {
-        this.hitboxRaytraceCheck.check(player, world, data, this);
+        this.reachCheck.check(player, world, data, this);
       }
       if (this.velocity.getValue()) {
         this.velocityCheck.check(player, data, this);
-      }
-      if (this.sprint.getValue()) {
-        this.omniSprintCheck.check(player, data, this);
-        this.actionSprintCheck.check(player, data, this);
       }
       if (this.autoClicker.getValue()) {
         this.clickSpeedCheck.check(player, data, currentTick, this);
@@ -144,6 +124,11 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
 
   @Override
   public void receiveSignal(String playerName, String cheatName) {
+    receiveSignal(playerName, cheatName, "behavior anomaly", 0);
+  }
+
+  @Override
+  public void receiveSignal(String playerName, String cheatName, String detail, int vl) {
     if (playerName == null || playerName.isEmpty() || cheatName == null) return;
     if (mc.thePlayer == null || mc.theWorld == null) return;
     if (playerName.equalsIgnoreCase(mc.thePlayer.getName())) return;
@@ -162,13 +147,7 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
     int maxFlagCount = this.maxFlagsFor(cheatName);
     int lastAlert = this.alertCooldowns.getOrDefault(flagKey, -ALERT_COOLDOWN_SECONDS);
     if (flagData[0] >= maxFlagCount && currentTime - lastAlert >= ALERT_COOLDOWN_SECONDS) {
-      ChatUtil.display(
-          "%s%s%s failed %s%s",
-          EnumChatFormatting.RED,
-          playerName,
-          EnumChatFormatting.GRAY,
-          EnumChatFormatting.RED,
-          cheatName);
+      AntiCheatAlertStyle.displayFlag(playerName, cheatName, detail, vl, flagData[0], maxFlagCount);
       if (this.sound.getValue()) {
         mc.thePlayer.playSound("random.orb", 0.3F, 1.0F);
       }
@@ -228,25 +207,18 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
 
   @Override
   public void onDisabled() {
-    this.scaffoldPlacementCheck.reset();
     this.scaffoldSneakCheck.reset();
     this.scaffoldRotationCheck.reset();
-    this.killAuraHeuristicsCheck.reset();
-    this.killAuraLatencyCheck.reset();
-    this.blinkCheck.reset();
-    this.microBlinkCheck.reset();
-    this.fakeLagCheck.reset();
-    this.clickSpeedCheck.reset();
-    this.killAuraAngleSnap.reset();
-    this.killAuraRotationSpeed.reset();
-    this.killAuraHeuristicsCheck.reset();
-    this.hitboxRaytraceCheck.reset();
+    this.scaffoldPlacementCheck.reset();
+    this.kaHeuristicsCheck.reset();
+    this.kaAngleSnap.reset();
+    this.kaLatencyCheck.reset();
+    this.kaRotationSpeed.reset();
     this.autoBlockCheck.reset();
     this.noSlowCheck.reset();
-    this.velocityCheck.reset();
     this.blinkCheck.reset();
-    this.omniSprintCheck.reset();
-    this.actionSprintCheck.reset();
+    this.reachCheck.reset();
+    this.velocityCheck.reset();
     this.clickSpeedCheck.reset();
     this.checkDataManager.reset();
     this.flagMap.clear();

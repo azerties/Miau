@@ -1,131 +1,168 @@
 package myau.module.modules.ghost;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import myau.Myau;
 import myau.event.EventTarget;
-import myau.event.impl.UpdateEvent;
+import myau.event.impl.KeyEvent;
+import myau.event.impl.TickEvent;
 import myau.event.types.EventType;
 import myau.module.Module;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
-import myau.property.properties.IntProperty;
+import myau.util.player.ItemUtil;
+import myau.util.player.PlayerUtil;
 import myau.util.player.RotationUtil;
 import myau.util.player.TeamUtil;
+import myau.util.time.TimerUtil;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockLiquid;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.item.ItemSword;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
+import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
-import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.MovingObjectPosition.MovingObjectType;
 
 public class AimAssist extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-
-  public final FloatProperty speed = new FloatProperty("speed", 2.0F, 1.0F, 10.0F);
-  public final BooleanProperty requireSwinging = new BooleanProperty("require-swinging", true);
-  public final BooleanProperty sticky = new BooleanProperty("sticky", false);
-  public final BooleanProperty mouseMovement = new BooleanProperty("require-mouse-movement", false);
-  public final BooleanProperty limitItems = new BooleanProperty("limit-items", false);
-  public final BooleanProperty aimWhilstOnTarget =
-      new BooleanProperty("aim-whilst-on-target", false);
-  public final IntProperty fov = new IntProperty("fov", 90, 0, 180);
-  public final BooleanProperty player = new BooleanProperty("player", true);
-  public final BooleanProperty invisibles = new BooleanProperty("invisibles", false);
-  public final BooleanProperty teams = new BooleanProperty("player-teammates", true);
-
-  private EntityLivingBase target;
-  private float moveYaw;
+  private final TimerUtil clickTimer = new TimerUtil();
+  public final FloatProperty range = new FloatProperty("range", 5.0F, 1.0F, 10.0F);
+  public final FloatProperty speed = new FloatProperty("speed", 1.0F, 1.0F, 60.0F);
+  public final FloatProperty compliSpeed = new FloatProperty("compli-speed", 1.0F, 1.0F, 50.0F);
+  public final FloatProperty fov = new FloatProperty("fov", 180.0F, 1.0F, 180.0F);
+  public final BooleanProperty faceCheck = new BooleanProperty("face-check", false);
+  public final BooleanProperty mouseDown = new BooleanProperty("mouse-down", true);
+  public final BooleanProperty allowBreakBlock = new BooleanProperty("allow-break-block", false);
+  public final BooleanProperty weaponOnly = new BooleanProperty("weapons-only", true);
+  public final BooleanProperty allowTools =
+      new BooleanProperty("allow-tools", false, this.weaponOnly::getValue);
+  public final BooleanProperty botChecks = new BooleanProperty("bot-check", true);
+  public final BooleanProperty team = new BooleanProperty("teams", true);
 
   public AimAssist() {
     super("AimAssist", false);
+    this.clickTimer.reset();
+  }
+
+  private boolean isValidTarget(EntityPlayer player) {
+    if (player == null
+        || mc.thePlayer == null
+        || player == mc.thePlayer
+        || player == mc.thePlayer.ridingEntity) {
+      return false;
+    }
+    if (player == mc.getRenderViewEntity() || player == mc.getRenderViewEntity().ridingEntity) {
+      return false;
+    }
+    if (player.deathTime > 0 || player.isDead || !player.isEntityAlive()) {
+      return false;
+    }
+    if (RotationUtil.distanceToEntity(player) > this.range.getValue()) {
+      return false;
+    }
+    if (RotationUtil.angleToEntity(player) > this.fov.getValue()) {
+      return false;
+    }
+    if (!mc.thePlayer.canEntityBeSeen(player)) {
+      return false;
+    }
+    if (TeamUtil.isFriend(player)) {
+      return false;
+    }
+    return (!this.team.getValue() || !TeamUtil.isSameTeam(player))
+        && (!this.botChecks.getValue() || !TeamUtil.isBot(player));
+  }
+
+  private boolean shouldSkipForBlockBreak() {
+    if (!this.allowBreakBlock.getValue()
+        || mc.objectMouseOver == null
+        || mc.objectMouseOver.typeOfHit != MovingObjectType.BLOCK) {
+      return false;
+    }
+    BlockPos blockPos = mc.objectMouseOver.getBlockPos();
+    if (blockPos == null || mc.theWorld == null) {
+      return false;
+    }
+    Block block = mc.theWorld.getBlockState(blockPos).getBlock();
+    return block != Blocks.air && !(block instanceof BlockLiquid);
+  }
+
+  private boolean shouldRunWeaponCheck() {
+    return !this.weaponOnly.getValue()
+        || ItemUtil.hasRawUnbreakingEnchant()
+        || this.allowTools.getValue() && ItemUtil.isHoldingTool();
+  }
+
+  private boolean isFaced(Entity entity) {
+    return RotationUtil.rayTrace(entity) == null && RotationUtil.angleToEntity(entity) <= 1.0F;
+  }
+
+  private float fovToTarget(Entity entity) {
+    double x = entity.posX - mc.thePlayer.posX;
+    double z = entity.posZ - mc.thePlayer.posZ;
+    double yaw = Math.atan2(x, z) * 57.2957795D;
+    return (float) (yaw * -1.0D);
+  }
+
+  private double fovFromTarget(Entity entity) {
+    return ((mc.thePlayer.rotationYaw - fovToTarget(entity)) % 360.0D + 540.0D) % 360.0D - 180.0D;
   }
 
   @EventTarget
-  public void onUpdate(UpdateEvent event) {
-    if (event.getType() == EventType.PRE) {
-      double range = 4.0;
-      moveYaw = 0.0f;
+  public void onTick(TickEvent event) {
+    if (!this.isEnabled()
+        || event.getType() != EventType.POST
+        || mc.currentScreen != null
+        || mc.theWorld == null
+        || mc.thePlayer == null) {
+      return;
+    }
+    if (!shouldRunWeaponCheck() || shouldSkipForBlockBreak()) {
+      return;
+    }
+    if (PlayerUtil.isAttacking()) {
+      this.clickTimer.reset();
+    }
+    if (this.mouseDown.getValue() && this.clickTimer.hasTimeElapsed(100L)) {
+      return;
+    }
 
-      List<EntityLivingBase> targets =
-          mc.theWorld.loadedEntityList.stream()
-              .filter(entity -> entity instanceof EntityLivingBase)
-              .map(entity -> (EntityLivingBase) entity)
-              .filter(entity -> entity != mc.thePlayer && entity.isEntityAlive())
-              .filter(entity -> mc.thePlayer.getDistanceToEntity(entity) <= range)
-              .filter(
-                  entity -> {
-                    if (entity instanceof net.minecraft.entity.player.EntityPlayer) {
-                      if (!player.getValue()) return false;
-                      if (!teams.getValue()
-                          && TeamUtil.isSameTeam((net.minecraft.entity.player.EntityPlayer) entity))
-                        return false;
-                      return true;
-                    }
-                    return false;
-                  })
-              .filter(entity -> !entity.isInvisible() || invisibles.getValue())
-              .sorted(
-                  (e1, e2) ->
-                      Float.compare(
-                          mc.thePlayer.getDistanceToEntity(e1),
-                          mc.thePlayer.getDistanceToEntity(e2)))
-              .collect(Collectors.toList());
+    List<EntityPlayer> targets =
+        mc.theWorld.loadedEntityList.stream()
+            .filter(entity -> entity instanceof EntityPlayer)
+            .map(entity -> (EntityPlayer) entity)
+            .filter(this::isValidTarget)
+            .sorted(Comparator.comparingDouble(RotationUtil::angleToEntity))
+            .collect(Collectors.toList());
+    if (targets.isEmpty()) {
+      return;
+    }
 
-      if (targets.isEmpty()) {
-        return;
-      }
+    EntityPlayer target = targets.get(0);
+    if (this.faceCheck.getValue() && isFaced(target)) {
+      return;
+    }
 
-      target = targets.get(0);
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    double normalSpeed = Math.max(1.0D, this.speed.getValue());
+    double compli = Math.max(1.0D, this.compliSpeed.getValue());
+    double fovFromTarget = fovFromTarget(target);
+    double compliFactor = random.nextDouble(compli - 1.47328D, compli + 2.48293D) / 100.0D;
+    double normalDivisor = 101.0D - random.nextDouble(normalSpeed - 4.723847D, normalSpeed);
+    mc.thePlayer.rotationYaw +=
+        (float) (-(fovFromTarget * compliFactor + fovFromTarget / normalDivisor));
+    mc.thePlayer.rotationYaw = MathHelper.wrapAngleTo180_float(mc.thePlayer.rotationYaw);
+  }
 
-      if (target == null
-          || myau.util.player.RayCastUtil.rayCast(
-                      mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch, range)
-                  .typeOfHit
-              != MovingObjectPosition.MovingObjectType.ENTITY) {
-        return;
-      }
-
-      float[] rotationsToTarget =
-          RotationUtil.getRotationsToBox(
-              target.getEntityBoundingBox(),
-              mc.thePlayer.rotationYaw,
-              mc.thePlayer.rotationPitch,
-              180,
-              1);
-      if (Math.abs(MathHelper.wrapAngleTo180_float(rotationsToTarget[0] - mc.thePlayer.rotationYaw))
-          > fov.getValue()) {
-        return;
-      }
-
-      if (limitItems.getValue()
-          && (mc.thePlayer.getHeldItem() == null
-              || !(mc.thePlayer.getHeldItem().getItem() instanceof ItemSword))) {
-        return;
-      }
-
-      float diffYaw =
-          MathHelper.wrapAngleTo180_float(rotationsToTarget[0] - mc.thePlayer.rotationYaw);
-      moveYaw =
-          Math.max(-speed.getValue(), Math.min(speed.getValue(), diffYaw))
-              * (sticky.getValue() ? 10 : 1)
-              / Math.max(1, Minecraft.getDebugFPS())
-              * 100;
-    } else if (event.getType() == EventType.POST) {
-      if (moveYaw == 0.0f) return;
-
-      if (((mc.mouseHelper.deltaX != 0 || mc.mouseHelper.deltaY != 0) || !mouseMovement.getValue())
-          && myau.util.player.RayCastUtil.rayCast(
-                      mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch, 3.0f)
-                  .typeOfHit
-              != MovingObjectPosition.MovingObjectType.ENTITY
-          && mc.objectMouseOver.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
-          && (!requireSwinging.getValue() || mc.thePlayer.isSwingInProgress)) {
-
-        final float f = mc.gameSettings.mouseSensitivity * 0.6F + 0.2F;
-        final float gcd = f * f * f * 8.0F;
-
-        float f2 = (mc.mouseHelper.deltaX + (moveYaw - mc.mouseHelper.deltaX)) * gcd;
-        mc.thePlayer.setAngles(f2, 0);
-      }
+  @EventTarget
+  public void onPress(KeyEvent event) {
+    if (event.getKey() == mc.gameSettings.keyBindAttack.getKeyCode()
+        && !Myau.moduleManager.modules.get(AutoClicker.class).isEnabled()) {
+      this.clickTimer.reset();
     }
   }
 }

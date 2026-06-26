@@ -3,16 +3,7 @@ package myau.util.shader;
 import static org.lwjgl.opengl.GL11.*;
 
 import java.awt.*;
-import myau.util.animation.*;
-import myau.util.client.*;
-import myau.util.math.*;
-import myau.util.misc.*;
-import myau.util.network.*;
-import myau.util.player.*;
-import myau.util.render.*;
 import myau.util.render.RenderUtil;
-import myau.util.time.*;
-import myau.util.world.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -60,11 +51,10 @@ public class RoundedUtils {
 
   public static void drawRound(
       float x, float y, float width, float height, float radius, boolean blur, int color) {
-    RenderUtil.resetColor();
+    RenderUtil.setAlphaLimit(0);
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    RenderUtil.setAlphaLimit(0);
 
     roundedShader.init();
     setupRoundedRectUniforms(x, y, width, height, radius, roundedShader);
@@ -88,7 +78,6 @@ public class RoundedUtils {
       Color bottomRight,
       Color topRight) {
     RenderUtil.setAlphaLimit(0);
-    RenderUtil.resetColor();
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     roundedGradientShader.init();
@@ -133,7 +122,6 @@ public class RoundedUtils {
       int bottomRight,
       int topRight) {
     RenderUtil.setAlphaLimit(0);
-    RenderUtil.resetColor();
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -164,13 +152,12 @@ public class RoundedUtils {
 
   public static void drawRound(
       float x, float y, float width, float height, float radius, boolean blur, Color color) {
-    RenderUtil.resetColor();
+    RenderUtil.setAlphaLimit(0);
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    RenderUtil.setAlphaLimit(0);
-    roundedShader.init();
 
+    roundedShader.init();
     setupRoundedRectUniforms(x, y, width, height, radius, roundedShader);
     roundedShader.setUniformi("blur", blur ? 1 : 0);
     roundedShader.setUniformf(
@@ -194,13 +181,12 @@ public class RoundedUtils {
       float outlineThickness,
       Color color,
       Color outlineColor) {
-    RenderUtil.resetColor();
+    RenderUtil.setAlphaLimit(0);
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    RenderUtil.setAlphaLimit(0);
-    roundedOutlineShader.init();
 
+    roundedOutlineShader.init();
     ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
     setupRoundedRectUniforms(x, y, width, height, radius, roundedOutlineShader);
     roundedOutlineShader.setUniformf("outlineThickness", outlineThickness * sr.getScaleFactor());
@@ -228,7 +214,6 @@ public class RoundedUtils {
 
   public static void drawRoundTextured(
       float x, float y, float width, float height, float radius, float alpha) {
-    RenderUtil.resetColor();
     RenderUtil.setAlphaLimit(0);
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -242,21 +227,15 @@ public class RoundedUtils {
   }
 
   private static void setupRoundedRectUniforms(
-      float x,
-      float y,
-      float width,
-      float height,
-      float radius,
-      ShaderUtils roundedTexturedShader) {
+      float x, float y, float width, float height, float radius, ShaderUtils shader) {
     ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
-    roundedTexturedShader.setUniformf(
+    shader.setUniformf(
         "location",
         x * sr.getScaleFactor(),
         (Minecraft.getMinecraft().displayHeight - (height * sr.getScaleFactor()))
             - (y * sr.getScaleFactor()));
-    roundedTexturedShader.setUniformf(
-        "rectSize", width * sr.getScaleFactor(), height * sr.getScaleFactor());
-    roundedTexturedShader.setUniformf("radius", radius * sr.getScaleFactor());
+    shader.setUniformf("rectSize", width * sr.getScaleFactor(), height * sr.getScaleFactor());
+    shader.setUniformf("radius", radius * sr.getScaleFactor());
   }
 
   public static void drawRoundedRectRise(

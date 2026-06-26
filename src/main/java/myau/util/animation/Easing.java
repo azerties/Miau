@@ -12,7 +12,7 @@ import myau.util.world.*;
 
 /**
  * Easing functions for smooth animations. Each function takes a progress value (0.0 to 1.0) and
- * returns an eased value. More easing functions can be found at: https:
+ * returns an eased value. More easing functions can be found at: https://easings.net/
  */
 public enum Easing {
   LINEAR(x -> x),

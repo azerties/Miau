@@ -113,7 +113,7 @@ public abstract class MixinFontRenderer {
       for (int i = 0; i < targetName.length(); i++) {
         String charStr = String.valueOf(targetName.charAt(i));
 
-        int charColor = hud.getColor(time, i * 15L).getRGB();
+        int charColor = hud != null ? hud.getColor(time, i * 15L).getRGB() : -1;
 
         currentX = this.drawString(charStr, currentX, y, charColor, dropShadow);
       }

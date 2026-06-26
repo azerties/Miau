@@ -8,9 +8,9 @@ import myau.event.impl.PickEvent;
 import myau.event.impl.RaytraceEvent;
 import myau.event.impl.Render3DEvent;
 import myau.module.modules.combat.*;
-import myau.module.modules.latency.*;
 import myau.module.modules.misc.*;
 import myau.module.modules.movement.*;
+import myau.module.modules.network.*;
 import myau.module.modules.player.*;
 import myau.module.modules.render.*;
 import myau.motionblur.MotionBlurShaderHook;
@@ -62,7 +62,7 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
   private void updateCameraAndRender(float float1, long long2, CallbackInfo callbackInfo) {
     if (this.mc.thePlayer != null) {
       KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
-      if (killAura.isEnabled() && killAura.isBlocking()) {
+      if (killAura != null && killAura.isEnabled() && killAura.isBlocking()) {
         this.using = new Box<>(((IAccessorEntityPlayer) this.mc.thePlayer).getItemInUse());
         ((IAccessorEntityPlayer) this.mc.thePlayer)
             .setItemInUse(this.mc.thePlayer.inventory.getCurrentItem());
@@ -163,7 +163,7 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
       at = {@At("HEAD")})
   private void updateRenderer(CallbackInfo callbackInfo) {
     AutoBlockIn autoBlockIn = (AutoBlockIn) Myau.moduleManager.modules.get(AutoBlockIn.class);
-    if (autoBlockIn.isEnabled() && autoBlockIn.itemSpoof.getValue()) {
+    if (autoBlockIn != null && autoBlockIn.isEnabled() && autoBlockIn.itemSpoof.getValue()) {
       int slot = autoBlockIn.getSlot();
       if (slot >= 0) {
         this.slot = new Box<>(this.mc.thePlayer.inventory.currentItem);
@@ -248,9 +248,9 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
       double double14,
       int integer15) {
     if (Myau.moduleManager != null) {
-      GhostHand event = (GhostHand) Myau.moduleManager.modules.get(GhostHand.class);
-      if (event.isEnabled()) {
-        list.removeIf(event::shouldSkip);
+      GhostHand ghostHand = (GhostHand) Myau.moduleManager.modules.get(GhostHand.class);
+      if (ghostHand != null && ghostHand.isEnabled()) {
+        list.removeIf(ghostHand::shouldSkip);
       }
     }
   }
@@ -304,7 +304,8 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
     if (Myau.moduleManager == null) {
       return vec31.distanceTo(vec32);
     } else {
-      return Myau.moduleManager.modules.get(ViewClip.class).isEnabled()
+      ViewClip viewClip = (ViewClip) Myau.moduleManager.modules.get(ViewClip.class);
+      return viewClip != null && viewClip.isEnabled()
           ? (double) this.thirdPersonDistance
           : vec31.distanceTo(vec32);
     }
@@ -321,9 +322,8 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
     if (Myau.moduleManager == null) {
       return block.getMaterial();
     } else {
-      return Myau.moduleManager.modules.get(ViewClip.class).isEnabled()
-          ? Material.air
-          : block.getMaterial();
+      ViewClip viewClip = (ViewClip) Myau.moduleManager.modules.get(ViewClip.class);
+      return viewClip != null && viewClip.isEnabled() ? Material.air : block.getMaterial();
     }
   }
 

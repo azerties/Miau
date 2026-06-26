@@ -8,41 +8,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
-import myau.util.animation.*;
-import myau.util.client.*;
-import myau.util.math.*;
-import myau.util.misc.*;
-import myau.util.network.*;
-import myau.util.player.*;
-import myau.util.render.*;
-import myau.util.time.*;
-import myau.util.world.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL20;
 
 public class ShaderUtils {
-
-  private Minecraft mc = Minecraft.getMinecraft();
+  private final Minecraft mc = Minecraft.getMinecraft();
   public final int programID;
-  private final Map<String, Integer> uniformLocations = new HashMap<String, Integer>();
-  private final String kawaseUpGlow =
+  private final Map<String, Integer> uniformLocations = new HashMap<>();
+
+  // GLSL shader sources
+  private static final String KAWASE_UP_GLOW =
       "#version 120\n"
-          + "\n"
           + "uniform sampler2D inTexture, textureToCheck;\n"
           + "uniform vec2 halfpixel, offset, iResolution;\n"
           + "uniform bool check;\n"
           + "uniform float lastPass;\n"
           + "uniform float exposure;\n"
-          + "\n"
           + "void main() {\n"
           + "    if(check && texture2D(textureToCheck, gl_TexCoord[0].st).a != 0.0) discard;\n"
           + "    vec2 uv = vec2(gl_FragCoord.xy / iResolution);\n"
-          + "\n"
           + "    vec4 sum = texture2D(inTexture, uv + vec2(-halfpixel.x * 2.0, 0.0) * offset);\n"
           + "    sum.rgb *= sum.a;\n"
-          + "    vec4 smpl1 =  texture2D(inTexture, uv + vec2(-halfpixel.x, halfpixel.y) * offset);\n"
+          + "    vec4 smpl1 = texture2D(inTexture, uv + vec2(-halfpixel.x, halfpixel.y) * offset);\n"
           + "    smpl1.rgb *= smpl1.a;\n"
           + "    sum += smpl1 * 2.0;\n"
           + "    vec4 smp2 = texture2D(inTexture, uv + vec2(0.0, halfpixel.y * 2.0) * offset);\n"
@@ -66,18 +55,16 @@ public class ShaderUtils {
           + "    vec4 result = sum / 12.0;\n"
           + "    gl_FragColor = vec4(result.rgb / result.a, mix(result.a, 1.0 - exp(-result.a * exposure), step(0.0, lastPass)));\n"
           + "}";
-  private final String glowShader =
+
+  private static final String GLOW_SHADER =
       "#version 120\n"
-          + "\n"
           + "uniform sampler2D textureIn, textureToCheck;\n"
           + "uniform vec2 texelSize, direction;\n"
           + "uniform vec3 color;\n"
           + "uniform bool avoidTexture;\n"
           + "uniform float exposure, radius;\n"
           + "uniform float weights[256];\n"
-          + "\n"
           + "#define offset direction * texelSize\n"
-          + "\n"
           + "void main() {\n"
           + "    if (direction.y == 1 && avoidTexture) {\n"
           + "        if (texture2D(textureToCheck, gl_TexCoord[0].st).a != 0.0) discard;\n"
@@ -88,62 +75,20 @@ public class ShaderUtils {
           + "    for (float r = 1.0; r <= radius; r++) {\n"
           + "        vec4 colorCurrent1 = texture2D(textureIn, gl_TexCoord[0].st + offset * r);\n"
           + "        vec4 colorCurrent2 = texture2D(textureIn, gl_TexCoord[0].st - offset * r);\n"
-          + "\n"
           + "        colorCurrent1.rgb *= colorCurrent1.a;\n"
           + "        colorCurrent2.rgb *= colorCurrent2.a;\n"
-          + "\n"
           + "        innerColor += (colorCurrent1 + colorCurrent2) * weights[int(r)];\n"
           + "    }\n"
-          + "\n"
           + "    gl_FragColor = vec4(innerColor.rgb / innerColor.a, mix(innerColor.a, 1.0 - exp(-innerColor.a * exposure), step(0.0, direction.y)));\n"
-          + "}\n";
-  private final String roundRectTexture =
-      "#version 120\n"
-          + "\n"
-          + "uniform vec2 location, rectSize;\n"
-          + "uniform sampler2D textureIn;\n"
-          + "uniform float radius, alpha;\n"
-          + "\n"
-          + "float roundedBoxSDF(vec2 centerPos, vec2 size, float radius) {\n"
-          + "    return length(max(abs(centerPos) -size, 0.)) - radius;\n"
-          + "}\n"
-          + "\n"
-          + "\n"
-          + "void main() {\n"
-          + "    float distance = roundedBoxSDF((rectSize * .5) - (gl_TexCoord[0].st * rectSize), (rectSize * .5) - radius - 1., radius);\n"
-          + "    float smoothedAlpha =  (1.0-smoothstep(0.0, 2.0, distance)) * alpha;\n"
-          + "    gl_FragColor = vec4(texture2D(textureIn, gl_TexCoord[0].st).rgb, smoothedAlpha);\n"
           + "}";
-  private final String roundRectOutline =
+
+  private static final String KAWASE_UP_BLOOM =
       "#version 120\n"
-          + "\n"
-          + "uniform vec2 location, rectSize;\n"
-          + "uniform vec4 color, outlineColor;\n"
-          + "uniform float radius, outlineThickness;\n"
-          + "\n"
-          + "float roundedSDF(vec2 centerPos, vec2 size, float radius) {\n"
-          + "    return length(max(abs(centerPos) - size + radius, 0.0)) - radius;\n"
-          + "}\n"
-          + "\n"
-          + "void main() {\n"
-          + "    float distance = roundedSDF(gl_FragCoord.xy - location - (rectSize * .5), (rectSize * .5) + (outlineThickness *.5) - 1.0, radius);\n"
-          + "\n"
-          + "    float blendAmount = smoothstep(0., 2., abs(distance) - (outlineThickness * .5));\n"
-          + "\n"
-          + "    vec4 insideColor = (distance < 0.) ? color : vec4(outlineColor.rgb,  0.0);\n"
-          + "    gl_FragColor = mix(outlineColor, insideColor, blendAmount);\n"
-          + "\n"
-          + "}";
-  private final String kawaseUpBloom =
-      "#version 120\n"
-          + "\n"
           + "uniform sampler2D inTexture, textureToCheck;\n"
           + "uniform vec2 halfpixel, offset, iResolution;\n"
           + "uniform int check;\n"
-          + "\n"
           + "void main() {\n"
           + "    vec2 uv = gl_FragCoord.xy / iResolution;\n"
-          + "\n"
           + "    vec2 offset1 = vec2(-halfpixel.x, 0.0) * offset;\n"
           + "    vec2 offset2 = vec2(-halfpixel.x, halfpixel.y) * offset;\n"
           + "    vec2 offset3 = vec2(0.0, halfpixel.y * 2.0) * offset;\n"
@@ -152,7 +97,6 @@ public class ShaderUtils {
           + "    vec2 offset6 = vec2(halfpixel.x, -halfpixel.y) * offset;\n"
           + "    vec2 offset7 = vec2(0.0, -halfpixel.y * 2.0) * offset;\n"
           + "    vec2 offset8 = vec2(-halfpixel.x, -halfpixel.y) * offset;\n"
-          + "\n"
           + "    vec4 sum = texture2D(inTexture, uv + offset1);\n"
           + "    sum.rgb *= sum.a;\n"
           + "    vec4 smpl1 = texture2D(inTexture, uv + offset2);\n"
@@ -176,20 +120,17 @@ public class ShaderUtils {
           + "    vec4 smp7 = texture2D(inTexture, uv + offset8);\n"
           + "    smp7.rgb *= smp7.a;\n"
           + "    sum += smp7 * 2.0;\n"
-          + "\n"
           + "    vec4 result = sum / 12.0;\n"
           + "    float checkAlpha = texture2D(textureToCheck, gl_TexCoord[0].st).a;\n"
           + "    gl_FragColor = vec4(result.rgb / result.a, mix(result.a, result.a * (1.0 - checkAlpha), float(check)));\n"
-          + "}\n";
-  private final String kawaseDownBloom =
+          + "}";
+
+  private static final String KAWASE_DOWN_BLOOM =
       "#version 120\n"
-          + "\n"
           + "uniform sampler2D inTexture;\n"
           + "uniform vec2 offset, halfpixel, iResolution;\n"
-          + "\n"
           + "void main() {\n"
           + "    vec2 uv = gl_FragCoord.xy / iResolution;\n"
-          + "\n"
           + "    vec4 sum = texture2D(inTexture, uv);\n"
           + "    sum.rgb *= sum.a;\n"
           + "    sum *= 4.0;\n"
@@ -207,17 +148,15 @@ public class ShaderUtils {
           + "    sum += smp4;\n"
           + "    vec4 result = sum / 8.0;\n"
           + "    gl_FragColor = vec4(result.rgb / result.a, result.a);\n"
-          + "}\n";
-  private final String kawaseUp =
+          + "}";
+
+  private static final String KAWASE_UP =
       "#version 120\n"
-          + "\n"
           + "uniform sampler2D inTexture, textureToCheck;\n"
           + "uniform vec2 halfpixel, offset, iResolution;\n"
           + "uniform int check;\n"
-          + "\n"
           + "void main() {\n"
           + "    vec2 uv = gl_FragCoord.xy / iResolution;\n"
-          + "\n"
           + "    vec4 sum = texture2D(inTexture, uv + vec2(-halfpixel.x * 2.0, 0.0) * offset);\n"
           + "    sum += texture2D(inTexture, uv + vec2(-halfpixel.x, halfpixel.y) * offset) * 2.0;\n"
           + "    sum += texture2D(inTexture, uv + vec2(0.0, halfpixel.y * 2.0) * offset);\n"
@@ -226,28 +165,106 @@ public class ShaderUtils {
           + "    sum += texture2D(inTexture, uv + vec2(halfpixel.x, -halfpixel.y) * offset) * 2.0;\n"
           + "    sum += texture2D(inTexture, uv + vec2(0.0, -halfpixel.y * 2.0) * offset);\n"
           + "    sum += texture2D(inTexture, uv + vec2(-halfpixel.x, -halfpixel.y) * offset) * 2.0;\n"
-          + "\n"
           + "    vec4 average = sum / 12.0;\n"
           + "    gl_FragColor = vec4(average.rgb, mix(1.0, texture2D(textureToCheck, gl_TexCoord[0].st).a, check));\n"
           + "}";
-  private final String kawaseDown =
+
+  private static final String KAWASE_DOWN =
       "#version 120\n"
-          + "\n"
           + "uniform sampler2D inTexture;\n"
           + "uniform vec2 offset, halfpixel, iResolution;\n"
-          + "\n"
           + "void main() {\n"
           + "    vec2 uv = gl_FragCoord.xy / iResolution;\n"
-          + "\n"
           + "    vec4 sum = texture2D(inTexture, uv) * 4.0;\n"
           + "    sum += texture2D(inTexture, uv - halfpixel.xy * offset);\n"
           + "    sum += texture2D(inTexture, uv + halfpixel.xy * offset);\n"
           + "    sum += texture2D(inTexture, uv + vec2(halfpixel.x, -halfpixel.y) * offset);\n"
           + "    sum += texture2D(inTexture, uv - vec2(halfpixel.x, -halfpixel.y) * offset);\n"
-          + "\n"
           + "    gl_FragColor = vec4(sum.rgb * 0.125, 1.0);\n"
           + "}";
-  private final String gradientMask =
+
+  // Rounded rect shaders
+  private static final String ROUNDED_RECT =
+      "#version 120\n"
+          + "\n"
+          + "uniform vec2 location, rectSize;\n"
+          + "uniform vec4 color;\n"
+          + "uniform float radius;\n"
+          + "uniform bool blur;\n"
+          + "\n"
+          + "float roundSDF(vec2 p, vec2 b, float r) {\n"
+          + "    return length(max(abs(p) - b, 0.0)) - r;\n"
+          + "}\n"
+          + "\n"
+          + "void main() {\n"
+          + "    vec2 rectHalf = rectSize * .5;\n"
+          + "    float smoothedAlpha = (1.0-smoothstep(0.0, 1.0, roundSDF(rectHalf - (gl_TexCoord[0].st * rectSize), rectHalf - radius - 1., radius))) * color.a;\n"
+          + "    gl_FragColor = vec4(color.rgb, smoothedAlpha);\n"
+          + "}";
+
+  private static final String ROUND_RECT_OUTLINE =
+      "#version 120\n"
+          + "\n"
+          + "uniform vec2 location, rectSize;\n"
+          + "uniform vec4 color, outlineColor;\n"
+          + "uniform float radius, outlineThickness;\n"
+          + "\n"
+          + "float roundedSDF(vec2 centerPos, vec2 size, float radius) {\n"
+          + "    return length(max(abs(centerPos) - size + radius, 0.0)) - radius;\n"
+          + "}\n"
+          + "\n"
+          + "void main() {\n"
+          + "    float distance = roundedSDF(gl_FragCoord.xy - location - (rectSize * .5), (rectSize * .5) + (outlineThickness *.5) - 1.0, radius);\n"
+          + "    float blendAmount = smoothstep(0., 2., abs(distance) - (outlineThickness * .5));\n"
+          + "    vec4 insideColor = (distance < 0.) ? color : vec4(outlineColor.rgb, 0.0);\n"
+          + "    gl_FragColor = mix(outlineColor, insideColor, blendAmount);\n"
+          + "}";
+
+  private static final String ROUND_RECT_TEXTURE =
+      "#version 120\n"
+          + "\n"
+          + "uniform vec2 location, rectSize;\n"
+          + "uniform sampler2D textureIn;\n"
+          + "uniform float radius, alpha;\n"
+          + "\n"
+          + "float roundedBoxSDF(vec2 centerPos, vec2 size, float radius) {\n"
+          + "    return length(max(abs(centerPos) -size, 0.)) - radius;\n"
+          + "}\n"
+          + "\n"
+          + "void main() {\n"
+          + "    float distance = roundedBoxSDF((rectSize * .5) - (gl_TexCoord[0].st * rectSize), (rectSize * .5) - radius - 1., radius);\n"
+          + "    float smoothedAlpha = (1.0-smoothstep(0.0, 2.0, distance)) * alpha;\n"
+          + "    gl_FragColor = vec4(texture2D(textureIn, gl_TexCoord[0].st).rgb, smoothedAlpha);\n"
+          + "}";
+
+  private static final String ROUNDED_RECT_GRADIENT =
+      "#version 120\n"
+          + "\n"
+          + "uniform vec2 location, rectSize;\n"
+          + "uniform vec4 color1, color2, color3, color4;\n"
+          + "uniform float radius;\n"
+          + "\n"
+          + "#define NOISE .5/255.0\n"
+          + "\n"
+          + "float roundSDF(vec2 p, vec2 b, float r) {\n"
+          + "    return length(max(abs(p) - b , 0.0)) - r;\n"
+          + "}\n"
+          + "\n"
+          + "vec4 createGradient(vec2 coords, vec4 color1, vec4 color2, vec4 color3, vec4 color4){\n"
+          + "    vec4 color = mix(mix(color1, color2, coords.y), mix(color3, color4, coords.y), coords.x);\n"
+          + "    color += mix(NOISE, -NOISE, fract(sin(dot(coords.xy, vec2(12.9898, 78.233))) * 43758.5453));\n"
+          + "    return color;\n"
+          + "}\n"
+          + "\n"
+          + "void main() {\n"
+          + "    vec2 st = gl_TexCoord[0].st;\n"
+          + "    vec2 halfSize = rectSize * .5;\n"
+          + "    float smoothedAlpha = (1.0-smoothstep(0.0, 2., roundSDF(halfSize - (gl_TexCoord[0].st * rectSize), halfSize - radius - 1., radius)));\n"
+          + "    vec4 gradient = createGradient(st, color1, color2, color3, color4);\n"
+          + "    gl_FragColor = vec4(gradient.rgb, gradient.a * smoothedAlpha);\n"
+          + "}";
+
+  private static final String GRADIENT_MASK =
       "#version 120\n"
           + "\n"
           + "uniform vec2 location, rectSize;\n"
@@ -268,7 +285,8 @@ public class ShaderUtils {
           + "    float texColorAlpha = texture2D(tex, gl_TexCoord[0].st).a;\n"
           + "    gl_FragColor = vec4(createGradient(coords, color1, color2, color3, color4), texColorAlpha * alpha);\n"
           + "}";
-  private final String mask =
+
+  private static final String MASK =
       "#version 120\n"
           + "\n"
           + "uniform vec2 location, rectSize;\n"
@@ -279,7 +297,8 @@ public class ShaderUtils {
           + "    vec3 tex2Color = texture2D(u_texture2, gl_TexCoord[0].st).rgb;\n"
           + "    gl_FragColor = vec4(tex2Color, texColorAlpha);\n"
           + "}";
-  private final String gradient =
+
+  private static final String GRADIENT =
       "#version 120\n"
           + "\n"
           + "uniform vec2 location, rectSize;\n"
@@ -289,7 +308,6 @@ public class ShaderUtils {
           + "\n"
           + "vec4 createGradient(vec2 coords, vec4 color1, vec4 color2, vec4 color3, vec4 color4){\n"
           + "    vec4 color = mix(mix(color1, color2, coords.y), mix(color3, color4, coords.y), coords.x);\n"
-          + "    //Dithering the color\n"
           + "    color += mix(NOISE, -NOISE, fract(sin(dot(coords.xy, vec2(12.9898, 78.233))) * 43758.5453));\n"
           + "    return color;\n"
           + "}\n"
@@ -298,55 +316,8 @@ public class ShaderUtils {
           + "    vec2 coords = (gl_FragCoord.xy - location) / rectSize;\n"
           + "    gl_FragColor = createGradient(coords, color1, color2, color3, color4);\n"
           + "}";
-  private final String roundedRectGradient =
-      "#version 120\n"
-          + "\n"
-          + "uniform vec2 location, rectSize;\n"
-          + "uniform vec4 color1, color2, color3, color4;\n"
-          + "uniform float radius;\n"
-          + "\n"
-          + "#define NOISE .5/255.0\n"
-          + "\n"
-          + "float roundSDF(vec2 p, vec2 b, float r) {\n"
-          + "    return length(max(abs(p) - b , 0.0)) - r;\n"
-          + "}\n"
-          + "\n"
-          + "vec4 createGradient(vec2 coords, vec4 color1, vec4 color2, vec4 color3, vec4 color4){\n"
-          + "    vec4 color = mix(mix(color1, color2, coords.y), mix(color3, color4, coords.y), coords.x);\n"
-          + "    //Dithering the color\n"
-          + "    color += mix(NOISE, -NOISE, fract(sin(dot(coords.xy, vec2(12.9898, 78.233))) * 43758.5453));\n"
-          + "    return color;\n"
-          + "}\n"
-          + "\n"
-          + "void main() {\n"
-          + "    vec2 st = gl_TexCoord[0].st;\n"
-          + "    vec2 halfSize = rectSize * .5;\n"
-          + "    \n"
-          + "   // use the bottom leftColor as the alpha\n"
-          + "    float smoothedAlpha =  (1.0-smoothstep(0.0, 2., roundSDF(halfSize - (gl_TexCoord[0].st * rectSize), halfSize - radius - 1., radius)));\n"
-          + "    vec4 gradient = createGradient(st, color1, color2, color3, color4);    gl_FragColor = vec4(gradient.rgb, gradient.a * smoothedAlpha);\n"
-          + "}";
-  private final String roundedRect =
-      "#version 120\n"
-          + "\n"
-          + "uniform vec2 location, rectSize;\n"
-          + "uniform vec4 color;\n"
-          + "uniform float radius;\n"
-          + "uniform bool blur;\n"
-          + "\n"
-          + "float roundSDF(vec2 p, vec2 b, float r) {\n"
-          + "    return length(max(abs(p) - b, 0.0)) - r;\n"
-          + "}\n"
-          + "\n"
-          + "\n"
-          + "void main() {\n"
-          + "    vec2 rectHalf = rectSize * .5;\n"
-          + "    // Smooth the result (free antialiasing).\n"
-          + "    float smoothedAlpha =  (1.0-smoothstep(0.0, 1.0, roundSDF(rectHalf - (gl_TexCoord[0].st * rectSize), rectHalf - radius - 1., radius))) * color.a;\n"
-          + "    gl_FragColor = vec4(color.rgb, smoothedAlpha);// mix(quadColor, shadowColor, 0.0);\n"
-          + "\n"
-          + "}";
-  private final String roundedRectRise =
+
+  private static final String ROUNDED_RECT_RISE =
       "#version 120\n"
           + "\n"
           + "uniform vec2 u_size;\n"
@@ -357,9 +328,6 @@ public class ShaderUtils {
           + "void main(void)\n"
           + "{\n"
           + "    vec2 tex_coord = gl_TexCoord[0].st;\n"
-          + "\n"
-          + "    // fast implementation of custom corners\n"
-          + "    // can probably be better, but this is good enough for now\n"
           + "    if (tex_coord.x < 0.5 && tex_coord.y > 0.5 && u_edges.x == 0.0 ||\n"
           + "        tex_coord.x > 0.5 && tex_coord.y > 0.5 && u_edges.y == 0.0 ||\n"
           + "        tex_coord.x > 0.5 && tex_coord.y < 0.5 && u_edges.z == 0.0 ||\n"
@@ -370,6 +338,10 @@ public class ShaderUtils {
           + "    }\n"
           + "}";
 
+  public ShaderUtils(String fragmentShaderLoc) {
+    this(fragmentShaderLoc, "minecraft:shaders/vertex.vsh");
+  }
+
   public ShaderUtils(String fragmentShaderLoc, String vertexShaderLoc) {
     int program = glCreateProgram();
     try {
@@ -377,64 +349,65 @@ public class ShaderUtils {
       switch (fragmentShaderLoc) {
         case "kawaseUpGlow":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(kawaseUpGlow.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(new ByteArrayInputStream(KAWASE_UP_GLOW.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "glow":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(glowShader.getBytes()), GL_FRAGMENT_SHADER);
-          break;
-        case "roundRectTexture":
-          fragmentShaderID =
-              createShader(
-                  new ByteArrayInputStream(roundRectTexture.getBytes()), GL_FRAGMENT_SHADER);
-          break;
-        case "roundRectOutline":
-          fragmentShaderID =
-              createShader(
-                  new ByteArrayInputStream(roundRectOutline.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(new ByteArrayInputStream(GLOW_SHADER.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "kawaseUpBloom":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(kawaseUpBloom.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(
+                  new ByteArrayInputStream(KAWASE_UP_BLOOM.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "kawaseDownBloom":
           fragmentShaderID =
               createShader(
-                  new ByteArrayInputStream(kawaseDownBloom.getBytes()), GL_FRAGMENT_SHADER);
+                  new ByteArrayInputStream(KAWASE_DOWN_BLOOM.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "kawaseUp":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(kawaseUp.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(new ByteArrayInputStream(KAWASE_UP.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "kawaseDown":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(kawaseDown.getBytes()), GL_FRAGMENT_SHADER);
-          break;
-        case "gradientMask":
-          fragmentShaderID =
-              createShader(new ByteArrayInputStream(gradientMask.getBytes()), GL_FRAGMENT_SHADER);
-          break;
-        case "mask":
-          fragmentShaderID =
-              createShader(new ByteArrayInputStream(mask.getBytes()), GL_FRAGMENT_SHADER);
-          break;
-        case "gradient":
-          fragmentShaderID =
-              createShader(new ByteArrayInputStream(gradient.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(new ByteArrayInputStream(KAWASE_DOWN.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "roundedRect":
           fragmentShaderID =
-              createShader(new ByteArrayInputStream(roundedRect.getBytes()), GL_FRAGMENT_SHADER);
+              createShader(new ByteArrayInputStream(ROUNDED_RECT.getBytes()), GL_FRAGMENT_SHADER);
+          break;
+        case "roundRectOutline":
+          fragmentShaderID =
+              createShader(
+                  new ByteArrayInputStream(ROUND_RECT_OUTLINE.getBytes()), GL_FRAGMENT_SHADER);
+          break;
+        case "roundRectTexture":
+          fragmentShaderID =
+              createShader(
+                  new ByteArrayInputStream(ROUND_RECT_TEXTURE.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "roundedRectGradient":
           fragmentShaderID =
               createShader(
-                  new ByteArrayInputStream(roundedRectGradient.getBytes()), GL_FRAGMENT_SHADER);
+                  new ByteArrayInputStream(ROUNDED_RECT_GRADIENT.getBytes()), GL_FRAGMENT_SHADER);
+          break;
+        case "gradientMask":
+          fragmentShaderID =
+              createShader(new ByteArrayInputStream(GRADIENT_MASK.getBytes()), GL_FRAGMENT_SHADER);
+          break;
+        case "mask":
+          fragmentShaderID =
+              createShader(new ByteArrayInputStream(MASK.getBytes()), GL_FRAGMENT_SHADER);
+          break;
+        case "gradient":
+          fragmentShaderID =
+              createShader(new ByteArrayInputStream(GRADIENT.getBytes()), GL_FRAGMENT_SHADER);
           break;
         case "roundedRectRise":
           fragmentShaderID =
               createShader(
-                  new ByteArrayInputStream(roundedRectRise.getBytes()), GL_FRAGMENT_SHADER);
+                  new ByteArrayInputStream(ROUNDED_RECT_RISE.getBytes()), GL_FRAGMENT_SHADER);
           break;
         default:
           fragmentShaderID =
@@ -455,20 +428,15 @@ public class ShaderUtils {
               GL_VERTEX_SHADER);
       glAttachShader(program, vertexShaderID);
     } catch (IOException e) {
-
+      e.printStackTrace();
     }
 
     glLinkProgram(program);
     int status = glGetProgrami(program, GL_LINK_STATUS);
-
     if (status == 0) {
       throw new IllegalStateException("Shader failed to link!");
     }
     this.programID = program;
-  }
-
-  public ShaderUtils(String fragmentShaderLoc) {
-    this(fragmentShaderLoc, "minecraft:shaders/vertex.vsh");
   }
 
   public static void drawQuads() {
@@ -510,9 +478,7 @@ public class ShaderUtils {
 
   public void setUniformf(String name, float... args) {
     int loc = getUniformLocation(name);
-    if (loc == -1) {
-      return;
-    }
+    if (loc == -1) return;
     switch (args.length) {
       case 1:
         glUniform1f(loc, args[0]);
@@ -531,19 +497,14 @@ public class ShaderUtils {
 
   public void setUniformi(String name, int... args) {
     int loc = getUniformLocation(name);
-    if (loc == -1) {
-      return;
-    }
+    if (loc == -1) return;
     if (args.length > 1) glUniform2i(loc, args[0], args[1]);
     else glUniform1i(loc, args[0]);
   }
 
   private int getUniformLocation(String name) {
-    Integer cachedLocation = uniformLocations.get(name);
-    if (cachedLocation != null) {
-      return cachedLocation;
-    }
-
+    Integer cached = uniformLocations.get(name);
+    if (cached != null) return cached;
     int location = glGetUniformLocation(programID, name);
     uniformLocations.put(name, location);
     return location;
@@ -551,27 +512,29 @@ public class ShaderUtils {
 
   private int createShader(InputStream inputStream, int shaderType) {
     int shader = glCreateShader(shaderType);
-    GL20.glShaderSource(shader, readInputStream(inputStream));
+    try {
+      String source = readInputStream(inputStream);
+      GL20.glShaderSource(shader, source);
+    } finally {
+      try {
+        inputStream.close();
+      } catch (IOException ignored) {
+      }
+    }
     glCompileShader(shader);
-
     if (glGetShaderi(shader, GL_COMPILE_STATUS) == 0) {
       System.out.println(glGetShaderInfoLog(shader, 4096));
       throw new IllegalStateException(String.format("Shader (%s) failed to compile!", shaderType));
     }
-
     return shader;
   }
 
-  public static String readInputStream(java.io.InputStream inputStream) {
-    StringBuilder stringBuilder = new StringBuilder();
+  private static String readInputStream(InputStream inputStream) {
     try {
-      java.io.BufferedReader bufferedReader =
-          new java.io.BufferedReader(new java.io.InputStreamReader(inputStream));
-      String line;
-      while ((line = bufferedReader.readLine()) != null) stringBuilder.append(line).append('\n');
+      java.util.Scanner scanner = new java.util.Scanner(inputStream, "UTF-8").useDelimiter("\\A");
+      return scanner.hasNext() ? scanner.next() : "";
     } catch (Exception e) {
-
+      return "";
     }
-    return stringBuilder.toString();
   }
 }

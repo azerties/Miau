@@ -1,6 +1,7 @@
 package myau.management;
 
 import java.util.Deque;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import myau.event.EventTarget;
 import myau.event.impl.PacketEvent;
@@ -22,35 +23,71 @@ import net.minecraft.util.Vec3;
 public class LagManager {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final Deque<LagPacket> packetQueue;
+
+  // Tick-based delay (original Miau, used by BlockHit)
   private int tickDelay;
+  // Millisecond-based delay (raven-bS style, used by LagRange)
+  private long msDelay;
+  private boolean usingMsDelay;
+
   private boolean flushing;
   private Vec3 lastPosition;
+
+  /**
+   * FastTrack set: packets in this set bypass the queue on re-entry. Set by LagRange (or any lag
+   * module) before flushing to prevent flushed packets from being re-queued by the LagManager. Uses
+   * IdentityHashMap so packet identity (==) is used, not equals().
+   */
+  public Set<Packet<?>> fastTrackSet;
 
   public LagManager() {
     this.packetQueue = new ConcurrentLinkedDeque<>();
     this.tickDelay = 0;
+    this.msDelay = 0;
+    this.usingMsDelay = false;
     this.flushing = false;
     this.lastPosition = new Vec3(0.0, 0.0, 0.0);
   }
 
+  /**
+   * Flush all packets from the queue whose release conditions are met. - Tick mode: packet's
+   * accumulated delay must exceed current tickDelay - Ms mode: elapsed time since enqueue must be
+   * >= msDelay
+   */
   private void flushQueue() {
     if (mc.getNetHandler() == null) {
       this.packetQueue.clear();
-    } else {
-      for (this.flushing = true; !this.packetQueue.isEmpty(); this.packetQueue.poll()) {
-        LagPacket lagPacket = this.packetQueue.peek();
-        if (this.tickDelay > 0 && lagPacket.delay <= this.tickDelay) {
-          break;
+      return;
+    }
+    this.flushing = true;
+    try {
+      while (!this.packetQueue.isEmpty()) {
+        LagPacket lp = this.packetQueue.peek();
+        boolean canRelease;
+
+        if (this.usingMsDelay) {
+          // Time-based release: packet leaves when its wait time has expired
+          canRelease =
+              this.msDelay <= 0L || (System.currentTimeMillis() - lp.enqueueTimeMs) >= this.msDelay;
+        } else {
+          // Tick-based release: packet leaves when its age exceeds the current delay threshold
+          canRelease = this.tickDelay <= 0 || lp.delay > this.tickDelay;
         }
-        PacketUtil.sendPacketNoEvent(lagPacket.packet);
-        if (lagPacket.packet instanceof C03PacketPlayer) {
-          C03PacketPlayer c03 = (C03PacketPlayer) lagPacket.packet;
+
+        if (!canRelease) break;
+
+        this.packetQueue.poll();
+        PacketUtil.sendPacketNoEvent(lp.packet);
+
+        if (lp.packet instanceof C03PacketPlayer) {
+          C03PacketPlayer c03 = (C03PacketPlayer) lp.packet;
           if (c03.isMoving()) {
             this.lastPosition =
                 new Vec3(c03.getPositionX(), c03.getPositionY(), c03.getPositionZ());
           }
         }
       }
+    } finally {
       this.flushing = false;
     }
   }
@@ -59,11 +96,34 @@ public class LagManager {
     this.packetQueue.forEach(z -> z.delay++);
   }
 
+  /**
+   * Called from MixinNetworkManager.sendPacket() for every outbound packet. Returns true if the
+   * packet was queued (caller should cancel sending), false if it was passed through.
+   */
   public boolean handlePacket(Packet<?> packet) {
     this.flushQueue();
+
+    // FastTrack bypass: if this exact packet instance is in the fast track set,
+    // remove it and let it through (prevents flushed packets from re-queuing)
+    if (this.fastTrackSet != null && this.fastTrackSet.remove(packet)) {
+      if (packet instanceof C03PacketPlayer) {
+        C03PacketPlayer c03 = (C03PacketPlayer) packet;
+        if (c03.isMoving()) {
+          this.lastPosition = new Vec3(c03.getPositionX(), c03.getPositionY(), c03.getPositionZ());
+        }
+      }
+      return false;
+    }
+
+    // Critical packets always go through immediately
     if (packet instanceof C00PacketKeepAlive || packet instanceof C01PacketChatMessage) {
       return false;
-    } else if ((long) this.tickDelay > 0L) {
+    }
+
+    // Check whether queuing is active
+    boolean shouldQueue = this.usingMsDelay ? this.msDelay > 0L : this.tickDelay > 0;
+
+    if (shouldQueue) {
       this.packetQueue.offer(new LagPacket(packet));
       return true;
     } else {
@@ -77,8 +137,25 @@ public class LagManager {
     }
   }
 
-  public void setDelay(int delay) {
-    this.tickDelay = delay;
+  /** Set delay in game ticks (50ms each). Used by BlockHit for backward compatibility. */
+  public void setDelay(int ticks) {
+    this.tickDelay = ticks;
+    this.usingMsDelay = false;
+    this.msDelay = 0L;
+  }
+
+  /** Set delay in milliseconds. Used by LagRange for precise time-based release. */
+  public void setDelayMs(long ms) {
+    this.msDelay = ms;
+    this.usingMsDelay = true;
+    this.tickDelay = 0;
+  }
+
+  /** Reset all delays immediately (both tick and ms). */
+  public void resetDelay() {
+    this.tickDelay = 0;
+    this.msDelay = 0L;
+    this.usingMsDelay = false;
   }
 
   public Vec3 getLastPosition() {
@@ -89,13 +166,21 @@ public class LagManager {
     return this.flushing;
   }
 
+  /** Expose whether the manager is currently operating in ms-precision mode. */
+  public boolean isUsingMsDelay() {
+    return this.usingMsDelay;
+  }
+
   @EventTarget
   public void onTick(TickEvent event) {
     if (event.getType() == EventType.POST) {
       if (mc.thePlayer.isDead) {
-        this.setDelay(0);
+        this.resetDelay();
       }
-      this.incrementDelays();
+      // Tick-based mode: age the packets (ms mode relies on wall-clock time)
+      if (!this.usingMsDelay) {
+        this.incrementDelays();
+      }
       this.flushQueue();
     }
   }
@@ -107,17 +192,23 @@ public class LagManager {
         || event.getPacket() instanceof C00PacketServerQuery
         || event.getPacket() instanceof C01PacketPing
         || event.getPacket() instanceof C01PacketEncryptionResponse) {
-      this.setDelay(0);
+      this.resetDelay();
     }
   }
 
   public static class LagPacket {
     public final Packet<?> packet;
+
+    /** Tick-based age counter (incremented each tick in tick mode). */
     public int delay;
+
+    /** Timestamp when this packet was enqueued (for ms-based release). */
+    public final long enqueueTimeMs;
 
     public LagPacket(Packet<?> packet) {
       this.packet = packet;
       this.delay = 0;
+      this.enqueueTimeMs = System.currentTimeMillis();
     }
   }
 }

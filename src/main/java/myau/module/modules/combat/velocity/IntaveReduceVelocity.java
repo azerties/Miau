@@ -3,19 +3,12 @@ package myau.module.modules.combat.velocity;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.UpdateEvent;
 import myau.module.modules.combat.Velocity;
-import myau.property.properties.FloatProperty;
-import myau.property.properties.IntProperty;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 
 public class IntaveReduceVelocity extends VelocityMode {
   private boolean hasReceivedVelocity = false;
   private int intaveTick = 0;
   private int intaveDamageTick = 0;
-
-  public final FloatProperty intaveReduceFactor =
-      new FloatProperty("intave-reduce-factor", 0.6F, 0.6F, 1.0F);
-  public final IntProperty intaveReduceHurtTime =
-      new IntProperty("intave-reduce-hurt-time", 9, 1, 10);
 
   public IntaveReduceVelocity(String name, Velocity parent) {
     super(name, parent);

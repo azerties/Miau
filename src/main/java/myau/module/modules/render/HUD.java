@@ -19,7 +19,6 @@ import myau.module.modules.render.hud.InterfaceComponent;
 import myau.property.properties.*;
 import myau.util.render.ColorUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import myau.util.render.Themes;
 import myau.util.vector.Vector2d;
 import net.minecraft.client.Minecraft;
@@ -40,7 +39,6 @@ public class HUD extends Module {
   private String bpsString = "0.00";
 
   public final BooleanProperty showWatermark = new BooleanProperty("watermark", true);
-  public final BooleanProperty showNotifications = new BooleanProperty("notifications", true);
   public final ModeProperty hudMode =
       new ModeProperty("mode", 0, new String[] {"NORMAL", "EXHIBITION"});
   public final TextProperty watermarkName =
@@ -90,6 +88,7 @@ public class HUD extends Module {
   public final FloatProperty roundingRadius =
       new FloatProperty("Rounding Radius", 1.0F, 0.0F, 10.0F);
 
+  // Hàm lấy Component tự động
   private InterfaceComponent getComponent(Module module) {
     return components.computeIfAbsent(module, InterfaceComponent::new);
   }
@@ -142,11 +141,11 @@ public class HUD extends Module {
     Themes theme = Themes.getCurrentTheme();
 
     switch (this.colorAnimation.getValue()) {
-      case 0:
+      case 0: // STATIC
         return theme.getFirstColor();
-      case 1:
+      case 1: // FADE
         return theme.getAccentColor(new Vector2d(0, yPos));
-      case 2:
+      case 2: // RAINBOW
         return ColorUtil.rainbow((int) (time * 500 / 6));
       default:
         return Color.white;
@@ -212,6 +211,7 @@ public class HUD extends Module {
     float delta = (currentMS - lastMS);
     lastMS = currentMS;
     if (delta > 200 || delta < 0) delta = 16;
+    ScaledResolution sr = new ScaledResolution(mc);
 
     for (Module module : Myau.moduleManager.modules.values()) {
       InterfaceComponent component = getComponent(module);
@@ -241,14 +241,15 @@ public class HUD extends Module {
     float currentYExhibition = (float) this.offsetY.getValue() + 1.0F * this.scale.getValue();
     float currentYNormal = (float) this.offsetY.getValue() + 1.0F * this.scale.getValue();
 
+    // AutoFit on the Left Side
     if (this.posX.getValue() == 0) {
-      if (this.posY.getValue() == 0) {
+      if (this.posY.getValue() == 0) { // Top Left: Avoid Watermark
         if (this.showWatermark.getValue()) {
           float watermarkHeight = getFont().getFontHeight() + 6.0F;
           currentYExhibition += watermarkHeight;
           currentYNormal += watermarkHeight;
         }
-      } else {
+      } else { // Bottom Left: Avoid Coordinates
         float bottomOffset = 0.0F;
         if (this.hudMode.getValue() == 1
             && this.showCoordinates.getValue()
@@ -262,13 +263,11 @@ public class HUD extends Module {
 
     if (this.posY.getValue() == 1) {
       currentYExhibition =
-          (float) new ScaledResolution(mc).getScaledHeight()
+          (float) sr.getScaledHeight()
               - currentYExhibition
               - heightExhibition * this.scale.getValue();
       currentYNormal =
-          (float) new ScaledResolution(mc).getScaledHeight()
-              - currentYNormal
-              - heightNormal * this.scale.getValue();
+          (float) sr.getScaledHeight() - currentYNormal - heightNormal * this.scale.getValue();
     }
 
     for (InterfaceComponent component : animatingComponents) {
@@ -297,7 +296,7 @@ public class HUD extends Module {
       String text = ((IAccessorGuiChat) mc.currentScreen).getInputField().getText().trim();
       if (Myau.commandManager != null && Myau.commandManager.isTypingCommand(text)) {
         RenderUtil.enableRenderState();
-        ShapeUtil.drawOutlineRect(
+        RenderUtil.drawOutlineRect(
             2.0F,
             (float) (mc.currentScreen.height - 14),
             (float) (mc.currentScreen.width - 2),
@@ -313,33 +312,44 @@ public class HUD extends Module {
       long l = System.currentTimeMillis();
 
       if (this.shaders.getValue()) {
-        final long finalL = l;
-        final float finalDelta = delta;
-        myau.util.shader.RenderSystem.renderBloom(
-            () -> {
-              renderElements(finalL, finalDelta, animatingComponents);
-            });
+        // Bloom pass: soft glow
+        myau.util.shader.BlurUtils.prepareBloom();
+        renderElements(l, delta, animatingComponents, sr);
+        myau.util.shader.BlurUtils.bloomEnd(
+            bloomCompression.getValue().intValue(), bloomRadius.getValue());
 
-        if (this.blurSettings.getValue()) {}
+        // Blur pass: frosted-glass
+        myau.util.shader.BlurUtils.prepareBlur();
+        renderElements(l, delta, animatingComponents, sr);
+        myau.util.shader.BlurUtils.blurEnd(
+            blurCompression.getValue().intValue(), blurRadius.getValue());
       }
-      renderElements(l, delta, animatingComponents);
+      renderElements(l, delta, animatingComponents, sr);
     }
   }
 
   private void renderElements(
-      long l, float delta, java.util.List<InterfaceComponent> animatingComponents) {
+      long l,
+      float delta,
+      java.util.List<InterfaceComponent> animatingComponents,
+      ScaledResolution sr) {
     if (this.showWatermark.getValue()) {
       String watermark = getExhibitionWatermark();
-      if (watermark != null)
-        getFont().drawWithShadow(watermark, 3.0F, 3.0F, this.getColor(l).getRGB());
+      if (watermark != null) {
+        try {
+          mc.fontRendererObj.drawStringWithShadow(watermark, 3.0F, 3.0F, this.getColor(l).getRGB());
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
     }
 
-    if (this.hudMode.getValue() == 1) {
+    if (this.hudMode.getValue() == 1) { // Exhibition mode
       if (this.showCoordinates.getValue() && mc.thePlayer != null) {
         String posX2 = String.valueOf(Math.round(mc.thePlayer.posX));
         String posY2 = String.valueOf(Math.round(mc.thePlayer.posY));
         String posZ2 = String.valueOf(Math.round(mc.thePlayer.posZ));
-        float yCoord = new ScaledResolution(mc).getScaledHeight() - 10;
+        float yCoord = sr.getScaledHeight() - 10;
         float fontHeight = getFont().getFontHeight();
         int colour = this.getColor(l).getRGB();
         getFont().drawWithShadow("X: §7" + posX2, 3.0F, yCoord - fontHeight * 2, colour);
@@ -349,11 +359,12 @@ public class HUD extends Module {
 
       float height = (float) getFont().getFontHeight() + 2.0F;
       float x = (float) this.offsetX.getValue();
-      if (this.posX.getValue() == 1) x = (float) new ScaledResolution(mc).getScaledWidth() - x;
+      if (this.posX.getValue() == 1) x = (float) sr.getScaledWidth() - x;
 
       GlStateManager.pushMatrix();
       GlStateManager.scale(this.scale.getValue(), this.scale.getValue(), 0.0F);
 
+      // 4. Render Exhibition Mode
       for (InterfaceComponent component : animatingComponents) {
         Module module = component.module;
         String moduleName = this.getModuleName(module);
@@ -400,7 +411,7 @@ public class HUD extends Module {
 
         RenderUtil.enableRenderState();
         if (this.backgroundAlpha.getValue() > 0)
-          ShapeUtil.drawRect(
+          RenderUtil.drawRect(
               drawX - 2.0F,
               drawY - 2.0F,
               drawX + totalWidth + 2.0F,
@@ -409,10 +420,10 @@ public class HUD extends Module {
 
         if (this.showBar.getValue()) {
           if (this.posX.getValue() == 0)
-            ShapeUtil.drawRect(
+            RenderUtil.drawRect(
                 drawX - 3.0F, drawY - 2.0F, drawX - 2.0F, drawY + height - 2.0F, color);
           else
-            ShapeUtil.drawRect(
+            RenderUtil.drawRect(
                 drawX + totalWidth + 2.0F,
                 drawY - 2.0F,
                 drawX + totalWidth + 3.0F,
@@ -439,7 +450,7 @@ public class HUD extends Module {
           (float) this.offsetX.getValue()
               + (1.0F + (this.showBar.getValue() ? (this.shadow.getValue() ? 2.0F : 1.0F) : 0.0F))
                   * this.scale.getValue();
-      if (this.posX.getValue() == 1) x = (float) new ScaledResolution(mc).getScaledWidth() - x;
+      if (this.posX.getValue() == 1) x = (float) sr.getScaledWidth() - x;
 
       GlStateManager.pushMatrix();
       GlStateManager.scale(this.scale.getValue(), this.scale.getValue(), 0.0F);
@@ -491,7 +502,7 @@ public class HUD extends Module {
 
         RenderUtil.enableRenderState();
         if (this.backgroundAlpha.getValue() > 0) {
-          ShapeUtil.drawRect(
+          RenderUtil.drawRect(
               drawX - 1.0F,
               drawY
                   - (this.posY.getValue() == 0
@@ -507,14 +518,14 @@ public class HUD extends Module {
         }
         if (this.showBar.getValue()) {
           if (this.shadow.getValue()) {
-            ShapeUtil.drawRect(
+            RenderUtil.drawRect(
                 drawX + (this.posX.getValue() == 0 ? -3.0F : totalWidth + 1.0F),
                 drawY - (this.posY.getValue() == 0 ? (finalY == 0L ? 1.0F : 0.0F) : 1.0F),
                 drawX + (this.posX.getValue() == 0 ? -2.0F : totalWidth + 2.0F),
                 drawY + height + (this.posY.getValue() == 0 ? 1.0F : (finalY == 0L ? 1.0F : 0.0F)),
                 color);
           } else {
-            ShapeUtil.drawRect(
+            RenderUtil.drawRect(
                 drawX + (this.posX.getValue() == 0 ? -2.0F : totalWidth + 1.0F),
                 drawY - (this.posY.getValue() == 0 ? (finalY == 0L ? 1.0F : 0.0F) : 0.0F),
                 drawX + (this.posX.getValue() == 0 ? -1.0F : totalWidth + 2.0F),
@@ -565,13 +576,10 @@ public class HUD extends Module {
             getFont()
                 .draw(
                     String.valueOf(movementPacketSize),
-                    (float) new ScaledResolution(mc).getScaledWidth() / 2.0F / this.scale.getValue()
+                    (float) sr.getScaledWidth() / 2.0F / this.scale.getValue()
                         - (float) getFont().getStringWidth(String.valueOf(movementPacketSize))
                             / 2.0F,
-                    (float) new ScaledResolution(mc).getScaledHeight()
-                        / 5.0F
-                        * 3.0F
-                        / this.scale.getValue(),
+                    (float) sr.getScaledHeight() / 5.0F * 3.0F / this.scale.getValue(),
                     this.getColor(l, 0L).getRGB() & 16777215 | -1090519040,
                     this.shadow.getValue());
             GlStateManager.disableBlend();
@@ -582,12 +590,13 @@ public class HUD extends Module {
       GlStateManager.popMatrix();
     }
 
+    // Render Potion Effects
     if (mc.thePlayer != null) {
       java.util.Collection<net.minecraft.potion.PotionEffect> effects =
           mc.thePlayer.getActivePotionEffects();
       if (!effects.isEmpty()) {
         myau.util.font.Font font = getFont();
-        float drawY = new ScaledResolution(mc).getScaledHeight() - 3;
+        float drawY = sr.getScaledHeight() - 3;
 
         java.util.List<net.minecraft.potion.PotionEffect> sortedEffects = new ArrayList<>(effects);
         sortedEffects.sort(
@@ -621,7 +630,7 @@ public class HUD extends Module {
           String time = net.minecraft.potion.Potion.getDurationString(effect);
           String text = name + " §7" + time;
           int textWidth = font.getStringWidth(text);
-          float drawX = new ScaledResolution(mc).getScaledWidth() - 2;
+          float drawX = sr.getScaledWidth() - 2;
 
           drawY -= (font.height() + 1.5f);
 

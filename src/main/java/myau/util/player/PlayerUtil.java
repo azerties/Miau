@@ -28,6 +28,8 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.MathHelper;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
 import net.minecraftforge.common.ForgeHooks;
 
 public class PlayerUtil {
@@ -171,6 +173,29 @@ public class PlayerUtil {
   public static boolean isBlockWithinReach(
       BlockPos blockPos, double x, double y, double z, double reach) {
     return blockPos.distanceSqToCenter(x, y, z) < Math.pow(reach, 2.0);
+  }
+
+  /**
+   * Calculates the exact distance from the player's eyes to the entity's bounding box using AABB
+   * calculateIntercept. More accurate than distanceToEntity for hit validation. Ported from Rise 6.
+   */
+  public static double calculatePerfectRangeToEntity(Entity entity) {
+    double range = 1000;
+    Vec3 eyes = mc.thePlayer.getPositionEyes(1.0f);
+    float[] rotations = RotationUtil.calculate(entity);
+    Vec3 rotationVector = RayCastUtil.getVectorForRotation(rotations[1], rotations[0]);
+    AxisAlignedBB bb = entity.getEntityBoundingBox().expand(0.1, 0.1, 0.1);
+    MovingObjectPosition mop =
+        bb.calculateIntercept(
+            eyes,
+            eyes.addVector(
+                rotationVector.xCoord * range,
+                rotationVector.yCoord * range,
+                rotationVector.zCoord * range));
+    if (mop != null) {
+      return mop.hitVec.distanceTo(eyes);
+    }
+    return Double.MAX_VALUE;
   }
 
   public static void attackEntity(Entity target) {

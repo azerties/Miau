@@ -2,7 +2,7 @@ package myau.module.modules.render;
 
 import myau.module.Module;
 import myau.property.properties.BooleanProperty;
-import myau.ui.clickgui.miau.ClickGui;
+import myau.ui.clickgui.ClickGui;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.input.Keyboard;
 

@@ -4,6 +4,7 @@ import com.google.common.base.Predicates;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.EntitySelectors;
 import net.minecraft.util.MathHelper;
@@ -18,7 +19,7 @@ public class RayCastUtil {
   }
 
   public static MovingObjectPosition rayCast(float yaw, float pitch, double range, float expand) {
-    return rayCast(yaw, pitch, range, expand, mc.thePlayer);
+    return rayCast(yaw, pitch, range, expand, mc.getRenderViewEntity());
   }
 
   public static MovingObjectPosition rayCast(
@@ -85,11 +86,93 @@ public class RayCastUtil {
     return null;
   }
 
+  /**
+   * Performs a ray intercept check specifically against a target entity's bounding box, supporting
+   * through-walls by ignoring block raycasting. This is used by KillAura for precise through-walls
+   * targeting.
+   *
+   * @return MovingObjectPosition with entityHit set, or null if not intercepting
+   */
+  public static MovingObjectPosition getEntityIntercept(
+      Entity target, float yaw, float pitch, double range) {
+    final float partialTicks = ((myau.mixin.IAccessorMinecraft) mc).getTimer().renderPartialTicks;
+    Entity viewEntity = mc.getRenderViewEntity();
+    if (viewEntity == null || mc.theWorld == null || target == null) return null;
+
+    Vec3 eyePos = viewEntity.getPositionEyes(partialTicks);
+    Vec3 lookVec = getVectorForRotation(pitch, yaw);
+    Vec3 targetPos =
+        eyePos.addVector(lookVec.xCoord * range, lookVec.yCoord * range, lookVec.zCoord * range);
+
+    float borderSize = target.getCollisionBorderSize();
+    AxisAlignedBB bb = target.getEntityBoundingBox().expand(borderSize, borderSize, borderSize);
+    MovingObjectPosition mop = bb.calculateIntercept(eyePos, targetPos);
+
+    if (mop != null || bb.isVecInside(eyePos)) {
+      MovingObjectPosition result =
+          new MovingObjectPosition(target, mop != null ? mop.hitVec : eyePos);
+      return result;
+    }
+
+    return null;
+  }
+
   public static Vec3 getVectorForRotation(float pitch, float yaw) {
     float f = MathHelper.cos(-yaw * 0.017453292F - (float) Math.PI);
     float f1 = MathHelper.sin(-yaw * 0.017453292F - (float) Math.PI);
     float f2 = -MathHelper.cos(-pitch * 0.017453292F);
     float f3 = MathHelper.sin(-pitch * 0.017453292F);
     return new Vec3(f1 * f2, f3, f * f2);
+  }
+
+  /**
+   * Multi-point bounding box visibility check. Ported from Rise 6. For non-player entities: simple
+   * raycast to center. For player entities: scans 27 points (3x3x3) on bounding box to check if any
+   * part of the entity is visible.
+   *
+   * @return true if the entity is visible through raycast
+   */
+  public static boolean inView(final Entity entity) {
+    final int renderDistance = 16 * mc.gameSettings.renderDistanceChunks;
+    final float[] rotations = RotationUtil.calculate(entity);
+
+    // Early exit if entity is outside FOV
+    if (MoveUtil.wrappedDifference(mc.thePlayer.rotationYaw, rotations[0])
+        > mc.gameSettings.fovSetting) {
+      return false;
+    }
+
+    // For non-player entities (mobs, etc.): simple center point raycast
+    if (!(entity instanceof EntityPlayer)) {
+      MovingObjectPosition mop =
+          RayCastUtil.rayCast(rotations[0], rotations[1], renderDistance, 0.2f);
+      return mop != null && mop.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY;
+    }
+
+    // For player entities: multi-point scan across bounding box (3x3x3 grid)
+    AxisAlignedBB bb = entity.getEntityBoundingBox();
+    double width = bb.maxX - bb.minX;
+    double height = bb.maxY - bb.minY;
+    double depth = bb.maxZ - bb.minZ;
+
+    for (double yPercent = 1.0; yPercent >= -1.0; yPercent -= 0.5) {
+      for (double xPercent = 1.0; xPercent >= -1.0; xPercent -= 1.0) {
+        for (double zPercent = 1.0; zPercent >= -1.0; zPercent -= 1.0) {
+          Vec3 point =
+              new Vec3(
+                  bb.minX + width * xPercent,
+                  bb.minY + height * yPercent,
+                  bb.minZ + depth * zPercent);
+          float[] subRotations = RotationUtil.calculate(point);
+          MovingObjectPosition mop =
+              RayCastUtil.rayCast(subRotations[0], subRotations[1], renderDistance, 0.2f);
+          if (mop != null && mop.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   }
 }

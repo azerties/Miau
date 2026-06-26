@@ -183,6 +183,8 @@ public class RotationUtil {
     return RotationUtil.mc.theWorld.rayTraceBlocks(eyePos, targetPos);
   }
 
+  // Removed obsolete rayTrace(AxisAlignedBB...)
+
   private static float randomAngle = 0.0f;
   private static float offsetX = 0.0f;
   private static float offsetY = 0.0f;

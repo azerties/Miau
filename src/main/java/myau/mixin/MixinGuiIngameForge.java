@@ -41,7 +41,9 @@ public abstract class MixinGuiIngameForge {
       return entityPlayerSP.experience;
     } else {
       NickHider event = (NickHider) Myau.moduleManager.modules.get(NickHider.class);
-      return event.isEnabled() && event.level.getValue() ? 0.0F : entityPlayerSP.experience;
+      return event != null && event.isEnabled() && event.level.getValue()
+          ? 0.0F
+          : entityPlayerSP.experience;
     }
   }
 
@@ -56,7 +58,9 @@ public abstract class MixinGuiIngameForge {
       return entityPlayerSP.experienceLevel;
     } else {
       NickHider event = (NickHider) Myau.moduleManager.modules.get(NickHider.class);
-      return event.isEnabled() && event.level.getValue() ? 0 : entityPlayerSP.experienceLevel;
+      return event != null && event.isEnabled() && event.level.getValue()
+          ? 0
+          : entityPlayerSP.experienceLevel;
     }
   }
 }

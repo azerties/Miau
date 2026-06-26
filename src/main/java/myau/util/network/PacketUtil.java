@@ -186,16 +186,19 @@ public class PacketUtil {
     try {
       if (packet == null) return false;
 
+      // Check if chunk coordinate is valid
       int chunkX = packet.getChunkX();
       int chunkZ = packet.getChunkZ();
 
+      // Validate chunk coordinates are within reasonable bounds
       if (Math.abs(chunkX) > 30000000 || Math.abs(chunkZ) > 30000000) {
         LOGGER.warn("Invalid chunk coordinates from ViaVersion: x={}, z={}", chunkX, chunkZ);
         return false;
       }
 
+      // Check if extractedSize is valid (ViaVersion can corrupt this)
       int extractedSize = packet.getExtractedSize();
-      if (extractedSize < 0 || extractedSize > 2097152) {
+      if (extractedSize < 0 || extractedSize > 2097152) { // 2MB max
         LOGGER.warn(
             "Invalid chunk data size from ViaVersion: {} bytes at x={}, z={}",
             extractedSize,
@@ -216,6 +219,7 @@ public class PacketUtil {
     try {
       if (packet == null) return false;
 
+      // Check chunk count
       int chunkCount = packet.getChunkCount();
       if (chunkCount <= 0 || chunkCount > 1024) {
         LOGGER.warn("Invalid bulk chunk count from ViaVersion: {}", chunkCount);
@@ -233,6 +237,7 @@ public class PacketUtil {
   private static void logChunkError(String packetType, Exception e, Object... details) {
     long currentTime = System.currentTimeMillis();
 
+    // Reset counter if last error was more than 5 seconds ago
     if (currentTime - lastChunkErrorTime > 5000) {
       chunkErrorCount = 0;
     }
@@ -240,6 +245,7 @@ public class PacketUtil {
     chunkErrorCount++;
     lastChunkErrorTime = currentTime;
 
+    // Log full details for first few errors, then summarize
     if (chunkErrorCount <= 3) {
       LOGGER.error(
           "ViaVersion chunk packet error #{} [{}]: {}",

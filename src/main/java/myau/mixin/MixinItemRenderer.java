@@ -1,5 +1,6 @@
 package myau.mixin;
 
+import myau.interfaces.IMixinItemRenderer;
 import myau.module.modules.render.Animations;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -18,10 +19,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ItemRenderer.class)
-public abstract class MixinItemRenderer {
+public abstract class MixinItemRenderer implements IMixinItemRenderer {
   @Shadow private float prevEquippedProgress;
 
   @Shadow private float equippedProgress;
@@ -65,6 +68,32 @@ public abstract class MixinItemRenderer {
   protected abstract void renderPlayerArm(
       AbstractClientPlayer clientPlayer, float equipProgress, float swingProgress);
 
+  // ─── spoofItem support ─────────────────────────────────────────────────
+  private ItemStack originalItemToRender;
+  public boolean cancelUpdate = false;
+  public boolean cancelReset = false;
+  private boolean renderItemInUse;
+
+  @Override
+  public void setCancelUpdate(boolean cancel) {
+    this.cancelUpdate = cancel;
+  }
+
+  @Override
+  public void setCancelReset(boolean reset) {
+    this.cancelReset = reset;
+  }
+
+  @Override
+  public boolean isRenderItemInUse() {
+    return renderItemInUse;
+  }
+
+  @Override
+  public void setRenderItemInUse(boolean renderItemInUse) {
+    this.renderItemInUse = renderItemInUse;
+  }
+
   @Redirect(
       method = "updateEquippedItem",
       at =
@@ -76,12 +105,46 @@ public abstract class MixinItemRenderer {
     return inventoryPlayer.mainInventory[inventoryPlayer.currentItem];
   }
 
+  @Inject(method = "updateEquippedItem", at = @At("HEAD"), cancellable = true)
+  private void onUpdateEquippedItem(CallbackInfo ci) {
+    if (cancelUpdate) {
+      cancelUpdate = false;
+      equippedProgress = 1.0F;
+      prevEquippedProgress = 1.0f;
+      ci.cancel();
+    }
+  }
+
+  @Inject(method = "resetEquippedProgress", at = @At("HEAD"), cancellable = true)
+  public void injectResetEquippedProgress(CallbackInfo ci) {
+    if (cancelReset) {
+      cancelReset = false;
+      equippedProgress = 1.0F;
+      prevEquippedProgress = 1.0f;
+      ci.cancel();
+    }
+  }
+
+  @Inject(method = "resetEquippedProgress2", at = @At("HEAD"), cancellable = true)
+  public void injectResetEquippedProgress2(CallbackInfo ci) {
+    if (cancelReset) {
+      cancelReset = false;
+      equippedProgress = 1.0F;
+      prevEquippedProgress = 1.0f;
+      ci.cancel();
+    }
+  }
+
   /**
    * @author CCBlueX, ported to Miau
-   * @reason Add configurable blocking animations.
+   * @reason Add configurable blocking animations + spoofItem support.
    */
   @Overwrite
   public void renderItemInFirstPerson(float partialTicks) {
+    // spoofItem: swap itemToRender before rendering
+    originalItemToRender = itemToRender;
+    itemToRender = getSpoofedItem(originalItemToRender);
+
     float equipProgress =
         1.0F
             - (this.prevEquippedProgress
@@ -122,10 +185,8 @@ public abstract class MixinItemRenderer {
           this.doBowTransformations(partialTicks, player);
         }
       } else {
-        if (!Animations.applySwing(swingProgress, equipProgress)) {
-          this.doItemUsedTransformations(swingProgress);
-          this.transformFirstPersonItem(equipProgress, swingProgress);
-        }
+        this.doItemUsedTransformations(swingProgress);
+        this.transformFirstPersonItem(equipProgress, swingProgress);
       }
 
       this.renderItem(player, this.itemToRender, ItemCameraTransforms.TransformType.FIRST_PERSON);
@@ -136,5 +197,27 @@ public abstract class MixinItemRenderer {
     GlStateManager.popMatrix();
     GlStateManager.disableRescaleNormal();
     RenderHelper.disableStandardItemLighting();
+
+    // spoofItem: restore original itemToRender after rendering
+    itemToRender = originalItemToRender;
+  }
+
+  private static ItemStack getSpoofedItem(ItemStack original) {
+    myau.module.modules.player.AutoTool autoTool =
+        (myau.module.modules.player.AutoTool)
+            myau.Myau.moduleManager.getModule(myau.module.modules.player.AutoTool.class);
+    if (autoTool != null
+        && autoTool.isEnabled()
+        && autoTool.spoofItem.getValue()
+        && Minecraft.getMinecraft().thePlayer != null) {
+      return Minecraft.getMinecraft()
+          .thePlayer
+          .inventory
+          .getStackInSlot(
+              autoTool.previousSlot == -1
+                  ? Minecraft.getMinecraft().thePlayer.inventory.currentItem
+                  : autoTool.previousSlot);
+    }
+    return original;
   }
 }

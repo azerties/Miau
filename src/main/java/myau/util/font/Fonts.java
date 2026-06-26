@@ -90,7 +90,7 @@ public enum Fonts {
           return MINECRAFT.get();
         }
       } catch (Exception e) {
-
+        e.printStackTrace();
         return MINECRAFT.get();
       }
     }

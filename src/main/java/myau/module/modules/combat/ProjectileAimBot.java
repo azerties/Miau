@@ -12,7 +12,7 @@ import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
 import myau.property.properties.ModeProperty;
 import myau.util.player.RotationUtil;
-import myau.util.render.ShapeUtil;
+import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
@@ -215,8 +215,8 @@ public class ProjectileAimBot extends Module {
 
     GlStateManager.pushMatrix();
     GlStateManager.translate(renderX, renderY + 0.02D, renderZ);
-    ShapeUtil.drawLine((float) -radius, 0.0F, (float) radius, 0.0F, 2.0F, color.getRGB());
-    ShapeUtil.drawLine(0.0F, (float) -radius, 0.0F, (float) radius, 2.0F, color.getRGB());
+    RenderUtil.drawLine((float) -radius, 0.0F, (float) radius, 0.0F, 2.0F, color.getRGB());
+    RenderUtil.drawLine(0.0F, (float) -radius, 0.0F, (float) radius, 2.0F, color.getRGB());
     GlStateManager.popMatrix();
   }
 

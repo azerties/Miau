@@ -9,7 +9,6 @@ import myau.module.Module;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.PercentProperty;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
@@ -206,7 +205,7 @@ public class Trajectories extends Module {
             case 1:
               GlStateManager.rotate(90.0F, 1.0F, 0.0F, 0.0F);
           }
-          ShapeUtil.drawLine(
+          RenderUtil.drawLine(
               -0.25F,
               -0.25F,
               0.25F,
@@ -218,7 +217,7 @@ public class Trajectories extends Module {
                       hasHitEntity ? 85 : 255,
                       (int) (this.opacity.getValue().floatValue() / 100.0F * 255.0F))
                   .getRGB());
-          ShapeUtil.drawLine(
+          RenderUtil.drawLine(
               -0.25F,
               0.25F,
               0.25F,

@@ -1,11 +1,14 @@
 package myau.module.modules.minigames;
 
 import java.awt.Color;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -19,28 +22,41 @@ import myau.event.impl.TickEvent;
 import myau.event.types.EventType;
 import myau.event.types.Priority;
 import myau.module.Module;
-import myau.notification.NotificationType;
 import myau.property.properties.*;
 import myau.util.client.ChatUtil;
 import myau.util.client.SoundUtil;
 import myau.util.player.TeamUtil;
 import myau.util.render.ColorUtil;
+import net.minecraft.block.BlockBed;
+import net.minecraft.block.BlockObsidian;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityEnderPearl;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
+import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemBow;
 import net.minecraft.item.ItemEnderPearl;
+import net.minecraft.item.ItemFireball;
+import net.minecraft.item.ItemPotion;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemSword;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.network.play.server.S02PacketChat;
+import net.minecraft.network.play.server.S04PacketEntityEquipment;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
+import net.minecraft.network.play.server.S23PacketBlockChange;
+import net.minecraft.potion.Potion;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
@@ -56,8 +72,96 @@ public class BedwarUtils extends Module {
       new BooleanProperty("hud-shadow", true, this.hud::getValue);
   public final BooleanProperty diamondUpgrades = new BooleanProperty("diamond-upgrades", true);
   public final BooleanProperty itemTracker = new BooleanProperty("item-tracker", true);
+  public final BooleanProperty itemAlerts = new BooleanProperty("item-alerts", true);
+  public final BooleanProperty chatAlerts =
+      new BooleanProperty("chat-alerts", true, this.itemAlerts::getValue);
+  public final BooleanProperty hudAlerts =
+      new BooleanProperty("hud-alerts", true, this.itemAlerts::getValue);
+  public final FloatProperty hudAlertDuration =
+      new FloatProperty("hud-duration", 5.0F, 0.0F, 10.0F, this.hudAlerts::getValue);
+  public final IntProperty alertDelay =
+      new IntProperty("alert-delay", 15, 0, 60, this.itemAlerts::getValue);
+  public final BooleanProperty trackTeammates =
+      new BooleanProperty("track-teammates", false, this.itemAlerts::getValue);
+  public final BooleanProperty trackBow =
+      new BooleanProperty("track-bow", true, this.itemAlerts::getValue);
+  public final BooleanProperty trackPotions =
+      new BooleanProperty("track-potions", true, this.itemAlerts::getValue);
+  public final BooleanProperty trackSpecials =
+      new BooleanProperty("track-specials", true, this.itemAlerts::getValue);
+  public final BooleanProperty trackUpgrades =
+      new BooleanProperty("track-upgrades", true, this.itemAlerts::getValue);
   public final BooleanProperty bedTracker = new BooleanProperty("bedtracker", true);
   public final BooleanProperty invisAlert = new BooleanProperty("invis-alert", true);
+  public final BooleanProperty diamondArmor = new BooleanProperty("diamond-armor", true);
+  public final BooleanProperty fireballAlert = new BooleanProperty("fireball-alert", false);
+  public final BooleanProperty enderPearlAlert = new BooleanProperty("ender-pearl-alert", true);
+  public final BooleanProperty obsidianAlert = new BooleanProperty("obsidian-alert", true);
+  public final BooleanProperty alertSound = new BooleanProperty("alert-sound", true);
+  public final BooleanProperty alertDistance = new BooleanProperty("alert-distance", true);
+
+  public enum TeamBedColor {
+    RED('c', 14, "RED"),
+    GREEN('a', 13, "GREEN"),
+    BLUE('9', 11, "BLUE"),
+    YELLOW('e', 4, "YELLOW"),
+    AQUA('b', 3, "AQUA"),
+    WHITE('f', 0, "WHITE"),
+    PINK('d', 6, "PINK"),
+    GRAY('7', 8, "GRAY");
+
+    public final char colorCode;
+
+    /** Wool metadata color, also used for bed identification in 1.8.9 */
+    public final int woolMeta;
+
+    public final String name;
+
+    TeamBedColor(char colorCode, int woolMeta, String name) {
+      this.colorCode = colorCode;
+      this.woolMeta = woolMeta;
+      this.name = name;
+    }
+
+    public static TeamBedColor fromColorCode(char code) {
+      for (TeamBedColor c : values()) {
+        if (c.colorCode == code) return c;
+      }
+      return null;
+    }
+  }
+
+  // Detect own team bed color from scoreboard teams on Hypixel
+  public static TeamBedColor detectOwnTeamColor() {
+    if (mc.thePlayer == null || mc.getNetHandler() == null) return null;
+    NetworkPlayerInfo selfInfo = mc.getNetHandler().getPlayerInfo(mc.thePlayer.getUniqueID());
+    if (selfInfo == null) return null;
+    net.minecraft.scoreboard.ScorePlayerTeam team = selfInfo.getPlayerTeam();
+    if (team == null) return null;
+    String prefix = team.getColorPrefix();
+    if (prefix == null || prefix.length() < 2) return null;
+    char code = prefix.charAt(1);
+    return TeamBedColor.fromColorCode(code);
+  }
+
+  // Get the own bed position from the BedTracker (if available)
+  // Populated when BedwarUtils is enabled and bedTracker is on
+  private static BlockPos trackedOwnBed = null;
+
+  public static BlockPos getTrackedOwnBed() {
+    return trackedOwnBed;
+  }
+
+  private void updateTrackedOwnBed() {
+    if (this.bedTracker.getValue() && this.isEnabled()) {
+      BlockPos pos = this.bedTrackerDelegate.getBedPos();
+      if (this.bedTrackerDelegate.isBed(pos)) {
+        trackedOwnBed = pos;
+        return;
+      }
+    }
+    trackedOwnBed = null;
+  }
 
   public final BooleanProperty bedTrackerAlerts;
   public final IntProperty bedTrackerAlertRange;
@@ -88,15 +192,12 @@ public class BedwarUtils extends Module {
   private boolean sharp;
   private int protLevel;
   private final LinkedHashMap<String, Long> invisAlertCooldowns = new LinkedHashMap<>();
-
-  private final java.util.Collection<EntityPlayer> ironSword = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> diamondSword = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> stoneSword = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> diamondArmor = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> chainArmor = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> ironArmor = new java.util.HashSet<>();
-  private final java.util.Collection<EntityPlayer> invisible = new java.util.HashSet<>();
-  private boolean wasThePlayerInvis = false;
+  private final Set<String> armoredPlayers = new HashSet<>();
+  private final Map<String, String> lastHeldMap = new ConcurrentHashMap<>();
+  private final Map<BlockPos, Long> trackedObsidian = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, Long>> alertCooldowns = new ConcurrentHashMap<>();
+  private final Set<String> trackedTeamUpgrades = new HashSet<>();
+  private final Map<String, String> itemDisplayColors = new HashMap<>();
 
   public BedwarUtils() {
     super("BedwarUtils", false, false);
@@ -120,35 +221,61 @@ public class BedwarUtils extends Module {
     this.bedTrackerHudScale = this.bedTrackerDelegate.hudScale;
     this.bedTrackerHudShadow = this.bedTrackerDelegate.hudShadow;
     this.bedTrackerDelegate.setEnabled(true);
+    this.initItemDisplayColors();
   }
 
   @EventTarget
   public void onPacket(PacketEvent event) {
-    if (!this.isEnabled()
-        || event.getType() != EventType.RECEIVE
-        || !(event.getPacket() instanceof S02PacketChat)) {
+    if (!this.isEnabled() || event.getType() != EventType.RECEIVE) {
       return;
     }
-    String text = ((S02PacketChat) event.getPacket()).getChatComponent().getUnformattedText();
-    String formattedText =
-        ((S02PacketChat) event.getPacket()).getChatComponent().getFormattedText();
-    this.scanMessage(text, formattedText);
-    if (this.bedTracker.getValue()) {
-      this.bedTrackerDelegate.onPacket(event);
+    if (event.getPacket() instanceof S02PacketChat) {
+      String text = ((S02PacketChat) event.getPacket()).getChatComponent().getUnformattedText();
+      String formattedText =
+          ((S02PacketChat) event.getPacket()).getChatComponent().getFormattedText();
+      this.scanMessage(text, formattedText);
+      if (this.bedTracker.getValue()) {
+        this.bedTrackerDelegate.onPacket(event);
+      }
     }
+    if (this.obsidianAlert.getValue() && event.getPacket() instanceof S23PacketBlockChange) {
+      S23PacketBlockChange p = (S23PacketBlockChange) event.getPacket();
+      if (p.getBlockState() != null
+          && p.getBlockState().getBlock() instanceof BlockObsidian
+          && isNextToBed(p.getBlockPosition())) {
+        this.trackedObsidian.put(p.getBlockPosition(), System.currentTimeMillis());
+        if (mc.thePlayer != null) {
+          ChatUtil.display("&7Obsidian placed near bed!");
+          if (this.alertSound.getValue()) {
+            SoundUtil.playSound("note.pling");
+          }
+        }
+      }
+    }
+    if (this.itemAlerts.getValue() && event.getPacket() instanceof S04PacketEntityEquipment) {
+      this.processEquipmentAlert((S04PacketEntityEquipment) event.getPacket());
+    }
+  }
+
+  @Override
+  public void onEnabled() {
+    this.alertCooldowns.clear();
+    this.trackedTeamUpgrades.clear();
+  }
+
+  @Override
+  public void onDisabled() {
+    this.alertCooldowns.clear();
+    this.trackedTeamUpgrades.clear();
   }
 
   @EventTarget
   public void onLoadWorld(LoadWorldEvent event) {
     this.reset(false);
+    this.alertCooldowns.clear();
+    this.trackedTeamUpgrades.clear();
     this.bedTrackerDelegate.onLoadWorld(event);
-    this.diamondSword.clear();
-    this.ironSword.clear();
-    this.stoneSword.clear();
-    this.chainArmor.clear();
-    this.ironArmor.clear();
-    this.diamondArmor.clear();
-    this.invisible.clear();
+    trackedOwnBed = null;
   }
 
   @EventTarget
@@ -161,167 +288,30 @@ public class BedwarUtils extends Module {
     }
     if (this.itemTracker.getValue()) {
       for (Object object : mc.theWorld.playerEntities) {
-        if (!(object instanceof EntityPlayer)) continue;
-        EntityPlayer entity = (EntityPlayer) object;
-        if (entity == mc.thePlayer || entity.isDead || entity.getName() == null) continue;
-
-        if (entity.getHeldItem() != null
-            && entity.getHeldItem().getItem() instanceof net.minecraft.item.ItemSword) {
-          String type =
-              ((net.minecraft.item.ItemSword) entity.getHeldItem().getItem())
-                  .getToolMaterialName()
-                  .toLowerCase();
-          if (type.contains("iron")) {
-            if (!this.ironSword.contains(entity)) {
-              this.ironSword.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has an "
-                      + EnumChatFormatting.AQUA
-                      + "Iron Sword");
-            }
-          } else if (type.contains("emerald")) {
-            if (!this.diamondSword.contains(entity)) {
-              this.diamondSword.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has a "
-                      + EnumChatFormatting.AQUA
-                      + "Diamond Sword");
-            }
-          } else if (type.contains("stone")) {
-            if (!this.stoneSword.contains(entity)) {
-              this.stoneSword.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has a "
-                      + EnumChatFormatting.AQUA
-                      + "Stone Sword");
-            }
-          } else if (type.contains("wood")) {
-            this.stoneSword.remove(entity);
-            this.ironSword.remove(entity);
-            this.diamondSword.remove(entity);
-          }
+        if (!(object instanceof EntityPlayer)) {
+          continue;
         }
-
-        net.minecraft.item.ItemStack entityCurrentArmor = entity.getCurrentArmor(2);
-        if (entityCurrentArmor == null) entityCurrentArmor = entity.getCurrentArmor(1);
-        if (entityCurrentArmor != null
-            && entityCurrentArmor.getItem() instanceof net.minecraft.item.ItemArmor) {
-          net.minecraft.item.ItemArmor armor =
-              (net.minecraft.item.ItemArmor) entityCurrentArmor.getItem();
-          if (armor.getArmorMaterial() == net.minecraft.item.ItemArmor.ArmorMaterial.CHAIN) {
-            if (!this.chainArmor.contains(entity)) {
-              this.chainArmor.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has "
-                      + EnumChatFormatting.LIGHT_PURPLE
-                      + "Chain Armor");
-            }
-          } else if (armor.getArmorMaterial() == net.minecraft.item.ItemArmor.ArmorMaterial.IRON) {
-            if (!this.ironArmor.contains(entity)) {
-              this.ironArmor.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has "
-                      + EnumChatFormatting.LIGHT_PURPLE
-                      + "Iron Armor");
-            }
-          } else if (armor.getArmorMaterial()
-              == net.minecraft.item.ItemArmor.ArmorMaterial.DIAMOND) {
-            if (!this.diamondArmor.contains(entity)) {
-              this.diamondArmor.add(entity);
-              ChatUtil.display(
-                  "Player "
-                      + EnumChatFormatting.RED
-                      + entity.getName()
-                      + EnumChatFormatting.WHITE
-                      + " has "
-                      + EnumChatFormatting.LIGHT_PURPLE
-                      + "Diamond Armor");
-            }
-          } else if (armor.getArmorMaterial()
-              == net.minecraft.item.ItemArmor.ArmorMaterial.LEATHER) {
-            this.chainArmor.remove(entity);
-            this.ironArmor.remove(entity);
-            this.diamondArmor.remove(entity);
-          }
+        EntityPlayer player = (EntityPlayer) object;
+        if (player == mc.thePlayer
+            || player.isDead
+            || player.getName() == null
+            || player.getName().isEmpty()) {
+          continue;
+        }
+        this.scanPlayerItem(player, "held", player.getHeldItem());
+        for (int slot = 0; slot < 4; slot++) {
+          this.scanPlayerItem(player, "armor-" + slot, player.getCurrentArmor(slot));
         }
       }
     }
     if (this.bedTracker.getValue()) {
       this.bedTrackerDelegate.onTick(event);
     }
+    this.updateTrackedOwnBed();
     if (this.invisAlert.getValue()) {
-      for (Object object : mc.theWorld.playerEntities) {
-        if (!(object instanceof EntityPlayer)) continue;
-        EntityPlayer entity = (EntityPlayer) object;
-        if (entity == mc.thePlayer || entity.isDead || entity.getName() == null) continue;
-
-        if (entity.getActivePotionEffect(net.minecraft.potion.Potion.invisibility) != null) {
-          if (!this.invisible.contains(entity)) {
-            this.invisible.add(entity);
-            ChatUtil.display(
-                "Player "
-                    + EnumChatFormatting.RED
-                    + entity.getName()
-                    + EnumChatFormatting.WHITE
-                    + " is now "
-                    + EnumChatFormatting.GOLD
-                    + "Invisible");
-          }
-        } else if (this.invisible.contains(entity)) {
-          this.invisible.remove(entity);
-          ChatUtil.display(
-              "Player "
-                  + EnumChatFormatting.RED
-                  + entity.getName()
-                  + EnumChatFormatting.WHITE
-                  + " is now "
-                  + EnumChatFormatting.GOLD
-                  + "Visible");
-        }
-      }
-
-      if (mc.thePlayer.getActivePotionEffect(net.minecraft.potion.Potion.invisibility) != null) {
-        wasThePlayerInvis = true;
-        if (mc.thePlayer.ticksExisted % 200 == 0) {
-          ChatUtil.display(
-              "Your Invisibility"
-                  + EnumChatFormatting.RED
-                  + " expires "
-                  + EnumChatFormatting.RESET
-                  + "in "
-                  + EnumChatFormatting.RED
-                  + (mc.thePlayer
-                          .getActivePotionEffect(net.minecraft.potion.Potion.invisibility)
-                          .getDuration()
-                      / 20)
-                  + EnumChatFormatting.RESET
-                  + " second(s)");
-        }
-      } else if (wasThePlayerInvis) {
-        ChatUtil.display("Invisibility" + EnumChatFormatting.RED + " Expired");
-        wasThePlayerInvis = false;
-      }
+      this.scanInvisiblePlayers();
     }
+    this.scanPlayerAlerts();
   }
 
   @EventTarget
@@ -379,6 +369,7 @@ public class BedwarUtils extends Module {
         this.protLevel = Math.max(this.protLevel, level <= 0 ? 1 : level);
       }
     }
+    this.scanItemTracker(text, formattedText);
   }
 
   private boolean isNewGameMessage(String lower) {
@@ -601,6 +592,11 @@ public class BedwarUtils extends Module {
     }
     this.trackedItemMessages.clear();
     this.invisAlertCooldowns.clear();
+    this.armoredPlayers.clear();
+    this.lastHeldMap.clear();
+    this.trackedObsidian.clear();
+    this.alertCooldowns.clear();
+    this.trackedTeamUpgrades.clear();
   }
 
   private void sendItemTrackerMessage(String formattedPlayer, String item) {
@@ -609,18 +605,370 @@ public class BedwarUtils extends Module {
     }
     mc.thePlayer.addChatMessage(
         new ChatComponentText(this.getMyauPrefix() + " §f" + formattedPlayer + " §fhas §a" + item));
-
-    Myau.notificationManager
-        .builder(NotificationType.INFO)
-        .title("Item Alerts")
-        .description(
-            EnumChatFormatting.getTextWithoutFormattingCodes(formattedPlayer) + " has " + item)
-        .duration(2000)
-        .buildAndPublish();
   }
 
   private String getMyauPrefix() {
     return ChatColors.formatColor(Myau.clientName).trim();
+  }
+
+  private void scanPlayerAlerts() {
+    if (!this.fireballAlert.getValue() && !this.enderPearlAlert.getValue()) {
+      return;
+    }
+    for (EntityPlayer player : mc.theWorld.playerEntities) {
+      if (player == null || player == mc.thePlayer || player.isDead) continue;
+      String name = player.getName();
+      if (name == null) continue;
+
+      ItemStack held = player.getHeldItem();
+      String itemType = this.getAlertItemType(held);
+      if (itemType != null) {
+        if (!this.lastHeldMap.containsKey(name)) {
+          this.lastHeldMap.put(name, itemType);
+          this.sendAlert(player.getDisplayName().getFormattedText(), itemType, player);
+        } else {
+          String prevItemType = this.lastHeldMap.get(name);
+          if (!prevItemType.equals(this.getAlertItemType(held))) {
+            this.lastHeldMap.remove(name);
+          }
+        }
+      }
+    }
+  }
+
+  private String getAlertItemType(ItemStack item) {
+    if (item == null || item.getItem() == null) return null;
+    String unlocalizedName = item.getItem().getUnlocalizedName();
+    if (item.getItem() instanceof ItemEnderPearl && this.enderPearlAlert.getValue()) {
+      return "&7an &3Ender Pearl";
+    } else if (unlocalizedName.contains("tile.obsidian") && false) {
+      return null;
+    } else if (item.getItem() instanceof ItemFireball && this.fireballAlert.getValue()) {
+      return "&7a &6Fireball";
+    }
+    return null;
+  }
+
+  private void sendAlert(String formattedName, String itemType, EntityPlayer player) {
+    String distance = "";
+    if (this.alertDistance.getValue() && player != null && mc.thePlayer != null) {
+      double dist = Math.round(mc.thePlayer.getDistanceToEntity(player));
+      distance = " &7(" + "§d" + (int) dist + "m" + "&7)";
+    }
+    String alert = "&r" + formattedName + " &7is holding " + itemType + distance;
+    ChatUtil.display(alert);
+
+    if (this.alertSound.getValue()) {
+      SoundUtil.playSound("note.pling");
+    }
+  }
+
+  private boolean isNextToBed(BlockPos blockPos) {
+    for (EnumFacing enumFacing : EnumFacing.values()) {
+      BlockPos offset = blockPos.offset(enumFacing);
+      if (mc.theWorld != null && mc.theWorld.getBlockState(offset).getBlock() instanceof BlockBed) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void initItemDisplayColors() {
+    this.itemDisplayColors.put("&fChainmail Armor", "chainmail_armor");
+    this.itemDisplayColors.put("&fIron Armor", "iron_armor");
+    this.itemDisplayColors.put("&bDiamond Armor", "diamond_armor");
+    this.itemDisplayColors.put("&fIron Sword", "iron_sword");
+    this.itemDisplayColors.put("&bDiamond Sword", "diamond_sword");
+    this.itemDisplayColors.put("&bDiamond Pickaxe", "diamond_pickaxe");
+    this.itemDisplayColors.put("&3Ender Pearl", "ender_pearl");
+    this.itemDisplayColors.put("&eBridge Egg", "egg");
+    this.itemDisplayColors.put("&6Fireball", "fire_charge");
+    this.itemDisplayColors.put("&2Bow", "Bow");
+    this.itemDisplayColors.put("&5Obsidian", "obsidian");
+    this.itemDisplayColors.put("&cT&fN&cT", "tnt");
+    this.itemDisplayColors.put("&3Block Zapper", "prismarine_shard");
+    this.itemDisplayColors.put("&bSpeed Potion", "Speed II Potion (45 seconds)");
+    this.itemDisplayColors.put("&aJump Boost Potion", "Jump V Potion (45 seconds)");
+    this.itemDisplayColors.put("&fInvisibility Potion", "Invisibility Potion (30 seconds)");
+    this.itemDisplayColors.put("&fIron Golem", "&cDream Defender");
+    this.itemDisplayColors.put("&4Machine Gun Bow", "Machine Gun Bow");
+    this.itemDisplayColors.put("&dCharlie the Unicorn", "Charlie the Unicorn");
+    this.itemDisplayColors.put("&bIce Bridge", "Ice Bridge");
+    this.itemDisplayColors.put("&cSleeping Dust", "Sleeping Dust");
+    this.itemDisplayColors.put("&eUnstable Teleportation Device", "Unstable Teleportation Device");
+    this.itemDisplayColors.put("&2Devastator Bow", "Devastator Bow");
+    this.itemDisplayColors.put("&eMiracle of the Stars", "Miracle of the Stars");
+    this.itemDisplayColors.put("&dMystic Mirror", "Mystic Mirror");
+  }
+
+  private void processEquipmentAlert(S04PacketEntityEquipment packet) {
+    Entity entity = mc.theWorld.getEntityByID(packet.getEntityID());
+    if (mc.thePlayer == null || mc.theWorld == null) return;
+    if (!(entity instanceof EntityPlayer)) return;
+    EntityPlayer player = (EntityPlayer) entity;
+    if (player == mc.thePlayer || player.isDead) return;
+
+    // Check teammate filter
+    if (!this.trackTeammates.getValue() && TeamUtil.isSameTeam(player)) return;
+
+    ItemStack item = packet.getItemStack();
+    int slot = packet.getEquipmentSlot();
+    String playerName = player.getName();
+    String displayName = player.getDisplayName().getFormattedText();
+    String teamColor = this.extractTeamColor(player);
+    if (teamColor == null) return;
+
+    if (item == null) return;
+
+    long now = System.currentTimeMillis();
+    int delayMs = this.alertDelay.getValue() * 1000;
+
+    // Track upgrades on equipment
+    if (this.trackUpgrades.getValue()
+        && item.hasTagCompound()
+        && item.getTagCompound().hasKey("ench", 9)) {
+      NBTTagList enchants = (NBTTagList) item.getTagCompound().getTag("ench");
+
+      // Slot 0 (held) with sword = Sharpened Swords
+      if (slot == 0
+          && item.getItem() instanceof ItemSword
+          && hasEnchantment(enchants, "sharpness")) {
+        String upgradeKey = "sharpness_" + playerName;
+        if (!this.trackedTeamUpgrades.contains(upgradeKey)) {
+          this.trackedTeamUpgrades.add(upgradeKey);
+          this.sendUpgradeAlert(
+              displayName, teamColor + " Team", "&bSharpened Swords", "sharpness");
+        }
+      }
+
+      // Slot 2 (leggings) with protection = Reinforced Armor
+      if (slot == 2
+          && item.getItem() instanceof ItemArmor
+          && hasEnchantment(enchants, "protection")) {
+        String upgradeKey = "protection_" + playerName;
+        if (!this.trackedTeamUpgrades.contains(upgradeKey)) {
+          this.trackedTeamUpgrades.add(upgradeKey);
+          this.sendUpgradeAlert(
+              displayName, teamColor + " Team", "&bReinforced Armor", "protection");
+        }
+      }
+    }
+
+    // Track equipment items
+    String trackedItemKey = this.getTrackedItemKey(item, slot);
+    if (trackedItemKey == null) return;
+
+    // Handle armor upgrades (slot 2 = leggings)
+    if (slot == 2 && this.isArmorTracked(trackedItemKey)) {
+      Map<String, Long> playerCooldowns =
+          this.alertCooldowns.getOrDefault(playerName, new ConcurrentHashMap<>());
+      String armorKey = "armor_" + trackedItemKey;
+      long lastTime = playerCooldowns.getOrDefault(armorKey, 0L);
+
+      if (now > lastTime + delayMs) {
+        playerCooldowns.put(armorKey, now);
+        this.alertCooldowns.put(playerName, playerCooldowns);
+        this.sendTrackedItemAlert(displayName, player, trackedItemKey, teamColor);
+      }
+      return;
+    }
+
+    // Handle held items (slot 0)
+    if (slot == 0 && this.isHeldItemTracked(trackedItemKey)) {
+      Map<String, Long> playerCooldowns =
+          this.alertCooldowns.getOrDefault(playerName, new ConcurrentHashMap<>());
+      long lastTime = playerCooldowns.getOrDefault(trackedItemKey, 0L);
+
+      if (now > lastTime + delayMs) {
+        playerCooldowns.put(trackedItemKey, now);
+        this.alertCooldowns.put(playerName, playerCooldowns);
+        this.sendTrackedItemAlert(displayName, player, trackedItemKey, teamColor);
+      }
+    }
+  }
+
+  private String extractTeamColor(EntityPlayer player) {
+    String formatted = player.getDisplayName().getFormattedText();
+    if (formatted.length() < 2) return null;
+    String code = formatted.substring(1, 2);
+    // Valid color codes for bedwars teams
+    if ("c9aebfd8".contains(code)) return code;
+    return null;
+  }
+
+  private boolean hasEnchantment(NBTTagList enchants, String name) {
+    // Check if any enchantment has the given name (simplified)
+    // In practice we'd check the enchantment IDs, but this is a simplified approach
+    for (int i = 0; i < enchants.tagCount(); i++) {
+      short id = enchants.getCompoundTagAt(i).getShort("id");
+      // Sharpness = 16, Protection = 0
+      if (name.equals("sharpness") && id == 16) return true;
+      if (name.equals("protection") && id == 0) return true;
+    }
+    return false;
+  }
+
+  private String getTrackedItemKey(ItemStack item, int slot) {
+    if (item == null || item.getItem() == null) return null;
+
+    String rawName = item.getItem().getUnlocalizedName();
+    String displayName = EnumChatFormatting.getTextWithoutFormattingCodes(item.getDisplayName());
+    String lowerDisplay = displayName.toLowerCase();
+
+    if (slot == 2) {
+      if (rawName.contains("diamond_armor")) return "diamond_armor";
+      if (rawName.contains("iron_armor")) return "iron_armor";
+      if (rawName.contains("chainmail_armor")) return "chainmail_armor";
+    }
+
+    if (slot == 0) {
+      if (rawName.contains("iron_sword")) return "iron_sword";
+      if (rawName.contains("diamond_sword")) return "diamond_sword";
+      if (rawName.contains("diamond_pickaxe")) return "diamond_pickaxe";
+      if (rawName.contains("ender_pearl") || item.getItem() instanceof ItemEnderPearl)
+        return "ender_pearl";
+      if (rawName.contains("egg")) return "egg";
+      if (rawName.contains("fire_charge")
+          || rawName.contains("fireball")
+          || item.getItem() instanceof ItemFireball) return "fire_charge";
+      if (rawName.contains("tnt")) return "tnt";
+      if (rawName.contains("prismarine_shard")) return "prismarine_shard";
+      if (rawName.contains("obsidian")) return "obsidian";
+
+      // By display name
+      if (this.trackBow.getValue()) {
+        if (item.getItem() instanceof ItemBow) return "Bow";
+        if (lowerDisplay.contains("machine gun bow")) return "Machine Gun Bow";
+        if (lowerDisplay.contains("devastator bow")) return "Devastator Bow";
+        if (lowerDisplay.contains("bow")) return "Bow";
+      }
+
+      if (this.trackPotions.getValue()) {
+        if (item.getItem() instanceof ItemPotion) {
+          ItemPotion potion = (ItemPotion) item.getItem();
+          if (potion.getEffects(item) != null) {
+            boolean isSpeed = false;
+            boolean isJump = false;
+            boolean isInvis = false;
+            for (Object effect : potion.getEffects(item)) {
+              if (effect instanceof PotionEffect) {
+                PotionEffect pe = (PotionEffect) effect;
+                if (pe.getPotionID() == Potion.moveSpeed.getId()) isSpeed = true;
+                if (pe.getPotionID() == Potion.jump.getId()) isJump = true;
+                if (pe.getPotionID() == Potion.invisibility.getId()) isInvis = true;
+              }
+            }
+            if (isSpeed && lowerDisplay.contains("speed")) return "Speed II Potion (45 seconds)";
+            if (isJump) return "Jump V Potion (45 seconds)";
+            if (isInvis) return "Invisibility Potion (30 seconds)";
+          }
+        }
+      }
+
+      if (this.trackSpecials.getValue()) {
+        if (lowerDisplay.contains("dream defender")) return "&cDream Defender";
+        if (lowerDisplay.contains("charlie the unicorn")) return "Charlie the Unicorn";
+        if (lowerDisplay.contains("ice bridge")) return "Ice Bridge";
+        if (lowerDisplay.contains("sleeping dust")) return "Sleeping Dust";
+        if (lowerDisplay.contains("unstable teleportation")) return "Unstable Teleportation Device";
+        if (lowerDisplay.contains("miracle of the stars")) return "Miracle of the Stars";
+        if (lowerDisplay.contains("mystic mirror")) return "Mystic Mirror";
+        if (lowerDisplay.contains("block zapper")) return "prismarine_shard";
+      }
+    }
+
+    return null;
+  }
+
+  private boolean isArmorTracked(String key) {
+    return key.equals("diamond_leggings")
+        || key.equals("iron_leggings")
+        || key.equals("chainmail_leggings");
+  }
+
+  private boolean isHeldItemTracked(String key) {
+    if (key == null) return false;
+    // These are always tracked when enabled
+    if (key.equals("iron_sword")
+        || key.equals("diamond_sword")
+        || key.equals("diamond_pickaxe")
+        || key.equals("ender_pearl")
+        || key.equals("egg")
+        || key.equals("fire_charge")
+        || key.equals("obsidian")
+        || key.equals("tnt")
+        || key.equals("prismarine_shard")
+        || key.equals("chainmail_leggings")
+        || key.equals("iron_leggings")
+        || key.equals("diamond_leggings")) {
+      return true;
+    }
+    // Check categories
+    if (key.equals("Bow") || key.equals("Machine Gun Bow") || key.equals("Devastator Bow")) {
+      return this.trackBow.getValue();
+    }
+    if (key.equals("Speed II Potion (45 seconds)")
+        || key.equals("Jump V Potion (45 seconds)")
+        || key.equals("Invisibility Potion (30 seconds)")) {
+      return this.trackPotions.getValue();
+    }
+    if (key.equals("&cDream Defender")
+        || key.equals("Charlie the Unicorn")
+        || key.equals("Ice Bridge")
+        || key.equals("Sleeping Dust")
+        || key.equals("Unstable Teleportation Device")
+        || key.equals("Miracle of the Stars")
+        || key.equals("Mystic Mirror")) {
+      return this.trackSpecials.getValue();
+    }
+    return false;
+  }
+
+  private String getItemAlertDisplayColor(String itemKey) {
+    // Build reverse lookup from the itemDisplayColors map
+    for (Map.Entry<String, String> entry : this.itemDisplayColors.entrySet()) {
+      if (entry.getValue().equals(itemKey)) {
+        return entry.getKey();
+      }
+    }
+    // Fallback: color by item type
+    if (itemKey.contains("diamond")) return "&bDiamond";
+    if (itemKey.contains("iron")) return "&fIron";
+    if (itemKey.contains("chainmail")) return "&fChainmail";
+    return "&f" + itemKey;
+  }
+
+  private void sendTrackedItemAlert(
+      String formattedName, EntityPlayer player, String itemKey, String teamColor) {
+    String displayColor = this.getItemAlertDisplayColor(itemKey);
+    String coloredPlayer = ChatColors.formatColor("&" + teamColor + player.getName());
+    String msg = coloredPlayer + " &7has " + displayColor + "&7";
+
+    if (this.alertDistance.getValue()) {
+      double dist = mc.thePlayer.getDistanceToEntity(player);
+      msg += " &7(&d" + (int) dist + "m&7)";
+    }
+
+    if (this.chatAlerts.getValue()) {
+      ChatUtil.display(msg);
+    }
+
+    if (this.alertSound.getValue()) {
+      SoundUtil.playSound("note.pling");
+    }
+  }
+
+  private void sendUpgradeAlert(
+      String formattedName, String teamName, String upgradeName, String upgradeKey) {
+    String msg = teamName + " &7purchased " + upgradeName;
+
+    if (this.chatAlerts.getValue()) {
+      ChatUtil.display(msg);
+    }
+
+    if (this.alertSound.getValue()) {
+      SoundUtil.playSound("note.pling");
+    }
   }
 
   private class BedTracker extends Module {

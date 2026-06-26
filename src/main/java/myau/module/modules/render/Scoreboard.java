@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import myau.module.Module;
+import myau.property.properties.BooleanProperty;
+import myau.property.properties.IntProperty;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.scoreboard.Score;
@@ -16,6 +18,12 @@ public class Scoreboard extends Module {
       new myau.property.properties.DragProperty("Position", new myau.util.vector.Vector2d(0, 0));
   public float defaultX = 0;
   public float defaultY = 0;
+
+  // Tenacity-style properties
+  public final IntProperty yOffset = new IntProperty("Y Offset", 0, -250, 250);
+  public final BooleanProperty customFont = new BooleanProperty("Custom Font", false);
+  public final BooleanProperty textShadow = new BooleanProperty("Text Shadow", true);
+  public final BooleanProperty redNumbers = new BooleanProperty("Red Numbers", false);
 
   public Scoreboard() {
     super("Scoreboard", true, false);
@@ -63,11 +71,12 @@ public class Scoreboard extends Module {
     int height = size * mc.fontRendererObj.FONT_HEIGHT + 9;
 
     float baseX = scaledRes.getScaledWidth() - width - 2;
-    float baseY = scaledRes.getScaledHeight() / 2 - height / 3;
+    float baseY = scaledRes.getScaledHeight() / 2 - height / 3 + yOffset.getValue();
 
     this.defaultX = baseX;
     this.defaultY = baseY;
 
+    // Ensure drag property is initialized reasonably if it's 0,0
     if (this.drag.position.x == 0 && this.drag.position.y == 0 && this.drag.targetPosition.x == 0) {
       this.drag.position.x = baseX;
       this.drag.position.y = baseY;

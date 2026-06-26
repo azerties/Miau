@@ -20,9 +20,6 @@ import myau.property.properties.ModeProperty;
 import myau.util.player.TeamUtil;
 import myau.util.render.ColorUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
-import myau.util.shader.GlowShader;
-import myau.util.shader.OutlineShader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -31,8 +28,7 @@ import net.minecraft.entity.player.EntityPlayer;
 
 public class ESP extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private OutlineShader outlineRenderer = null;
-  private GlowShader glowShader = null;
+
   private boolean shadersAvailable = true;
   private Framebuffer framebuffer = null;
   private boolean outline = true;
@@ -99,30 +95,6 @@ public class ESP extends Module {
     super("ESP", false);
   }
 
-  private boolean ensureOutlineShaders() {
-    if (!this.shadersAvailable) {
-      return false;
-    }
-    try {
-      if (this.outlineRenderer == null) {
-        this.outlineRenderer = new OutlineShader();
-      }
-      if (this.glowShader == null) {
-        this.glowShader = new GlowShader();
-      }
-      if (!this.outlineRenderer.isValid() || !this.glowShader.isValid()) {
-        this.shadersAvailable = false;
-        return false;
-      }
-      return true;
-    } catch (Throwable throwable) {
-      this.shadersAvailable = false;
-      this.outlineRenderer = null;
-      this.glowShader = null;
-      return false;
-    }
-  }
-
   @EventTarget
   public void onTick(TickEvent event) {
     if (!this.isEnabled() || mc.theWorld == null) {
@@ -166,7 +138,7 @@ public class ESP extends Module {
               .map(EntityPlayer.class::cast)
               .collect(Collectors.toList());
       if (!renderedEntities.isEmpty()) {
-        if (this.mode.getValue() == 3 && this.ensureOutlineShaders()) {
+        if (this.mode.getValue() == 3 && false) {
           try {
             GlStateManager.pushMatrix();
             GlStateManager.pushAttrib();
@@ -180,25 +152,25 @@ public class ESP extends Module {
             mc.gameSettings.entityShadows = false;
             this.outline = false;
             this.glow = false;
-            this.glowShader.use();
+
             for (EntityPlayer player : renderedEntities) {
               Color entityColor = this.getEntityColor(player);
-              this.glowShader.W(entityColor);
+
               boolean invisible = player.isInvisible();
               player.setInvisible(false);
               mc.getRenderManager().renderEntityStatic(player, event.getPartialTicks(), true);
               player.setInvisible(invisible);
             }
-            this.glowShader.stop();
+
             this.glow = true;
             this.outline = true;
             mc.gameSettings.entityShadows = shadow;
             mc.entityRenderer.disableLightmap();
             mc.entityRenderer.setupOverlayRendering();
             mc.getFramebuffer().bindFramebuffer(false);
-            this.outlineRenderer.use();
+
             RenderUtil.drawFramebuffer(this.framebuffer);
-            this.outlineRenderer.stop();
+
             this.framebuffer.framebufferClear();
             mc.getFramebuffer().bindFramebuffer(false);
             GlStateManager.popAttrib();
@@ -228,18 +200,18 @@ public class ESP extends Module {
               float w = (float) screenPosition.w;
               if (this.mode.getValue() == 1) {
                 int color = this.getEntityColor(player).getRGB();
-                ShapeUtil.drawOutlineRect(
+                RenderUtil.drawOutlineRect(
                     x, y, z, w, 3.0F, 0, (color & 16579836) >> 2 | color & 0xFF000000);
-                ShapeUtil.drawOutlineRect(x, y, z, w, 1.5F, 0, color);
+                RenderUtil.drawOutlineRect(x, y, z, w, 1.5F, 0, color);
               }
               if (this.healthBar.getValue() == 1) {
                 float heal = player.getHealth() + player.getAbsorptionAmount();
                 float percent = Math.min(Math.max(heal / player.getMaxHealth(), 0.0F), 1.0F);
                 float box = (z - x) * 0.08F;
                 Color healthColor = ColorUtil.getHealthBlend(percent);
-                ShapeUtil.drawLine(
+                RenderUtil.drawLine(
                     x - box, y, x - box, w, 3.0F, ColorUtil.darker(healthColor, 0.2F).getRGB());
-                ShapeUtil.drawLine(
+                RenderUtil.drawLine(
                     x - box, w, x - box, w + (y - w) * percent, 1.5F, healthColor.getRGB());
               }
             }
@@ -307,10 +279,10 @@ public class ESP extends Module {
           float percent = Math.min(Math.max(heal / player.getMaxHealth(), 0.0F), 1.0F);
           Color healthColor = ColorUtil.getHealthBlend(percent);
           float height = player.height + 0.2F;
-          ShapeUtil.drawRect3D(
+          RenderUtil.drawRect3D(
               0.57250005F, -0.027500002F, 0.7275F, height + 0.027500002F, Color.black.getRGB());
-          ShapeUtil.drawRect3D(0.6F, 0.0F, 0.70000005F, height, Color.darkGray.getRGB());
-          ShapeUtil.drawRect3D(0.6F, 0.0F, 0.70000005F, height * percent, healthColor.getRGB());
+          RenderUtil.drawRect3D(0.6F, 0.0F, 0.70000005F, height, Color.darkGray.getRGB());
+          RenderUtil.drawRect3D(0.6F, 0.0F, 0.70000005F, height * percent, healthColor.getRGB());
           GlStateManager.popMatrix();
         }
       }

@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 import myau.Myau;
 import myau.event.EventTarget;
 import myau.event.impl.KeyEvent;
@@ -14,6 +15,7 @@ import myau.module.modules.render.HUD;
 import myau.util.client.SoundUtil;
 
 public class ModuleManager {
+  private static final Logger LOGGER = Logger.getLogger(ModuleManager.class.getName());
   private static final String MODULE_PACKAGE = "myau.module.modules.";
   private static final Map<String, String> CATEGORY_NAMES = new LinkedHashMap<>();
 
@@ -24,9 +26,8 @@ public class ModuleManager {
     CATEGORY_NAMES.put("render", "Render");
     CATEGORY_NAMES.put("player", "Player");
     CATEGORY_NAMES.put("misc", "Misc");
-    CATEGORY_NAMES.put("latency", "Latency");
+    CATEGORY_NAMES.put("network", "Network");
     CATEGORY_NAMES.put("minigames", "Minigames");
-    CATEGORY_NAMES.put("target", "Target");
   }
 
   private boolean sound = false;

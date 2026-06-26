@@ -152,7 +152,8 @@ public abstract class MixinEntityPlayerSP extends MixinEntityPlayer {
               target = "Lnet/minecraft/client/entity/EntityPlayerSP;isUsingItem()Z"))
   private boolean isUsing(EntityPlayerSP entityPlayerSP) {
     NoSlow noSlow = (NoSlow) Myau.moduleManager.modules.get(NoSlow.class);
-    return (!noSlow.isEnabled() || !noSlow.isAnyActive()) && entityPlayerSP.isUsingItem();
+    return (noSlow == null || !noSlow.isEnabled() || !noSlow.isAnyActive())
+        && entityPlayerSP.isUsingItem();
   }
 
   @Redirect(

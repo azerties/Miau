@@ -45,16 +45,19 @@ public class AutoWeapon extends Module {
 
     attackEnemy = false;
 
+    // Find best weapon in hotbar
     int slot = this.findBestWeaponSlot();
 
     if (slot == -1) return;
 
-    if (slot == mc.thePlayer.inventory.currentItem) {
+    if (slot == mc.thePlayer.inventory.currentItem) { // If in hand no need to swap
       return;
     }
 
+    // Switch to best weapon
     this.switchWeapon(slot);
 
+    // Resend attack packet
     mc.getNetHandler().addToSendQueue(packet);
     event.setCancelled(true);
   }
@@ -109,6 +112,7 @@ public class AutoWeapon extends Module {
   @EventTarget
   public void onUpdate(UpdateEvent event) {
 
+    // Switch back to old item after some time
     if (spoofedSlot > 0) {
       if (spoofedSlot == 1) {
         mc.getNetHandler()

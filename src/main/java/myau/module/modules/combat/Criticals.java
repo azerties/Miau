@@ -4,6 +4,7 @@ import myau.Myau;
 import myau.event.EventTarget;
 import myau.event.impl.AttackEvent;
 import myau.event.impl.PacketEvent;
+import myau.event.impl.UpdateEvent;
 import myau.event.types.EventType;
 import myau.mixin.IAccessorC03PacketPlayer;
 import myau.module.Module;
@@ -14,11 +15,13 @@ import myau.property.properties.ModeProperty;
 import myau.util.network.PacketUtil;
 import myau.util.time.TimerUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.network.play.client.C03PacketPlayer;
 
 public class Criticals extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
+
   public final ModeProperty mode =
       new ModeProperty(
           "mode",
@@ -34,11 +37,17 @@ public class Criticals extends Module {
             "Jump",
             "LowJump",
             "CustomMotion",
-            "Visual"
+            "Visual",
+            "DistanceJump"
           });
   public final IntProperty delay = new IntProperty("delay", 0, 0, 500);
   public final IntProperty hurtTime = new IntProperty("hurt-time", 10, 0, 10);
   public final FloatProperty customMotionY = new FloatProperty("custom-y", 0.2F, 0.01F, 0.42F);
+
+  public final FloatProperty jumpDist =
+      new FloatProperty(
+          "jump-dist", 4.0F, 10.0F, 0.0F, 50.0F, () -> (Integer) this.mode.getValue() == 11);
+
   public final TimerUtil timer = new TimerUtil();
 
   public Criticals() {
@@ -52,11 +61,56 @@ public class Criticals extends Module {
   }
 
   @EventTarget
+  public void onUpdate(UpdateEvent event) {
+    if (this.isEnabled() && (Integer) this.mode.getValue() == 11) {
+      if (mc.thePlayer == null || mc.theWorld == null) return;
+
+      EntityLivingBase target = null;
+      double minDistance = Double.MAX_VALUE;
+
+      for (Entity entity : mc.theWorld.loadedEntityList) {
+        if (entity instanceof EntityLivingBase
+            && entity != mc.thePlayer
+            && entity.isEntityAlive()) {
+          EntityLivingBase livingBase = (EntityLivingBase) entity;
+          if (mc.thePlayer.canEntityBeSeen(livingBase)) {
+            double distance = mc.thePlayer.getDistanceToEntity(livingBase);
+            if (distance < minDistance) {
+              minDistance = distance;
+              target = livingBase;
+            }
+          }
+        }
+      }
+
+      if (target != null) {
+        double distance = mc.thePlayer.getDistanceToEntity(target);
+
+        if (distance >= (Float) this.jumpDist.getValue()
+            && distance <= (Float) this.jumpDist.getSecondValue()) {
+          if (mc.thePlayer.onGround
+              && !mc.thePlayer.isOnLadder()
+              && !mc.thePlayer.isInWater()
+              && !mc.thePlayer.isInLava()) {
+            mc.thePlayer.jump();
+          }
+        }
+      }
+    }
+  }
+
+  @EventTarget
   public void onAttack(AttackEvent event) {
     if (this.isEnabled()) {
       if (mc.thePlayer != null && mc.theWorld != null) {
         if (event.getTarget() instanceof EntityLivingBase) {
           EntityLivingBase target = (EntityLivingBase) event.getTarget();
+
+          if ((Integer) this.mode.getValue() == 11) {
+            mc.thePlayer.onCriticalHit(target);
+            return;
+          }
+
           if (mc.thePlayer.onGround) {
             if (!mc.thePlayer.isUsingItem()) {
               if (!mc.thePlayer.isInWater() && !mc.thePlayer.isInLava()) {
@@ -130,6 +184,7 @@ public class Criticals extends Module {
                             break;
                           case 10:
                             mc.thePlayer.attackTargetEntityWithCurrentItem(target);
+                            break;
                         }
 
                         this.timer.reset();
@@ -169,7 +224,8 @@ public class Criticals extends Module {
           "Jump",
           "LowJump",
           "CustomMotion",
-          "Visual"
+          "Visual",
+          "DistanceJump"
         };
     return new String[] {modes[(Integer) this.mode.getValue()]};
   }

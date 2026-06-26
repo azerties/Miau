@@ -1,97 +1,60 @@
 package myau.module.modules.movement;
 
 import com.google.common.base.CaseFormat;
-import java.util.ArrayList;
-import java.util.List;
+import myau.Myau;
+import myau.enums.BlinkModules;
 import myau.event.EventTarget;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.TickEvent;
 import myau.event.types.EventType;
 import myau.event.types.Priority;
+import myau.mixin.IAccessorC03PacketPlayer;
+import myau.mixin.IAccessorMinecraft;
 import myau.module.Module;
-import myau.module.modules.movement.nofalls.*;
-import myau.property.Property;
 import myau.property.properties.FloatProperty;
 import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
-import myau.util.network.ServerUtil;
-import myau.util.time.TimerUtil;
+import myau.util.animation.*;
+import myau.util.client.*;
+import myau.util.math.*;
+import myau.util.misc.*;
+import myau.util.network.*;
+import myau.util.player.*;
+import myau.util.render.*;
+import myau.util.time.*;
+import myau.util.world.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.client.C03PacketPlayer;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
+import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.BlockPos;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
 
 public class NoFall extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final TimerUtil packetDelayTimer = new TimerUtil();
   private final TimerUtil scoreboardResetTimer = new TimerUtil();
-
-  public final List<NoFallMode> modes = new ArrayList<>();
-
+  private boolean slowFalling = false;
+  private boolean lastOnGround = false;
+  private int lastMlgSlot = -1;
+  private boolean mlgPlaced = false;
   public final ModeProperty mode =
-      new ModeProperty(
-          "Mode",
-          0,
-          new String[] {
-            register(new PacketNoFall("PACKET", this)),
-            register(new BlinkNoFall("BLINK", this)),
-            register(new NoGroundNoFall("NO_GROUND", this)),
-            register(new SpoofNoFall("SPOOF", this)),
-            register(new LegitNoFall("LEGIT", this))
-          });
-
+      new ModeProperty("mode", 0, new String[] {"PACKET", "BLINK", "NO_GROUND", "SPOOF", "LEGIT"});
   public final FloatProperty distance = new FloatProperty("distance", 3.0F, 0.0F, 20.0F);
   public final IntProperty delay = new IntProperty("delay", 0, 0, 10000);
-
-  public NoFall() {
-    super("NoFall", false);
-  }
-
-  private String register(NoFallMode m) {
-    this.modes.add(m);
-    return m.getName();
-  }
-
-  public NoFallMode getActiveMode() {
-    return modes.stream()
-        .filter(m -> m.getName().equals(mode.getModeString()))
-        .findFirst()
-        .orElse(modes.get(0));
-  }
-
-  @Override
-  public List<Property<?>> getAdditionalProperties() {
-    List<Property<?>> props = new ArrayList<>();
-    for (NoFallMode m : modes) {
-      for (java.lang.reflect.Field field : m.getClass().getDeclaredFields()) {
-        field.setAccessible(true);
-        try {
-          Object obj = field.get(m);
-          if (obj instanceof Property<?>) {
-            Property<?> prop = (Property<?>) obj;
-            java.util.function.BooleanSupplier original = prop.getVisibleChecker();
-            prop.setVisibleChecker(
-                () -> this.getActiveMode() == m && (original == null || original.getAsBoolean()));
-            props.add(prop);
-          }
-        } catch (Exception e) {
-        }
-      }
-    }
-    return props;
-  }
 
   public boolean canTrigger() {
     return this.scoreboardResetTimer.hasTimeElapsed(3000)
         && this.packetDelayTimer.hasTimeElapsed(this.delay.getValue().longValue());
   }
 
-  @Override
-  public void onEnabled() {
-    getActiveMode().onEnable();
-  }
-
-  @Override
-  public void onDisabled() {
-    getActiveMode().onDisable();
+  public NoFall() {
+    super("NoFall", false);
   }
 
   @EventTarget(Priority.HIGH)
@@ -99,8 +62,73 @@ public class NoFall extends Module {
     if (event.getType() == EventType.RECEIVE
         && event.getPacket() instanceof S08PacketPlayerPosLook) {
       this.onDisabled();
-    } else if (this.isEnabled()) {
-      getActiveMode().onPacket(event);
+    } else if (this.isEnabled() && event.getType() == EventType.SEND && !event.isCancelled()) {
+      if (event.getPacket() instanceof C03PacketPlayer) {
+        C03PacketPlayer packet = (C03PacketPlayer) event.getPacket();
+        switch (this.mode.getValue()) {
+          case 0:
+            if (this.slowFalling) {
+              this.slowFalling = false;
+              ((IAccessorMinecraft) mc).getTimer().timerSpeed = 1.0F;
+            } else if (!packet.isOnGround()) {
+              AxisAlignedBB aabb = mc.thePlayer.getEntityBoundingBox().expand(2.0, 0.0, 2.0);
+              if (PlayerUtil.canFly(this.distance.getValue())
+                  && !PlayerUtil.checkInWater(aabb)
+                  && this.canTrigger()) {
+                this.packetDelayTimer.reset();
+                this.slowFalling = true;
+                ((IAccessorMinecraft) mc).getTimer().timerSpeed = 0.5F;
+              }
+            }
+            break;
+          case 1:
+            boolean allowed =
+                !mc.thePlayer.isOnLadder()
+                    && !mc.thePlayer.capabilities.allowFlying
+                    && mc.thePlayer.hurtTime == 0;
+            if (Myau.blinkManager.getBlinkingModule() != BlinkModules.NO_FALL) {
+              if (this.lastOnGround
+                  && !packet.isOnGround()
+                  && allowed
+                  && PlayerUtil.canFly(this.distance.getValue().intValue())
+                  && mc.thePlayer.motionY < 0.0) {
+                Myau.blinkManager.setBlinkState(false, Myau.blinkManager.getBlinkingModule());
+                Myau.blinkManager.setBlinkState(true, BlinkModules.NO_FALL);
+              }
+            } else if (!allowed) {
+              Myau.blinkManager.setBlinkState(false, BlinkModules.NO_FALL);
+              ChatUtil.display("%s%s: &cFailed player check!&r", this.getName());
+            } else if (PlayerUtil.checkInWater(
+                mc.thePlayer.getEntityBoundingBox().expand(2.0, 0.0, 2.0))) {
+              Myau.blinkManager.setBlinkState(false, BlinkModules.NO_FALL);
+              ChatUtil.display("%s%s: &cFailed void check!&r", this.getName());
+            } else if (packet.isOnGround()) {
+              for (Packet<?> blinkedPacket : Myau.blinkManager.blinkedPackets) {
+                if (blinkedPacket instanceof C03PacketPlayer) {
+                  ((IAccessorC03PacketPlayer) blinkedPacket).setOnGround(true);
+                }
+              }
+              Myau.blinkManager.setBlinkState(false, BlinkModules.NO_FALL);
+              this.packetDelayTimer.reset();
+            }
+            this.lastOnGround = packet.isOnGround() && allowed && this.canTrigger();
+            break;
+          case 2:
+            ((IAccessorC03PacketPlayer) packet).setOnGround(false);
+            break;
+          case 3:
+            if (!packet.isOnGround()) {
+              AxisAlignedBB aabb = mc.thePlayer.getEntityBoundingBox().expand(2.0, 0.0, 2.0);
+              if (PlayerUtil.canFly(this.distance.getValue())
+                  && !PlayerUtil.checkInWater(aabb)
+                  && this.canTrigger()) {
+                this.packetDelayTimer.reset();
+                ((IAccessorC03PacketPlayer) packet).setOnGround(true);
+                mc.thePlayer.fallDistance = 0.0F;
+              }
+            }
+        }
+      }
     }
   }
 
@@ -110,7 +138,108 @@ public class NoFall extends Module {
       if (ServerUtil.hasPlayerCountInfo()) {
         this.scoreboardResetTimer.reset();
       }
-      getActiveMode().onTick(event);
+      if (this.mode.getValue() == 0 && this.slowFalling) {
+        PacketUtil.sendPacketNoEvent(new C03PacketPlayer(true));
+        mc.thePlayer.fallDistance = 0.0F;
+      }
+      if (this.mode.getValue() == 4) {
+        this.handleLegitMlg();
+      }
+    }
+  }
+
+  private void handleLegitMlg() {
+    if (mc.thePlayer == null || mc.theWorld == null || mc.playerController == null) return;
+    if (mc.thePlayer.onGround
+        || mc.thePlayer.capabilities.isFlying
+        || mc.thePlayer.isInWater()
+        || mc.thePlayer.isOnLadder()) {
+      this.resetLegitMlg();
+      return;
+    }
+    if (mc.thePlayer.fallDistance < this.distance.getValue() || mc.thePlayer.motionY >= -0.1D)
+      return;
+
+    int waterSlot = this.findWaterBucketSlot();
+    if (waterSlot == -1) return;
+    BlockPos target = this.findMlgTarget();
+    if (target == null) return;
+
+    if (this.lastMlgSlot == -1) {
+      this.lastMlgSlot = mc.thePlayer.inventory.currentItem;
+    }
+    mc.thePlayer.inventory.currentItem = waterSlot;
+    mc.playerController.updateController();
+    mc.thePlayer.rotationPitch = 90.0F;
+
+    if (!this.mlgPlaced
+        && mc.thePlayer.getDistance(
+                target.getX() + 0.5D, target.getY() + 0.5D, target.getZ() + 0.5D)
+            <= mc.playerController.getBlockReachDistance() + 1.5F) {
+      Vec3 hitVec = new Vec3(target.getX() + 0.5D, target.getY() + 1.0D, target.getZ() + 0.5D);
+      ItemStack stack = mc.thePlayer.inventory.getCurrentItem();
+      if (stack != null
+          && mc.playerController.onPlayerRightClick(
+              mc.thePlayer, mc.theWorld, stack, target, EnumFacing.UP, hitVec)) {
+        mc.thePlayer.swingItem();
+        this.mlgPlaced = true;
+      }
+    }
+  }
+
+  private int findWaterBucketSlot() {
+    for (int i = 0; i < 9; i++) {
+      ItemStack stack = mc.thePlayer.inventory.mainInventory[i];
+      if (stack != null && stack.getItem() == Items.water_bucket) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private BlockPos findMlgTarget() {
+    BlockPos playerPos = new BlockPos(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ);
+    for (int y = 1; y <= 6; y++) {
+      BlockPos pos = playerPos.down(y);
+      if (!mc.theWorld.isAirBlock(pos) && mc.theWorld.isAirBlock(pos.up())) {
+        return pos;
+      }
+    }
+    MovingObjectPosition ray =
+        mc.theWorld.rayTraceBlocks(
+            new Vec3(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY + mc.thePlayer.getEyeHeight(),
+                mc.thePlayer.posZ),
+            new Vec3(
+                mc.thePlayer.posX,
+                mc.thePlayer.posY - mc.playerController.getBlockReachDistance() - 2.0D,
+                mc.thePlayer.posZ),
+            false,
+            true,
+            false);
+    return ray != null && ray.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
+        ? ray.getBlockPos()
+        : null;
+  }
+
+  private void resetLegitMlg() {
+    if (this.lastMlgSlot != -1 && mc.thePlayer != null) {
+      mc.thePlayer.inventory.currentItem = this.lastMlgSlot;
+      mc.playerController.updateController();
+    }
+    this.lastMlgSlot = -1;
+    this.mlgPlaced = false;
+  }
+
+  @Override
+  public void onDisabled() {
+    this.lastOnGround = false;
+    this.resetLegitMlg();
+    Myau.blinkManager.setBlinkState(false, BlinkModules.NO_FALL);
+    if (this.slowFalling) {
+      this.slowFalling = false;
+      ((IAccessorMinecraft) mc).getTimer().timerSpeed = 1.0F;
     }
   }
 

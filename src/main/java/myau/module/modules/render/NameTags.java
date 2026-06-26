@@ -15,7 +15,6 @@ import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
 import myau.util.player.TeamUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import myau.util.render.Themes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
@@ -197,7 +196,7 @@ public class NameTags extends Module {
       float y2 = y1 + height + padding * 2.0f;
 
       RenderUtil.enableRenderState();
-      ShapeUtil.drawRect(x1, y1, x2, y2, Themes.getBackgroundShade().getRGB());
+      RenderUtil.drawRect(x1, y1, x2, y2, Themes.getBackgroundShade().getRGB());
       RenderUtil.disableRenderState();
 
       float centeredPosX = -(width / 2.0f);

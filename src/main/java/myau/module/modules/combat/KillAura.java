@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Random;
 import myau.Myau;
 import myau.enums.BlinkModules;
+import myau.event.*;
 import myau.event.EventManager;
 import myau.event.EventTarget;
 import myau.event.impl.*;
@@ -18,24 +19,22 @@ import myau.management.RotationState;
 import myau.mixin.IAccessorPlayerControllerMP;
 import myau.mixin.IAccessorRenderManager;
 import myau.module.Module;
+import myau.module.modules.misc.AntiBot;
 import myau.module.modules.movement.NoSlow;
 import myau.module.modules.player.AutoBlockIn;
 import myau.module.modules.player.AutoHeal;
 import myau.module.modules.player.BedNuker;
 import myau.module.modules.player.Scaffold;
 import myau.module.modules.render.HUD;
-import myau.module.modules.target.Targets;
 import myau.property.properties.*;
-import myau.util.animation.*;
 import myau.util.client.*;
 import myau.util.math.*;
-import myau.util.misc.*;
 import myau.util.network.*;
 import myau.util.player.*;
 import myau.util.render.*;
 import myau.util.time.*;
-import myau.util.world.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.EntityOtherPlayerMP;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -44,6 +43,16 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.EnumCreatureAttribute;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.boss.EntityDragon;
+import net.minecraft.entity.boss.EntityWither;
+import net.minecraft.entity.monster.EntityIronGolem;
+import net.minecraft.entity.monster.EntityMob;
+import net.minecraft.entity.monster.EntitySilverfish;
+import net.minecraft.entity.monster.EntitySlime;
+import net.minecraft.entity.passive.EntityAnimal;
+import net.minecraft.entity.passive.EntityBat;
+import net.minecraft.entity.passive.EntitySquid;
+import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemSword;
@@ -126,7 +135,39 @@ public class KillAura extends Module {
   public final ModeProperty debugLog;
   public final BooleanProperty tickLookahead;
   public final BooleanProperty smartKill;
+  public final BooleanProperty tacticalKD;
+  public final FloatProperty kdOffset;
   private int ticks = 255;
+
+  public final BooleanProperty targetPlayers = new BooleanProperty("target-players", true);
+  public final BooleanProperty targetInvisibles =
+      new BooleanProperty("target-invisibles", false, this.targetPlayers::getValue);
+  public final BooleanProperty targetBosses = new BooleanProperty("target-bosses", false);
+  public final BooleanProperty targetMobs = new BooleanProperty("target-mobs", false);
+  public final BooleanProperty targetAnimals = new BooleanProperty("target-animals", false);
+  public final BooleanProperty targetGolems = new BooleanProperty("target-golems", false);
+  public final BooleanProperty targetSilverfish = new BooleanProperty("target-silverfish", false);
+  public final BooleanProperty targetTeams = new BooleanProperty("target-teams", true);
+
+  private static final int KD_DIRECTIONS = 24;
+  private static final int KD_VOID_RINGS = 7;
+  private static final int KD_VOID_DEPTH = 8;
+  private static final double KD_RING_STEP = 0.5;
+  private static final double KD_WALL_BEHIND_DIST = 1.2;
+  private static final double KD_WALL_SIDE_STEP = 0.6;
+
+  private static final double[] KD_COS = new double[KD_DIRECTIONS];
+  private static final double[] KD_SIN = new double[KD_DIRECTIONS];
+
+  static {
+    for (int i = 0; i < KD_DIRECTIONS; i++) {
+      double theta = Math.PI * 2.0 * i / KD_DIRECTIONS;
+      KD_COS[i] = Math.cos(theta);
+      KD_SIN[i] = Math.sin(theta);
+    }
+  }
+
+  private int kdHitCounter = 0;
 
   // HitSelect state
   private boolean hsSprintState = false;
@@ -194,49 +235,38 @@ public class KillAura extends Module {
         mc.thePlayer.swingItem();
         this.hsAttackTime = System.currentTimeMillis();
 
-        net.minecraft.util.MovingObjectPosition rayCastPos =
-            myau.util.player.RayCastUtil.rayCast(yaw, pitch, this.attackRange.getValue());
+        net.minecraft.util.MovingObjectPosition rayCastPos = null;
         boolean rayCastHit = false;
 
-        if (this.throughWalls.getValue()) {
-          net.minecraft.util.Vec3 eyes = mc.thePlayer.getPositionEyes(1);
-          net.minecraft.util.Vec3 lookVec =
-              myau.util.player.RayCastUtil.getVectorForRotation(pitch, yaw);
-          net.minecraft.util.MovingObjectPosition wallMop =
-              this.target
-                  .getEntity()
-                  .getEntityBoundingBox()
-                  .expand(0.1, 0.1, 0.1)
-                  .calculateIntercept(
-                      eyes,
-                      eyes.addVector(
-                          lookVec.xCoord * this.attackRange.getValue(),
-                          lookVec.yCoord * this.attackRange.getValue(),
-                          lookVec.zCoord * this.attackRange.getValue()));
-          if (wallMop != null) {
-            rayCastPos = wallMop;
-            rayCastPos.typeOfHit = net.minecraft.util.MovingObjectPosition.MovingObjectType.ENTITY;
-            rayCastPos.entityHit = this.target.getEntity();
-          }
-        }
+        boolean useRaycast = this.rayCast.getValue() || this.tickLookahead.getValue();
 
-        if ((mc.thePlayer.getDistanceToEntity(this.target.getEntity())
-                    <= this.attackRange.getValue()
-                && !this.rayCast.getValue()
-                && !this.tickLookahead.getValue())
-            || ((this.rayCast.getValue() || this.tickLookahead.getValue())
-                && rayCastPos != null
-                && rayCastPos.entityHit == this.target.getEntity())) {
-          rayCastHit = true;
-        } else if (rayCastPos != null
-            && rayCastPos.typeOfHit
-                == net.minecraft.util.MovingObjectPosition.MovingObjectType.ENTITY) {
-          if (!(rayCastPos.entityHit instanceof net.minecraft.entity.projectile.EntityFireball
-              || rayCastPos.entityHit instanceof net.minecraft.entity.item.EntityItemFrame)) {
-            this.target =
-                new AttackData((net.minecraft.entity.EntityLivingBase) rayCastPos.entityHit);
-            rayCastHit = true;
+        if (useRaycast) {
+          if (this.throughWalls.getValue()) {
+            // Rise getEntityIntercept: ignores blocks, uses proper collision border size
+            rayCastPos =
+                myau.util.player.RayCastUtil.getEntityIntercept(
+                    this.target.getEntity(), yaw, pitch, this.attackRange.getValue());
+          } else {
+            // Rise full raycast: checks blocks then entities
+            rayCastPos =
+                myau.util.player.RayCastUtil.rayCast(yaw, pitch, this.attackRange.getValue());
           }
+
+          if (rayCastPos != null && rayCastPos.entityHit == this.target.getEntity()) {
+            rayCastHit = true;
+          } else if (rayCastPos != null
+              && rayCastPos.typeOfHit
+                  == net.minecraft.util.MovingObjectPosition.MovingObjectType.ENTITY) {
+            if (!(rayCastPos.entityHit instanceof net.minecraft.entity.projectile.EntityFireball
+                || rayCastPos.entityHit instanceof net.minecraft.entity.item.EntityItemFrame)) {
+              this.target =
+                  new AttackData((net.minecraft.entity.EntityLivingBase) rayCastPos.entityHit);
+              rayCastHit = true;
+            }
+          }
+        } else if (mc.thePlayer.getDistanceToEntity(this.target.getEntity())
+            <= this.attackRange.getValue()) {
+          rayCastHit = true;
         }
 
         if ((this.rotations.getValue() != 0 || !this.isBoxInAttackRange(this.target.getBox()))
@@ -575,9 +605,7 @@ public class KillAura extends Module {
   }
 
   private boolean isValidTarget(EntityLivingBase entityLivingBase) {
-    Targets targets = (Targets) Myau.moduleManager.modules.get(Targets.class);
-    return targets != null
-        && targets.isValid(entityLivingBase)
+    return this.isValid(entityLivingBase)
         && RotationUtil.angleToEntity(entityLivingBase) <= this.fov.getValue().floatValue()
         && (this.throughWalls.getValue() || RotationUtil.rayTrace(entityLivingBase) == null);
   }
@@ -607,6 +635,71 @@ public class KillAura extends Module {
   private boolean isPlayerTarget(EntityLivingBase entityLivingBase) {
     return entityLivingBase instanceof EntityPlayer
         && TeamUtil.isTarget((EntityPlayer) entityLivingBase);
+  }
+
+  // ─── Target Validation (inlined from Targets.java) ─────────────
+
+  private boolean isValid(EntityLivingBase entityLivingBase) {
+    if (entityLivingBase == null || mc.theWorld == null || mc.thePlayer == null) {
+      return false;
+    }
+    if (!mc.theWorld.loadedEntityList.contains(entityLivingBase)) {
+      return false;
+    }
+    if (entityLivingBase == mc.thePlayer || entityLivingBase == mc.thePlayer.ridingEntity) {
+      return false;
+    }
+    if (entityLivingBase == mc.getRenderViewEntity()
+        || entityLivingBase == mc.getRenderViewEntity().ridingEntity) {
+      return false;
+    }
+    if (entityLivingBase.deathTime > 0) {
+      return false;
+    }
+    if (entityLivingBase instanceof EntityOtherPlayerMP) {
+      return this.isValidPlayer((EntityPlayer) entityLivingBase);
+    }
+    if (entityLivingBase instanceof EntityDragon || entityLivingBase instanceof EntityWither) {
+      return this.targetBosses.getValue();
+    }
+    if (entityLivingBase instanceof EntityMob || entityLivingBase instanceof EntitySlime) {
+      if (entityLivingBase instanceof EntitySilverfish) {
+        return this.targetSilverfish.getValue() && this.allowTeamColor(entityLivingBase);
+      }
+      return this.targetMobs.getValue();
+    }
+    if (entityLivingBase instanceof EntityAnimal
+        || entityLivingBase instanceof EntityBat
+        || entityLivingBase instanceof EntitySquid
+        || entityLivingBase instanceof EntityVillager) {
+      return this.targetAnimals.getValue();
+    }
+    if (entityLivingBase instanceof EntityIronGolem) {
+      return this.targetGolems.getValue() && this.allowTeamColor(entityLivingBase);
+    }
+    return false;
+  }
+
+  private boolean isValidPlayer(EntityPlayer player) {
+    if (!this.targetPlayers.getValue()) {
+      return false;
+    }
+    boolean isInvisible = player.isInvisible();
+    if (isInvisible && !this.targetInvisibles.getValue()) {
+      return false;
+    }
+    if (TeamUtil.isFriend(player)) {
+      return false;
+    }
+    return this.allowSameTeam(player) && (isInvisible || !AntiBot.isBot(player));
+  }
+
+  private boolean allowTeamColor(EntityLivingBase entityLivingBase) {
+    return this.targetTeams.getValue() || !TeamUtil.hasTeamColor(entityLivingBase);
+  }
+
+  private boolean allowSameTeam(EntityPlayer player) {
+    return this.targetTeams.getValue() || !TeamUtil.isSameTeam(player);
   }
 
   private int findEmptySlot(int currentSlot) {
@@ -659,7 +752,8 @@ public class KillAura extends Module {
               "FAKE",
               "SMART",
               "RIGHT_HOLD",
-              "GRIM"
+              "GRIM",
+              "Test"
             });
     this.autoBlockRequirePress = new BooleanProperty("auto-block-require-press", false);
     this.smartUnblockMode =
@@ -800,6 +894,8 @@ public class KillAura extends Module {
     this.debugLog = new ModeProperty("debug-log", 0, new String[] {"NONE", "HEALTH"});
     this.tickLookahead = new BooleanProperty("tick-lookahead", false);
     this.smartKill = new BooleanProperty("smart-kill", true);
+    this.tacticalKD = new BooleanProperty("tactical-kd", false);
+    this.kdOffset = new FloatProperty("kd-offset", 45.0F, 15.0F, 90.0F);
   }
 
   public EntityLivingBase getTarget() {
@@ -1261,6 +1357,38 @@ public class KillAura extends Module {
                 this.fakeBlockState = false;
               }
               break;
+            case 12:
+              if (this.hasValidTarget()) {
+                int item =
+                    ((IAccessorPlayerControllerMP) mc.playerController).getCurrentPlayerItem();
+                if (mc.thePlayer.inventory.currentItem == item
+                    && !Myau.playerStateManager.digging
+                    && !Myau.playerStateManager.placing) {
+                  PacketUtil.sendPacket(
+                      new C02PacketUseEntity(target.getEntity(), C02PacketUseEntity.Action.ATTACK));
+                  mc.thePlayer.swingItem();
+                  if (this.autoBlock.getValue() == 12) {
+                    PacketUtil.sendPacket(
+                        new C08PacketPlayerBlockPlacement(
+                            new BlockPos(-1, -1, -1),
+                            255,
+                            mc.thePlayer.inventory.getCurrentItem(),
+                            0,
+                            0,
+                            0));
+                    this.isBlocking = true;
+                    this.fakeBlockState = true;
+                  }
+                  Myau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
+                  this.isBlocking = true;
+                  this.fakeBlockState = false;
+                } else {
+                  Myau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
+                  this.isBlocking = false;
+                  this.fakeBlockState = false;
+                }
+              }
+              break;
           }
         }
         boolean attacked = false;
@@ -1318,6 +1446,31 @@ public class KillAura extends Module {
             if (this.moveFix.getValue() != 0) {
               event.setPervRotation(rotations[0], 1);
             }
+          }
+          // ════════════════════════════════════════
+          //  KNOCKBACK DISPLACEMENT INTERCEPT
+          // ════════════════════════════════════════
+          if (attack
+              && this.tacticalKD.getValue()
+              && this.target.getEntity() instanceof EntityPlayer) {
+
+            EntityPlayer kdTarget = (EntityPlayer) this.target.getEntity();
+            float kdYaw = this.getTacticalKDYaw(kdTarget, event.getNewYaw());
+            float kdPitch = this.getTacticalKDPitch(kdTarget, event.getNewPitch());
+
+            // Raycast verification — revert to normal if KD yaw would miss
+            if (RayCastUtil.getEntityIntercept(
+                    kdTarget, kdYaw, kdPitch, this.attackRange.getValue())
+                != null) {
+              // Apply sensitivity patch for more natural rotation
+              float[] patched =
+                  RotationUtil.applySensitivityPatch(
+                      kdYaw, kdPitch, mc.thePlayer.prevRotationYaw, mc.thePlayer.prevRotationPitch);
+              event.setRotation(patched[0], patched[1], 1);
+            } else {
+              event.setRotation(kdYaw, event.getNewPitch(), 1);
+            }
+            this.kdHitCounter++;
           }
           if (attack) {
             attacked = this.performAttack(event.getNewYaw(), event.getNewPitch());
@@ -1803,6 +1956,7 @@ public class KillAura extends Module {
     this.hsSavedSlowdown = 0;
     this.hsAttackTime = -1L;
     this.hsCurrentShouldAttack = false;
+    this.kdHitCounter = 0;
   }
 
   @Override
@@ -1833,6 +1987,213 @@ public class KillAura extends Module {
     return new String[] {
       CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, this.mode.getModeString())
     };
+  }
+
+  private float getTacticalKDYaw(EntityPlayer target, float currentYaw) {
+    float voidPushYaw = this.scanVoidPushKD(target, currentYaw);
+    if (!Float.isNaN(voidPushYaw)) {
+      return voidPushYaw;
+    }
+
+    float voidYaw = this.scanVoidKD(target);
+    if (!Float.isNaN(voidYaw)) {
+      return voidYaw;
+    }
+
+    Float wallYaw = this.scanWallKD(target);
+    if (wallYaw != null) {
+      return wallYaw;
+    }
+
+    Float nearWallYaw = this.scanNearWallKD(target, currentYaw);
+    if (nearWallYaw != null) {
+      return nearWallYaw;
+    }
+
+    float velYaw = this.predictVelocityKD(target, currentYaw);
+    if (!Float.isNaN(velYaw)) {
+      return velYaw;
+    }
+
+    return this.zigzagKD(currentYaw, target);
+  }
+
+  private float scanVoidKD(EntityPlayer target) {
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
+      final double radius = ring * KD_RING_STEP;
+
+      for (int dir = 0; dir < KD_DIRECTIONS; dir++) {
+        final double wx = target.posX + KD_COS[dir] * radius;
+        final double wz = target.posZ + KD_SIN[dir] * radius;
+
+        if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
+          return RotationUtil.calculate(new Vec3(wx, target.posY, wz))[0];
+        }
+      }
+    }
+    return Float.NaN;
+  }
+
+  private float scanVoidPushKD(EntityPlayer target, float aimYaw) {
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return Float.NaN;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
+      final double radius = ring * KD_RING_STEP;
+      final double wx = target.posX + nx * radius;
+      final double wz = target.posZ + nz * radius;
+
+      if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
+        return aimYaw;
+      }
+    }
+    return Float.NaN;
+  }
+
+  private boolean isVoidColumn(double x, double y, double z, BlockPos.MutableBlockPos cursor) {
+    final int bx = MathHelper.floor_double(x);
+    final int bz = MathHelper.floor_double(z);
+    final int startY = MathHelper.floor_double(y) - 1;
+    final int bottomY = Math.max(0, startY - KD_VOID_DEPTH);
+
+    for (int by = startY; by >= bottomY; by--) {
+      cursor.set(bx, by, bz);
+      if (!mc.theWorld.isAirBlock(cursor)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private Float scanWallKD(EntityPlayer target) {
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return null;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+    final double sx = -nz;
+    final double sz = nx;
+
+    final double baseX = target.posX + nx * KD_WALL_BEHIND_DIST;
+    final double baseZ = target.posZ + nz * KD_WALL_BEHIND_DIST;
+    final int baseY = MathHelper.floor_double(target.posY);
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int side = -1; side <= 1; side++) {
+      final double cx = baseX + sx * side * KD_WALL_SIDE_STEP;
+      final double cz = baseZ + sz * side * KD_WALL_SIDE_STEP;
+
+      final int bx = MathHelper.floor_double(cx);
+      final int bz = MathHelper.floor_double(cz);
+
+      boolean solid = false;
+      for (int by = baseY; by < baseY + 2; by++) {
+        if (by < 0 || by >= 256) continue;
+        cursor.set(bx, by, bz);
+        if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
+          solid = true;
+          break;
+        }
+      }
+      if (!solid) continue;
+
+      final double wallCX = bx + 0.5;
+      final double wallCZ = bz + 0.5;
+      final double normDx = target.posX - wallCX;
+      final double normDz = target.posZ - wallCZ;
+      final double normLen = Math.sqrt(normDx * normDx + normDz * normDz);
+      if (normLen < 0.01) continue;
+
+      final float normalYaw = (float) Math.toDegrees(Math.atan2(normDz, normDx)) - 90.0F;
+      final boolean slideRight = (target.ticksExisted & 2) == 0;
+      return normalYaw + (slideRight ? 90.0F : -90.0F);
+    }
+    return null;
+  }
+
+  private Float scanNearWallKD(EntityPlayer target, float aimYaw) {
+    if (mc.thePlayer == null) return null;
+
+    // Direction vector from player → target
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return null;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+    final int px = MathHelper.floor_double(mc.thePlayer.posX);
+    final int py = MathHelper.floor_double(mc.thePlayer.posY + 0.5);
+    final int pz = MathHelper.floor_double(mc.thePlayer.posZ);
+
+    // Check both sides (perpendicular to player→target vector)
+    for (int side : new int[] {-1, 1}) {
+      final double sx = -nz * side;
+      final double sz = nx * side;
+
+      for (int d = 1; d <= 3; d++) {
+        final int bx = px + (int) Math.round(sx * d);
+        final int bz = pz + (int) Math.round(sz * d);
+
+        for (int by = py - 1; by <= py + 1; by++) {
+          if (by < 0 || by >= 256) continue;
+          cursor.set(bx, by, bz);
+          if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
+            // Wall beside player → aim to push target into wall
+            return aimYaw + side * 45.0F;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private float predictVelocityKD(EntityPlayer target, float aimYaw) {
+    // Determine which direction the target is moving
+    final double velX = target.posX - target.prevPosX;
+    final double velZ = target.posZ - target.prevPosZ;
+    final double vel = Math.sqrt(velX * velX + velZ * velZ);
+
+    if (vel < 0.03) return Float.NaN;
+
+    // Heading the target is moving toward
+    final float velYaw = (float) Math.toDegrees(Math.atan2(velZ, velX)) - 90.0F;
+    final float diff = MathHelper.wrapAngleTo180_float(velYaw - aimYaw);
+
+    // Only offset if they're moving away (positive knockback direction)
+    if (Math.abs(diff) < 90.0F && Math.abs(diff) > 5.0F) {
+      return aimYaw + diff * 0.35F;
+    }
+    return Float.NaN;
+  }
+
+  private float getTacticalKDPitch(EntityPlayer target, float currentPitch) {
+    // If target is airborne → tilt pitch for extra vertical displacement
+    if (!target.onGround && target.hurtTime <= 0 && target.fallDistance > 0.5F) {
+      return Math.min(currentPitch + 8.0F, 15.0F);
+    }
+    return currentPitch;
+  }
+
+  private float zigzagKD(float currentYaw, EntityPlayer target) {
+    final boolean phase = ((this.kdHitCounter / 2) & 1) == 0;
+    float offset = phase ? this.kdOffset.getValue() : -this.kdOffset.getValue();
+    offset += (target.ticksExisted % 3) * 2.0F - 3.0F;
+    return currentYaw + offset;
   }
 
   private long getPing() {

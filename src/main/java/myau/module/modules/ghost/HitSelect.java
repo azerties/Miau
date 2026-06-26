@@ -1,4 +1,4 @@
-package myau.module.modules.combat;
+package myau.module.modules.ghost;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,22 +26,22 @@ public class HitSelect extends Module {
   private static final Logger LOGGER = Logger.getLogger(HitSelect.class.getName());
 
   public final ModeProperty mode =
-      new ModeProperty("mode", 0, new String[] {"SECOND", "PAUSE", "ACTIVE"});
+      new ModeProperty("mode", 0, new String[] {"SECOND", "CRITICALS", "W_TAP", "PAUSE", "ACTIVE"});
   public final ModeProperty preference =
       new ModeProperty(
           "preference",
           0,
           new String[] {"MOVE_SPEED", "KB_REDUCTION", "CRITICAL_HITS"},
-          () -> this.mode.getValue() == 1 || this.mode.getValue() == 2);
+          () -> this.mode.getValue() == 3 || this.mode.getValue() == 4);
   public final IntProperty delay =
       new IntProperty(
-          "delay", 420, 300, 500, () -> this.mode.getValue() == 1 || this.mode.getValue() == 2);
+          "delay", 420, 300, 500, () -> this.mode.getValue() == 3 || this.mode.getValue() == 4);
   public final IntProperty chance =
       new IntProperty(
-          "chance", 80, 0, 100, () -> this.mode.getValue() == 1 || this.mode.getValue() == 2);
+          "chance", 80, 0, 100, () -> this.mode.getValue() == 3 || this.mode.getValue() == 4);
   public final FloatProperty range =
       new FloatProperty(
-          "range", 8.0F, 1.0F, 20.0F, () -> this.mode.getValue() == 1 || this.mode.getValue() == 2);
+          "range", 8.0F, 1.0F, 20.0F, () -> this.mode.getValue() == 3 || this.mode.getValue() == 4);
 
   private boolean sprintState = false;
   private boolean set = false;
@@ -62,7 +62,7 @@ public class HitSelect extends Module {
     }
 
     if (event.getType() == EventType.PRE
-        && (this.mode.getValue() == 1 || this.mode.getValue() == 2)) {
+        && (this.mode.getValue() == 3 || this.mode.getValue() == 4)) {
       EntityLivingBase target = this.getNearestEntityInRange();
       if (target == null) {
         this.resetState();
@@ -140,9 +140,15 @@ public class HitSelect extends Module {
           allow = this.prioritizeSecondHit(mc.thePlayer, living);
           break;
         case 1:
-          allow = this.prioritizePauseHits();
+          allow = this.prioritizeCriticalHits(mc.thePlayer);
           break;
         case 2:
+          allow = this.prioritizeWTapHits(mc.thePlayer, this.sprintState);
+          break;
+        case 3:
+          allow = this.prioritizePauseHits();
+          break;
+        case 4:
           allow = true;
           break;
       }
@@ -156,7 +162,6 @@ public class HitSelect extends Module {
   }
 
   private boolean prioritizeSecondHit(EntityLivingBase player, EntityLivingBase target) {
-
     if (target.hurtTime != 0) {
       return true;
     }
@@ -183,7 +188,6 @@ public class HitSelect extends Module {
   }
 
   private boolean prioritizeCriticalHits(EntityLivingBase player) {
-
     if (player.onGround) {
       return true;
     }
@@ -201,7 +205,6 @@ public class HitSelect extends Module {
   }
 
   private boolean prioritizeWTapHits(EntityLivingBase player, boolean sprinting) {
-
     if (player.isCollidedHorizontally) {
       return true;
     }
@@ -269,7 +272,6 @@ public class HitSelect extends Module {
     }
 
     try {
-
       this.savedSlowdown = keepSprint.slowdown.getValue();
       this.keepSprintWasEnabled = keepSprint.isEnabled();
 
@@ -292,7 +294,6 @@ public class HitSelect extends Module {
     KeepSprint keepSprint = (KeepSprint) Myau.moduleManager.modules.get(KeepSprint.class);
     if (keepSprint != null) {
       try {
-
         keepSprint.slowdown.setValue(this.savedSlowdown);
 
         if (!this.keepSprintWasEnabled && keepSprint.isEnabled()) {

@@ -35,7 +35,7 @@ public class DragManager {
     if (mc.thePlayer == null || mc.theWorld == null) return;
     boolean shouldRender =
         mc.currentScreen instanceof GuiChat
-            || mc.currentScreen instanceof myau.ui.clickgui.miau.ClickGui;
+            || mc.currentScreen instanceof myau.ui.clickgui.ClickGui;
 
     if (!shouldRender) {
       selectedValue = null;

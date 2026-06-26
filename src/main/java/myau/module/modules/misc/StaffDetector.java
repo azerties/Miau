@@ -124,6 +124,7 @@ public class StaffDetector extends Module {
       return;
     }
 
+    // Protocol Exploit Layer 1: Unregistered Entity Tracking (Vanish Detection)
     if (vanishDetect.getValue()) {
       if (packet instanceof S14PacketEntity) {
         int entityId = ((IAccessorS14PacketEntity) packet).getEntityId();
@@ -134,6 +135,7 @@ public class StaffDetector extends Module {
       }
     }
 
+    // Protocol Exploit Layer 2: Team Packet Leak Scanner
     if (teamScanner.getValue() && packet instanceof S3EPacketTeams) {
       S3EPacketTeams teamsPacket = (S3EPacketTeams) packet;
       checkTeamLeak(teamsPacket);
@@ -145,6 +147,7 @@ public class StaffDetector extends Module {
     if (mc.thePlayer != null && entityId == mc.thePlayer.getEntityId()) return;
     if (validEntities.contains(entityId) || flaggedGhost.contains(entityId)) return;
 
+    // Check if the entity exists in the local world tracker
     if (mc.theWorld.getEntityByID(entityId) == null) {
       flaggedGhost.add(entityId);
 
@@ -152,6 +155,7 @@ public class StaffDetector extends Module {
       if (now - lastGhostAlert.getOrDefault(entityId, 0L) > 10000L) {
         lastGhostAlert.put(entityId, now);
 
+        // Build and publish notification
         Myau.notificationManager
             .builder(NotificationType.WARN)
             .title("Staff Detector")
@@ -173,7 +177,7 @@ public class StaffDetector extends Module {
 
     if (teamName != null && !alertedStaffTeams.contains(teamName)) {
       String lowerTeam = teamName.toLowerCase();
-
+      // Check team name hierarchy indicators used by admin groups
       if (lowerTeam.contains("admin")
           || lowerTeam.contains("mod")
           || lowerTeam.contains("helper")
@@ -203,6 +207,7 @@ public class StaffDetector extends Module {
         String lowerPlayer = player.toLowerCase();
         boolean isStaff = STAFF_LIST.contains(lowerPlayer);
 
+        // Scan against administrative names or system tags to catch un-nicked staff
         if (!isStaff) {
           if (lowerPlayer.contains("admin")
               || lowerPlayer.contains("mod_")

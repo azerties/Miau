@@ -92,9 +92,11 @@ public abstract class MixinMinecraft {
       at = {@At("HEAD")},
       cancellable = true)
   private void clickMouse(CallbackInfo callbackInfo) {
-    if (Myau.moduleManager != null
-        && Myau.moduleManager.modules.get(NoClickDelay.class).isEnabled()) {
-      this.leftClickCounter = 0;
+    if (Myau.moduleManager != null) {
+      NoClickDelay noClickDelay = (NoClickDelay) Myau.moduleManager.modules.get(NoClickDelay.class);
+      if (noClickDelay != null && noClickDelay.isEnabled()) {
+        this.leftClickCounter = 0;
+      }
     }
     LeftClickMouseEvent event = new LeftClickMouseEvent();
     EventManager.call(event);

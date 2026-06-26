@@ -22,7 +22,7 @@ public abstract class MixinItemStack {
   private void hasEffect(CallbackInfoReturnable<Boolean> callbackInfoReturnable) {
     if (Myau.moduleManager != null) {
       ESP esp = (ESP) Myau.moduleManager.modules.get(ESP.class);
-      if (esp.isEnabled() && !esp.isGlowEnabled()) {
+      if (esp != null && esp.isEnabled() && !esp.isGlowEnabled()) {
         callbackInfoReturnable.setReturnValue(false);
       }
     }

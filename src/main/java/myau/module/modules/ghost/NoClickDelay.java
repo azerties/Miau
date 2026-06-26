@@ -3,6 +3,7 @@ package myau.module.modules.ghost;
 import myau.event.EventTarget;
 import myau.event.impl.UpdateEvent;
 import myau.event.types.EventType;
+import myau.mixin.IAccessorMinecraft;
 import myau.module.Module;
 import net.minecraft.client.Minecraft;
 
@@ -17,7 +18,7 @@ public class NoClickDelay extends Module {
   public void onUpdate(UpdateEvent event) {
     if (event.getType() == EventType.PRE) {
       if (mc.thePlayer != null && mc.theWorld != null) {
-        mc.leftClickCounter = 0;
+        ((IAccessorMinecraft) mc).setLeftClickCounter(0);
       }
     }
   }

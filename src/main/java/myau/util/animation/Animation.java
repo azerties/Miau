@@ -6,7 +6,7 @@ package myau.util.animation;
  */
 public class Animation {
   private Easing easing;
-  private long duration;
+  protected long duration;
   private long startTime;
 
   private float startValue;
@@ -22,6 +22,22 @@ public class Animation {
     this.destinationValue = 0f;
     this.value = 0f;
     this.finished = true;
+  }
+
+  // Tenacity Integration fields
+  public myau.util.time.TimerUtil timerUtil = new myau.util.time.TimerUtil();
+  protected double endPoint;
+  protected Direction direction;
+
+  // Tenacity constructors
+  public Animation(int ms, double endPoint) {
+    this(ms, endPoint, Direction.FORWARDS);
+  }
+
+  public Animation(int ms, double endPoint, Direction direction) {
+    this.duration = ms;
+    this.endPoint = endPoint;
+    this.direction = direction;
   }
 
   /**
@@ -63,6 +79,70 @@ public class Animation {
     this.startTime = System.currentTimeMillis();
     this.startValue = value;
     this.finished = false;
+
+    if (timerUtil != null) {
+      timerUtil.reset();
+    }
+  }
+
+  // Tenacity Integration Methods
+  public boolean finished(Direction direction) {
+    return isDone() && this.direction.equals(direction);
+  }
+
+  public double getLinearOutput() {
+    return 1 - ((timerUtil.getTime() / (double) duration) * endPoint);
+  }
+
+  public double getEndPoint() {
+    return endPoint;
+  }
+
+  public void setEndPoint(double endPoint) {
+    this.endPoint = endPoint;
+  }
+
+  public boolean isDone() {
+    return timerUtil.hasTimeElapsed(duration);
+  }
+
+  public void changeDirection() {
+    setDirection(direction.opposite());
+  }
+
+  public Direction getDirection() {
+    return direction;
+  }
+
+  public Animation setDirection(Direction direction) {
+    if (this.direction != direction) {
+      this.direction = direction;
+      timerUtil.setTime(
+          System.currentTimeMillis() - (duration - Math.min(duration, timerUtil.getTime())));
+    }
+    return this;
+  }
+
+  protected boolean correctOutput() {
+    return false;
+  }
+
+  public Double getOutput() {
+    if (direction.forwards()) {
+      if (isDone()) return endPoint;
+      return getEquation(timerUtil.getTime() / (double) duration) * endPoint;
+    } else {
+      if (isDone()) return 0.0;
+      if (correctOutput()) {
+        double revTime = Math.min(duration, Math.max(0, duration - timerUtil.getTime()));
+        return getEquation(revTime / (double) duration) * endPoint;
+      }
+      return (1 - getEquation(timerUtil.getTime() / (double) duration)) * endPoint;
+    }
+  }
+
+  protected double getEquation(double x) {
+    return x;
   }
 
   public Easing getEasing() {

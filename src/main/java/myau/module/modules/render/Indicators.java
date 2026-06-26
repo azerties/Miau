@@ -11,7 +11,6 @@ import myau.property.properties.FloatProperty;
 import myau.util.player.RotationUtil;
 import myau.util.player.TeamUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -151,7 +150,7 @@ public class Indicators extends Module {
       GlStateManager.pushMatrix();
       GlStateManager.translate((offset + 15.0f) * x + 1.0f, (offset + 15.0f) * z + 1.0f, -100.0f);
       RenderUtil.enableRenderState();
-      ShapeUtil.drawArrow(
+      RenderUtil.drawArrow(
           0.0f,
           0.0f,
           (float) (Math.atan2(z, x) + Math.PI),

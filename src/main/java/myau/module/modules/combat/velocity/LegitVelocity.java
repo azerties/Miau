@@ -1,53 +1,50 @@
 package myau.module.modules.combat.velocity;
 
+import myau.event.impl.MoveInputEvent;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.UpdateEvent;
 import myau.module.modules.combat.Velocity;
-import myau.property.properties.IntProperty;
-import myau.property.properties.PercentProperty;
+import myau.util.player.MoveUtil;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 
 public class LegitVelocity extends VelocityMode {
-  private boolean hasReceivedVelocity = false;
-  private int legitSmartJumpCount = 0;
-
-  public final IntProperty legitJumpLimit = new IntProperty("legit-jump-limit", 2, 1, 5);
-  public final PercentProperty chance = new PercentProperty("chance", 100);
+  private boolean jump;
 
   public LegitVelocity(String name, Velocity parent) {
     super(name, parent);
   }
 
   @Override
-  public void onPacket(PacketEvent event) {
-    if (event.getType() == myau.event.types.EventType.RECEIVE
-        && event.getPacket() instanceof S12PacketEntityVelocity) {
-      S12PacketEntityVelocity packet = (S12PacketEntityVelocity) event.getPacket();
-      if (packet.getEntityID() == mc.thePlayer.getEntityId()) {
-        hasReceivedVelocity = true;
-      }
+  public void onUpdate(UpdateEvent event) {
+    if (event.getType() == myau.event.types.EventType.PRE) {
+      jump = false;
     }
   }
 
   @Override
-  public void onUpdate(UpdateEvent event) {
-    if (event.getType() == myau.event.types.EventType.POST) {
-      if (hasReceivedVelocity) {
-        if (mc.thePlayer.onGround
-            && mc.thePlayer.hurtTime >= 8
-            && mc.thePlayer.isSprinting()
-            && !parent.isInLiquidOrWeb()) {
-          if (legitSmartJumpCount >= legitJumpLimit.getValue()) {
-            legitSmartJumpCount = 0;
-            hasReceivedVelocity = false;
-          } else {
-            legitSmartJumpCount++;
-            mc.thePlayer.movementInput.jump = true;
-          }
-        } else if (mc.thePlayer.hurtTime <= 1) {
-          hasReceivedVelocity = false;
-          legitSmartJumpCount = 0;
-        }
+  public void onMoveInput(MoveInputEvent event) {
+    if (parent.onSwing.getValue() && !mc.thePlayer.isSwingInProgress) return;
+
+    if (jump && MoveUtil.isMoving() && Math.random() * 100 < parent.chance.getValue()) {
+      mc.thePlayer.movementInput.jump = true;
+    }
+  }
+
+  @Override
+  public void onPacket(PacketEvent event) {
+    if (parent.onSwing.getValue() && !mc.thePlayer.isSwingInProgress || event.isCancelled()) return;
+
+    if (!mc.thePlayer.onGround) {
+      return;
+    }
+
+    if (event.getType() == myau.event.types.EventType.RECEIVE
+        && event.getPacket() instanceof S12PacketEntityVelocity) {
+      S12PacketEntityVelocity packet = (S12PacketEntityVelocity) event.getPacket();
+
+      // legitTiming is not ported as a property to keep it clean, assuming false for now
+      if (packet.getEntityID() == mc.thePlayer.getEntityId() && packet.getMotionY() > 0) {
+        jump = true;
       }
     }
   }

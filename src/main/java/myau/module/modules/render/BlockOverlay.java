@@ -67,7 +67,7 @@ public class BlockOverlay extends Module {
     GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     GL11.glEnable(GL11.GL_LINE_SMOOTH);
     GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
-    GL11.glLineWidth(Math.max(0.1F, this.thickness.getValue()));
+    GL11.glLineWidth(this.thickness.getValue());
     GL11.glDisable(GL11.GL_TEXTURE_2D);
     if (!this.depth.getValue()) GL11.glDisable(GL11.GL_DEPTH_TEST);
     GL11.glDepthMask(false);

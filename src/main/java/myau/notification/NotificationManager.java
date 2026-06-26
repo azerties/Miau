@@ -6,11 +6,19 @@ import java.util.Iterator;
 import java.util.List;
 import myau.event.EventTarget;
 import myau.event.impl.Render2DEvent;
-import myau.util.shader.RoundedUtils;
+import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 
 public class NotificationManager {
+  // Raven-bS compact style constants
+  private static final float PADDING = 8f;
+  private static final float ICON_SIZE = 16f;
+  private static final float SPACING = 6f;
+  private static final float CONTAINER_HEIGHT = 26f;
+  private static final float GAP = 3f;
+
   private final List<Notification> notifications = new ArrayList<>();
   private long lastRenderTime = System.currentTimeMillis();
   private boolean initialized = false;
@@ -40,13 +48,6 @@ public class NotificationManager {
   }
 
   public void render(ScaledResolution sr) {
-    myau.module.modules.render.HUD hud =
-        (myau.module.modules.render.HUD)
-            myau.Myau.moduleManager.modules.get(myau.module.modules.render.HUD.class);
-    if (hud == null || !hud.isEnabled() || !hud.showNotifications.getValue()) {
-      return;
-    }
-
     Minecraft mc = Minecraft.getMinecraft();
 
     long currentTime = System.currentTimeMillis();
@@ -57,15 +58,6 @@ public class NotificationManager {
 
     final float animationSpeed = 12.0f;
 
-    final float paddingLeft = 8f;
-    final float paddingRight = 8f;
-    final float iconWidth = 16f;
-    final float iconHeight = 16f;
-    final float spacing = 7f;
-    final float containerHeight = 28f;
-    final float marginBottom = 10f;
-    final float gap = 4f;
-
     if (!initialized) {
       drag.position.x = drag.targetPosition.x = sr.getScaledWidth() - 165;
       drag.position.y = drag.targetPosition.y = sr.getScaledHeight() - 15;
@@ -73,7 +65,7 @@ public class NotificationManager {
     }
 
     if (!(mc.currentScreen instanceof net.minecraft.client.gui.GuiChat
-        || mc.currentScreen instanceof myau.ui.clickgui.miau.ClickGui)) {
+        || mc.currentScreen instanceof myau.ui.clickgui.ClickGui)) {
       drag.position.x = drag.targetPosition.x;
       drag.position.y = drag.targetPosition.y;
     }
@@ -85,7 +77,6 @@ public class NotificationManager {
     float anchorY = (float) drag.position.y;
 
     float scaledWidth = sr.getScaledWidth();
-    float scaledHeight = sr.getScaledHeight();
 
     synchronized (notifications) {
       int activeIndex = 0;
@@ -106,17 +97,19 @@ public class NotificationManager {
         if (notif.hasExpired()) {
           currentTargetY = notif.targetY;
         } else {
-          currentTargetY = anchorY - (activeIndex * (containerHeight + gap)) - containerHeight;
+          currentTargetY = anchorY - (activeIndex * (CONTAINER_HEIGHT + GAP)) - CONTAINER_HEIGHT;
           notif.targetY = currentTargetY;
           activeIndex++;
         }
 
+        // Miau animation: slide-in on first frame
         if (notif.firstFrame) {
           notif.x = scaledWidth + 10;
           notif.y = currentTargetY;
           notif.firstFrame = false;
         }
 
+        // Smooth lerp animation (Miau style)
         notif.x += (targetX - notif.x) * animationSpeed * deltaTime;
         notif.y += (currentTargetY - notif.y) * animationSpeed * deltaTime;
 
@@ -125,30 +118,9 @@ public class NotificationManager {
         }
       }
 
-      if (hud.shaders.getValue()) {
-        myau.util.shader.RenderSystem.renderBloom(
-            () -> {
-              for (Notification notif : notifications) {
-                renderNotificationBloom(
-                    notif, containerHeight, iconWidth, iconHeight, paddingLeft, spacing);
-              }
-            });
-
-        if (hud.blurSettings.getValue()) {
-          myau.util.shader.RenderSystem.renderBlur(
-              () -> {
-                for (Notification notif : notifications) {
-                  float containerWidth = getContainerWidth(notif);
-                  RoundedUtils.drawRound(
-                      notif.x, notif.y, containerWidth, containerHeight, 4f, false, Color.black);
-                }
-              });
-        }
-      }
-
+      // Raven-bS flat render — no bloom, no glow, no progress bar
       for (Notification notif : notifications) {
-        renderNotificationNormal(
-            notif, hud, containerHeight, iconWidth, iconHeight, paddingLeft, spacing);
+        renderNotification(notif);
       }
     }
   }
@@ -159,102 +131,51 @@ public class NotificationManager {
     int titleWidth = boldFont.width(notif.getTitle());
     int descWidth = regFont.width(notif.getDescription());
     float textWidth = Math.max(titleWidth, descWidth);
-    return Math.max(150f, 8f + 16f + 7f + textWidth + 12f);
+    return Math.max(150f, PADDING + ICON_SIZE + SPACING + textWidth + PADDING);
   }
 
-  private void renderNotificationBloom(
-      Notification notif,
-      float containerHeight,
-      float iconWidth,
-      float iconHeight,
-      float paddingLeft,
-      float spacing) {
+  private void renderNotification(Notification notif) {
     float x = notif.x;
     float y = notif.y;
     float containerWidth = getContainerWidth(notif);
 
     int typeColor = notif.getType().getColor();
-    int r = (typeColor >> 16) & 0xFF;
-    int g = (typeColor >> 8) & 0xFF;
-    int b = typeColor & 0xFF;
 
-    int iconGlowColor = (80 << 24) | (r << 16) | (g << 8) | b;
-    float iconY = y + (containerHeight - iconHeight) / 2f;
-    RoundedUtils.drawRound(x + paddingLeft, iconY, iconWidth, iconHeight, 3f, true, iconGlowColor);
+    // Raven-bS flat dark background
+    Gui.drawRect(
+        (int) x,
+        (int) y,
+        (int) (x + containerWidth),
+        (int) (y + CONTAINER_HEIGHT),
+        new Color(0, 0, 0, 200).getRGB());
 
-    float progress = Math.max(0, notif.getRemainingTime()) / (float) notif.getDuration();
-    float barWidth = containerWidth * progress;
-    if (barWidth > 0) {
-      RoundedUtils.drawRound(x, y + containerHeight - 1, barWidth, 1, 0.5f, true, typeColor);
-    }
+    // Raven-bS thin left accent bar
+    Gui.drawRect((int) x, (int) y, (int) (x + 2), (int) (y + CONTAINER_HEIGHT), typeColor);
 
+    // Icon — draw a small filled shape instead of relying on Material Icons font
+    // which fails to load at runtime (Fonts.ICONS silently falls back to Minecraft
+    // default font which has no glyphs for Material Icons PUA characters).
+    float iconCX = x + PADDING + ICON_SIZE / 2f;
+    float iconCY = y + CONTAINER_HEIGHT / 2f;
+    float iconRadius = 5f;
+
+    // Outer circle with type color
+    RenderUtil.enableRenderState();
+    RenderUtil.fillCircle(iconCX, iconCY, iconRadius, 16, typeColor);
+    // Inner white symbol: a small filled circle or diamond
+    RenderUtil.fillCircle(iconCX, iconCY, iconRadius * 0.45f, 12, 0xFFFFFFFF);
+    RenderUtil.disableRenderState();
+
+    // Text
     myau.util.font.Font boldFont = myau.util.font.Fonts.MAIN.get(14, myau.util.font.Weight.BOLD);
     myau.util.font.Font regFont = myau.util.font.Fonts.MAIN.get(12);
-    myau.util.font.Font iconFont = myau.util.font.Fonts.ICONS.get(18);
-    float textX = x + paddingLeft + iconWidth + spacing;
+    float textX = x + PADDING + ICON_SIZE + SPACING;
     float totalTextHeight = boldFont.height() + regFont.height() + 2;
-    float startTextY = y + (containerHeight - totalTextHeight) / 2f;
-
-    iconFont.drawWithShadow(
-        notif.getType().getIcon(),
-        x + paddingLeft + (iconWidth - iconFont.width(notif.getType().getIcon())) / 2f,
-        iconY + (iconHeight - iconFont.height()) / 2f + 1,
-        typeColor);
-    boldFont.drawWithShadow(notif.getTitle(), textX, startTextY, -1);
-  }
-
-  private void renderNotificationNormal(
-      Notification notif,
-      myau.module.modules.render.HUD hud,
-      float containerHeight,
-      float iconWidth,
-      float iconHeight,
-      float paddingLeft,
-      float spacing) {
-    float x = notif.x;
-    float y = notif.y;
-    float containerWidth = getContainerWidth(notif);
-
-    int shadowColor = new Color(0, 0, 0, 160).getRGB();
-    if (!(hud.shaders.getValue() && hud.blurSettings.getValue())) {
-      RoundedUtils.drawRound(x, y, containerWidth, containerHeight, 4f, true, shadowColor);
-    }
-
-    int bgColor = new Color(192, 192, 192, 153).getRGB();
-    RoundedUtils.drawRound(x, y, containerWidth, containerHeight, 4f, false, bgColor);
-
-    int typeColor = notif.getType().getColor();
-    int r = (typeColor >> 16) & 0xFF;
-    int g = (typeColor >> 8) & 0xFF;
-    int b = typeColor & 0xFF;
-
-    float iconY = y + (containerHeight - iconHeight) / 2f;
-    int iconBgColor = (40 << 24) | (r << 16) | (g << 8) | b;
-    RoundedUtils.drawRound(x + paddingLeft, iconY, iconWidth, iconHeight, 3f, false, iconBgColor);
-
-    myau.util.font.Font boldFont = myau.util.font.Fonts.MAIN.get(14, myau.util.font.Weight.BOLD);
-    myau.util.font.Font regFont = myau.util.font.Fonts.MAIN.get(12);
-    myau.util.font.Font iconFont = myau.util.font.Fonts.ICONS.get(18);
-    float textX = x + paddingLeft + iconWidth + spacing;
-
-    iconFont.drawWithShadow(
-        notif.getType().getIcon(),
-        x + paddingLeft + (iconWidth - iconFont.width(notif.getType().getIcon())) / 2f,
-        iconY + (iconHeight - iconFont.height()) / 2f + 1,
-        typeColor);
-
-    float totalTextHeight = boldFont.height() + regFont.height() + 2;
-    float startTextY = y + (containerHeight - totalTextHeight) / 2f;
+    float startTextY = y + (CONTAINER_HEIGHT - totalTextHeight) / 2f;
 
     boldFont.drawWithShadow(notif.getTitle(), textX, startTextY, -1);
     regFont.drawWithShadow(
         notif.getDescription(), textX, startTextY + boldFont.height() + 2, 0xFFAAAAAA);
-
-    float progress = Math.max(0, notif.getRemainingTime()) / (float) notif.getDuration();
-    float barWidth = containerWidth * progress;
-    if (barWidth > 0) {
-      RoundedUtils.drawRound(x, y + containerHeight - 1, barWidth, 1, 0.5f, false, typeColor);
-    }
   }
 
   public static class NotificationBuilder {

@@ -1,4 +1,4 @@
-package myau.module.modules.combat;
+package myau.module.modules.ghost;
 
 import myau.event.EventTarget;
 import myau.event.impl.MoveInputEvent;

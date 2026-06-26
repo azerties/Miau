@@ -46,14 +46,10 @@ public final class Animations extends Module {
         "Slide"
       };
 
-  private static final String[] SWING_MODES =
-      new String[] {"None", "Punch", "Shove", "Smooth", "1.9+"};
-
   private static final double a = Math.PI;
   private static final float b = 180.0F;
 
   public final ModeProperty blockAnimation = new ModeProperty("Block Animation", 0, BLOCK_MODES);
-  public final ModeProperty swingAnimation = new ModeProperty("Swing Animation", 0, SWING_MODES);
   public final BooleanProperty onlyWhenBlocking =
       new BooleanProperty("Update Position Only When Blocking", true);
   public final IntProperty swingSpeed = new IntProperty("Swing Speed", 1, -200, 50);
@@ -80,15 +76,6 @@ public final class Animations extends Module {
       return false;
     }
     animations.renderBlock(swingProgress, equipProgress, player);
-    return true;
-  }
-
-  public static boolean applySwing(float swingProgress, float equipProgress) {
-    Animations animations = (Animations) Myau.moduleManager.modules.get(Animations.class);
-    if (animations == null || !animations.isEnabled()) {
-      return false;
-    }
-    animations.renderSwing(swingProgress, equipProgress);
     return true;
   }
 
@@ -385,57 +372,6 @@ public final class Animations extends Module {
         GL11.glTranslated(2.4D, 0.3D, 0.5D);
         GL11.glTranslatef(-2.10F, -0.2F, 0.1F);
         GlStateManager.rotate(var1_dort * 13.0F, -10.0F, -1.4F, -10.0F);
-        break;
-    }
-  }
-
-  private void renderSwing(float swingProgress, float equipProgress) {
-    if (!onlyWhenBlocking.getValue()) {
-      GlStateManager.translate(x.getValue(), y.getValue(), z.getValue());
-    }
-
-    double var7 = scale.getValue().doubleValue();
-    float animationProgression = equipProgress;
-
-    switch (swingAnimation.getModeString()) {
-      case "None":
-        doItemUsedTransformations(swingProgress);
-        transformFirstPersonItem(animationProgression, swingProgress);
-        if (!onlyWhenBlocking.getValue()) {
-          GlStateManager.scale(var7, var7, var7);
-        }
-        break;
-
-      case "Punch":
-        transformFirstPersonItem(animationProgression, swingProgress);
-        doItemUsedTransformations(swingProgress);
-        if (!onlyWhenBlocking.getValue()) {
-          GlStateManager.scale(var7, var7, var7);
-        }
-        break;
-
-      case "Shove":
-        transformFirstPersonItem(animationProgression, animationProgression);
-        doItemUsedTransformations(swingProgress);
-        if (!onlyWhenBlocking.getValue()) {
-          GlStateManager.scale(var7, var7, var7);
-        }
-        break;
-
-      case "Smooth":
-        transformFirstPersonItem(animationProgression, swingProgress);
-        doItemUsedTransformations(animationProgression);
-        if (!onlyWhenBlocking.getValue()) {
-          GlStateManager.scale(var7, var7, var7);
-        }
-        break;
-
-      case "1.9+":
-        doItemUsedTransformations(swingProgress);
-        transformFirstPersonItem(animationProgression, swingProgress);
-        if (!onlyWhenBlocking.getValue()) {
-          GlStateManager.scale(var7, var7, var7);
-        }
         break;
     }
   }

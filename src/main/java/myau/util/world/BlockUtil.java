@@ -10,6 +10,7 @@ import myau.util.render.*;
 import myau.util.time.*;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.EnumFacing;
@@ -18,6 +19,14 @@ import net.minecraft.util.Vec3;
 
 public class BlockUtil {
   private static final Minecraft mc = Minecraft.getMinecraft();
+
+  public static IBlockState getBlockState(BlockPos pos) {
+    return mc.theWorld.getBlockState(pos);
+  }
+
+  public static Block getBlock(BlockPos pos) {
+    return mc.theWorld.getBlockState(pos).getBlock();
+  }
 
   public static boolean isReplaceable(BlockPos blockPos) {
     return BlockUtil.isReplaceable(BlockUtil.mc.theWorld.getBlockState(blockPos).getBlock());

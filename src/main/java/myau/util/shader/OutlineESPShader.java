@@ -2,15 +2,6 @@ package myau.util.shader;
 
 import java.util.HashMap;
 import java.util.Map;
-import myau.util.animation.*;
-import myau.util.client.*;
-import myau.util.math.*;
-import myau.util.misc.*;
-import myau.util.network.*;
-import myau.util.player.*;
-import myau.util.render.*;
-import myau.util.time.*;
-import myau.util.world.*;
 import org.lwjgl.opengl.GL20;
 
 public abstract class OutlineESPShader {
@@ -19,7 +10,7 @@ public abstract class OutlineESPShader {
           + "void main() {\n"
           + "  gl_TexCoord[0] = gl_MultiTexCoord0;\n"
           + "  gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-          + "}";
+          + "}\n";
 
   protected int programId = -1;
   private final Map<String, Integer> uniforms = new HashMap<>();

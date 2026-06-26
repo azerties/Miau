@@ -33,9 +33,6 @@ public class Chams extends Module {
   public final BooleanProperty bots = new BooleanProperty("bots", false);
 
   private boolean shouldRenderChams(EntityLivingBase entityLivingBase) {
-    if (entityLivingBase == null || mc.getRenderViewEntity() == null || mc.thePlayer == null) {
-      return false;
-    }
     if (entityLivingBase.deathTime > 0) {
       return false;
     } else if (mc.getRenderViewEntity().getDistanceToEntity(entityLivingBase) > 512.0F) {

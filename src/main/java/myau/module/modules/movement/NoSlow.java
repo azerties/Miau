@@ -8,7 +8,6 @@ import myau.event.impl.RightClickMouseEvent;
 import myau.event.impl.UpdateEvent;
 import myau.module.Module;
 import myau.module.modules.movement.noslow.*;
-import myau.property.Property;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.ModeProperty;
 import myau.util.player.ItemUtil;
@@ -18,72 +17,36 @@ import net.minecraft.item.ItemPotion;
 public class NoSlow extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  public final List<NoSlowMode> modes = new ArrayList<>();
-
   public final ModeProperty mode =
       new ModeProperty(
-          "Mode",
-          0,
-          new String[] {
-            register(new OMVanillaNoSlow("Vanilla", this)),
-            register(new OMNCPNoSlow("NCP", this)),
-            register(new OMNewNCPNoSlow("New NCP", this)),
-            register(new OMWatchdogNoSlow("Watchdog", this)),
-            register(new OMIntaveNoSlow("Intave", this)),
-            register(new OMGrimNoSlow("Grim 1.9", this))
-          });
-
+          "mode", 0, new String[] {"VANILLA", "NCP", "NEW_NCP", "WATCHDOG", "INTAVE", "GRIM"});
   public final BooleanProperty swordValue = new BooleanProperty("sword", true);
   public final BooleanProperty foodValue = new BooleanProperty("food", true);
   public final BooleanProperty potionValue = new BooleanProperty("potion", true);
   public final BooleanProperty bowValue = new BooleanProperty("bow", true);
   public final BooleanProperty antiSwitch = new BooleanProperty("anti-switch", false);
 
+  private final List<NoSlowMode> modes = new ArrayList<>();
+
   public NoSlow() {
     super("NoSlow", false);
+    modes.add(new OMVanillaNoSlow("VANILLA", this));
+    modes.add(new OMNCPNoSlow("NCP", this));
+    modes.add(new OMNewNCPNoSlow("NEW_NCP", this));
+    modes.add(new OMWatchdogNoSlow("WATCHDOG", this));
+    modes.add(new OMIntaveNoSlow("INTAVE", this));
+    modes.add(new OMGrimNoSlow("GRIM", this));
   }
 
-  private String register(NoSlowMode m) {
-    this.modes.add(m);
-    return m.getName();
+  private NoSlowMode getActiveMode() {
+    return modes.get(this.mode.getValue());
   }
 
-  public NoSlowMode getActiveMode() {
-    return modes.stream()
-        .filter(m -> m.getName().equals(mode.getModeString()))
-        .findFirst()
-        .orElse(modes.get(0));
-  }
-
-  @Override
-  public List<Property<?>> getAdditionalProperties() {
-    List<Property<?>> props = new ArrayList<>();
-    for (NoSlowMode m : modes) {
-      for (java.lang.reflect.Field field : m.getClass().getDeclaredFields()) {
-        field.setAccessible(true);
-        try {
-          Object obj = field.get(m);
-          if (obj instanceof Property<?>) {
-            Property<?> prop = (Property<?>) obj;
-            java.util.function.BooleanSupplier original = prop.getVisibleChecker();
-            prop.setVisibleChecker(
-                () -> this.getActiveMode() == m && (original == null || original.getAsBoolean()));
-            props.add(prop);
-          }
-        } catch (Exception e) {
-        }
-      }
-    }
-    return props;
-  }
-
-  @Override
-  public void onEnabled() {
+  public void onEnable() {
     getActiveMode().onEnable();
   }
 
-  @Override
-  public void onDisabled() {
+  public void onDisable() {
     getActiveMode().onDisable();
   }
 
@@ -128,7 +91,7 @@ public class NoSlow extends Module {
   }
 
   public float getMotionMultiplier() {
-    if (this.mode.getModeString().equals("GRIM")) {
+    if (this.mode.getValue() == 5) { // GRIM
       return 0.35f;
     }
     return 1.0f;
@@ -153,10 +116,5 @@ public class NoSlow extends Module {
     if (this.isEnabled()) {
       getActiveMode().onRightClick(event);
     }
-  }
-
-  @Override
-  public String[] getSuffix() {
-    return new String[] {this.mode.getModeString()};
   }
 }

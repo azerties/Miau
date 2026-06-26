@@ -1,9 +1,8 @@
 package myau.mixin;
 
 import myau.Myau;
-import myau.module.modules.render.BedESP;
-import net.minecraft.block.BlockBed;
-import net.minecraft.block.BlockBed.EnumPartType;
+import myau.module.modules.render.Xray;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.BlockRendererDispatcher;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -30,13 +29,18 @@ public abstract class MixinBlockRendererDispatcher {
       IBlockAccess iBlockAccess,
       WorldRenderer worldRenderer,
       CallbackInfoReturnable<Boolean> callbackInfoReturnable) {
-    if (Myau.moduleManager != null) {
-      BedESP bedESP = (BedESP) Myau.moduleManager.modules.get(BedESP.class);
-      if (bedESP != null
-          && bedESP.isEnabled()
-          && iBlockState.getBlock() instanceof BlockBed
-          && iBlockState.getValue(BlockBed.PART) == EnumPartType.HEAD) {
-        bedESP.beds.add(new BlockPos(blockPos));
+    // Safety: OptiFine chunk batching can pass null iBlockState
+    if (iBlockState == null || blockPos == null) return;
+    if (Myau.moduleManager == null) return;
+    Xray xray = (Xray) Myau.moduleManager.modules.get(Xray.class);
+    if (xray == null || !xray.isEnabled()) return;
+    Block block = iBlockState.getBlock();
+    if (block == null) return;
+    if (xray.isXrayBlock(Block.getIdFromBlock(block))) {
+      if (xray.checkBlock(blockPos)) {
+        xray.trackedBlocks.add(new BlockPos(blockPos));
+      } else {
+        xray.trackedBlocks.remove(blockPos);
       }
     }
   }

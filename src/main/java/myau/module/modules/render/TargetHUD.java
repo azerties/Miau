@@ -1,125 +1,47 @@
 package myau.module.modules.render;
 
 import java.awt.*;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.Locale;
 import myau.Myau;
-import myau.enums.ChatColors;
 import myau.event.EventTarget;
-import myau.event.impl.PacketEvent;
 import myau.event.impl.Render2DEvent;
-import myau.event.types.EventType;
+import myau.event.impl.Render3DEvent;
 import myau.module.Module;
 import myau.module.modules.combat.KillAura;
 import myau.property.properties.*;
-import myau.util.player.TeamUtil;
 import myau.util.render.ColorUtil;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
+import myau.util.shader.BlurUtils;
+import myau.util.shader.RoundedUtils;
 import myau.util.time.TimerUtil;
+import myau.util.vector.Vector2d;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.item.EntityArmorStand;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.network.play.client.C02PacketUseEntity;
-import net.minecraft.network.play.client.C02PacketUseEntity.Action;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
 
 public class TargetHUD extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private static final DecimalFormat healthFormat =
-      new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
-  private static final DecimalFormat diffFormat =
-      new DecimalFormat("+0.0;-0.0", new DecimalFormatSymbols(Locale.US));
-  private final TimerUtil lastAttackTimer = new TimerUtil();
-  private final TimerUtil animTimer = new TimerUtil();
-  private EntityLivingBase lastTarget = null;
-  private EntityLivingBase target = null;
-  private ResourceLocation headTexture = null;
-  private float oldHealth = 0.0F;
-  private float newHealth = 0.0F;
-  private float maxHealth = 0.0F;
-  public final ModeProperty style = new ModeProperty("style", 0, new String[] {"MYAU", "CLEAN"});
-  public final ModeProperty color =
-      new ModeProperty(
-          "color", 0, new String[] {"DEFAULT", "HUD"}, () -> this.style.getValue() == 0);
-  public final FloatProperty scale = new FloatProperty("scale", 1.0F, 0.5F, 1.5F);
-  public final DragProperty drag =
-      new DragProperty("Position", new myau.util.vector.Vector2d(150, 150));
-  public final PercentProperty background =
-      new PercentProperty("background", 25, () -> this.style.getValue() == 0);
-  public final BooleanProperty head =
-      new BooleanProperty("head", true, () -> this.style.getValue() == 0);
-  public final BooleanProperty indicator =
-      new BooleanProperty("indicator", true, () -> this.style.getValue() == 0);
-  public final BooleanProperty outline =
-      new BooleanProperty("outline", false, () -> this.style.getValue() == 0);
-  public final BooleanProperty animations =
-      new BooleanProperty("animations", true, () -> this.style.getValue() == 0);
-  public final BooleanProperty shadow = new BooleanProperty("shadow", true);
-  public final BooleanProperty kaOnly = new BooleanProperty("ka-only", true);
-  public final BooleanProperty chatPreview = new BooleanProperty("chat-preview", false);
 
-  private EntityLivingBase resolveTarget() {
-    KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
-    if (killAura.isEnabled()
-        && killAura.isAttackAllowed()
-        && TeamUtil.isEntityLoaded(killAura.getTarget())) {
-      return killAura.getTarget();
-    } else if (!(Boolean) this.kaOnly.getValue()
-        && !this.lastAttackTimer.hasTimeElapsed(1500L)
-        && TeamUtil.isEntityLoaded(this.lastTarget)) {
-      return this.lastTarget;
-    } else {
-      return (this.chatPreview.getValue()
-              || mc.currentScreen instanceof net.minecraft.client.gui.GuiChat
-              || mc.currentScreen instanceof myau.ui.clickgui.miau.ClickGui)
-          ? mc.thePlayer
-          : null;
-    }
-  }
+  private EntityLivingBase target;
+  private long lastAliveMS;
+  private double lastHealth;
+  private float lastHealthBar;
+  private TimerUtil fadeTimer;
+  private TimerUtil healthBarTimer;
+  public EntityLivingBase renderEntity;
 
-  private ResourceLocation getSkin(EntityLivingBase entityLivingBase) {
-    if (entityLivingBase instanceof EntityPlayer) {
-      NetworkPlayerInfo playerInfo = mc.getNetHandler().getPlayerInfo(entityLivingBase.getName());
-      if (playerInfo != null) {
-        return playerInfo.getLocationSkin();
-      }
-    }
-    return null;
-  }
+  /** Tracks whether drag.position has been converted from offset → absolute coordinates */
+  private boolean positionInitialized = false;
 
-  private Color getTargetColor(EntityLivingBase entityLivingBase) {
-    if (entityLivingBase instanceof EntityPlayer) {
-      if (TeamUtil.isFriend((EntityPlayer) entityLivingBase)) {
-        return Myau.friendManager.getColor();
-      }
-      if (TeamUtil.isTarget((EntityPlayer) entityLivingBase)) {
-        return Myau.targetManager.getColor();
-      }
-    }
-    switch (this.color.getValue()) {
-      case 0:
-        if (!(entityLivingBase instanceof EntityPlayer)) {
-          return new Color(-1);
-        }
-        return TeamUtil.getTeamColor((EntityPlayer) entityLivingBase, 1.0F);
-      case 1:
-        int rgb =
-            ((HUD) Myau.moduleManager.modules.get(HUD.class))
-                .getColor(System.currentTimeMillis())
-                .getRGB();
-        return new Color(rgb);
-      default:
-        return new Color(-1);
-    }
-  }
+  public final ModeProperty mode = new ModeProperty("Mode", 0, new String[] {"Modern", "Legacy"});
+  public final BooleanProperty showStatus = new BooleanProperty("Show win or loss", true);
+  public final BooleanProperty healthColor = new BooleanProperty("Traditional health color", false);
+  public final BooleanProperty renderEsp = new BooleanProperty("Render ESP", true);
+  public final FloatProperty scale = new FloatProperty("Scale", 1.0F, 0.5F, 1.5F);
+  public final BooleanProperty shadow = new BooleanProperty("Shadow", true);
+  public final DragProperty drag = new DragProperty("Position", new Vector2d(70, 30));
 
   public TargetHUD() {
     super("TargetHUD", false, true);
@@ -127,267 +49,367 @@ public class TargetHUD extends Module {
 
   @Override
   public void onDisabled() {
-    this.target = null;
-    this.lastTarget = null;
+    reset();
+  }
+
+  @Override
+  public void onEnabled() {
+    // Reset position flag so we re-initialize on next render
+    positionInitialized = false;
   }
 
   @EventTarget
-  public void onRender(Render2DEvent event) {
-    if (!this.isEnabled() || mc.thePlayer == null) {
-      this.target = null;
+  public void onRender2D(Render2DEvent event) {
+    if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null) {
+      reset();
       return;
     }
-    EntityLivingBase entityLivingBase = this.target;
-    this.target = this.resolveTarget();
-    if (this.target != null) {
-      float health = (mc.thePlayer.getHealth() + mc.thePlayer.getAbsorptionAmount()) / 2.0F;
-      float abs = this.target.getAbsorptionAmount() / 2.0F;
-      float heal = this.target.getHealth() / 2.0F + abs;
-      if (this.target != entityLivingBase) {
-        this.headTexture = null;
-        this.animTimer.setTime();
-        this.oldHealth = heal;
-        this.newHealth = heal;
-      }
-      if (!this.animations.getValue() || this.animTimer.hasTimeElapsed(150L)) {
-        this.oldHealth = this.newHealth;
-        this.newHealth = heal;
-        this.maxHealth = this.target.getMaxHealth() / 2.0F;
-        if (this.oldHealth != this.newHealth) {
-          this.animTimer.reset();
-        }
-      }
-      ResourceLocation resourceLocation = this.getSkin(this.target);
-      if (resourceLocation != null) {
-        this.headTexture = resourceLocation;
-      }
-      float elapsedTime = (float) Math.min(Math.max(this.animTimer.getElapsedTime(), 0L), 150L);
-      float healthRatio =
-          Math.min(
-              Math.max(
-                  RenderUtil.lerpFloat(this.newHealth, this.oldHealth, elapsedTime / 150.0F)
-                      / this.maxHealth,
-                  0.0F),
-              1.0F);
-      Color targetColor = this.getTargetColor(this.target);
-      if (this.style.getValue() == 1) {
-        drawCleanStyle(this.target);
-        return;
-      }
-      Color healthBarColor =
-          this.color.getValue() == 0 ? ColorUtil.getHealthBlend(healthRatio) : targetColor;
-      float healthDeltaRatio = Math.min(Math.max((health - heal + 1.0F) / 2.0F, 0.0F), 1.0F);
-      Color healthDeltaColor = ColorUtil.getHealthBlend(healthDeltaRatio);
-      ScaledResolution scaledResolution = new ScaledResolution(mc);
-      String targetNameText =
-          ChatColors.formatColor(String.format("&r%s&r", TeamUtil.stripName(this.target)));
-      int targetNameWidth = mc.fontRendererObj.getStringWidth(targetNameText);
-      String healthText =
-          ChatColors.formatColor(
-              String.format("&r&f%s%s❤&r", healthFormat.format(heal), abs > 0.0F ? "&6" : "&c"));
-      int healthTextWidth = mc.fontRendererObj.getStringWidth(healthText);
-      String statusText =
-          ChatColors.formatColor(
-              String.format("&r&l%s&r", heal == health ? "D" : (heal < health ? "W" : "L")));
-      int statusTextWidth = mc.fontRendererObj.getStringWidth(statusText);
-      String healthDiffText =
-          ChatColors.formatColor(
-              String.format("&r%s&r", heal == health ? "0.0" : diffFormat.format(health - heal)));
-      int healthDiffWidth = mc.fontRendererObj.getStringWidth(healthDiffText);
-      float barContentWidth =
-          Math.max(
-              (float) targetNameWidth
-                  + (this.indicator.getValue() ? 2.0F + (float) statusTextWidth + 2.0F : 0.0F),
-              (float) healthTextWidth
-                  + (this.indicator.getValue() ? 2.0F + (float) healthDiffWidth + 2.0F : 0.0F));
-      float headIconOffset = this.head.getValue() && this.headTexture != null ? 25.0F : 0.0F;
-      float barTotalWidth =
-          Math.max(headIconOffset + 70.0F, headIconOffset + 2.0F + barContentWidth + 2.0F);
 
-      float posX = (float) this.drag.position.x / this.scale.getValue();
-      float posY = (float) this.drag.position.y / this.scale.getValue();
+    KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
+    if (killAura == null) return;
 
-      this.drag.scale.x = barTotalWidth * this.scale.getValue();
-      this.drag.scale.y = 27.0F * this.scale.getValue();
+    EntityLivingBase killTarget = killAura.getTarget();
+    if (killTarget != null && killAura.isEnabled()) {
+      target = killTarget;
+      lastAliveMS = System.currentTimeMillis();
+      fadeTimer = null;
+    } else if (target != null) {
+      if (System.currentTimeMillis() - lastAliveMS >= 400 && fadeTimer == null) {
+        fadeTimer = new TimerUtil();
+        fadeTimer.reset();
+      }
+    } else {
+      return;
+    }
+
+    String playerInfo = target.getDisplayName().getFormattedText();
+    double health = target.getHealth() / target.getMaxHealth();
+    if (target.isDead) {
+      health = 0;
+    }
+
+    if (health != lastHealth) {
+      healthBarTimer = new TimerUtil();
+      healthBarTimer.reset();
+    }
+    lastHealth = health;
+
+    String healthStr =
+        " "
+            + (target.getHealth() == (int) target.getHealth()
+                ? String.valueOf((int) target.getHealth())
+                : String.format("%.1f", target.getHealth()));
+    playerInfo += healthStr;
+
+    drawTargetHUD(playerInfo, health);
+  }
+
+  @EventTarget
+  public void onRender3D(Render3DEvent event) {
+    if (!renderEsp.getValue() || !this.isEnabled() || mc.thePlayer == null || mc.theWorld == null) {
+      return;
+    }
+
+    KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
+    if (killAura == null) return;
+
+    // Skip ESP rendering when KillAura's showTarget is not NONE,
+    // because KillAura already renders its own target visualization
+    // (SIGMA_RING=1, ABOVE_BOX=2, FULL_BOX=3)
+    if (killAura.showTarget.getValue() != 0) return;
+
+    EntityLivingBase espTarget = killAura.getTarget();
+    if (espTarget != null && killAura.isEnabled()) {
+      RenderUtil.renderEntity(espTarget, 2, 0.0, 0.0, -1, false);
+    } else if (renderEntity != null) {
+      RenderUtil.renderEntity(renderEntity, 2, 0.0, 0.0, -1, false);
+    }
+  }
+
+  private void drawTargetHUD(String string, double health) {
+    if (showStatus.getValue()) {
+      float playerTotalHealth = mc.thePlayer.getHealth() + mc.thePlayer.getAbsorptionAmount();
+      float playerMaxHealth = mc.thePlayer.getMaxHealth();
+      boolean shouldWin = health <= (double) (playerTotalHealth / playerMaxHealth);
+      string += shouldWin ? " §aW" : " §cL";
+    }
+
+    ScaledResolution scaledResolution = new ScaledResolution(mc);
+    int padding = 8;
+    int targetStrWithPadding = mc.fontRendererObj.getStringWidth(string) + padding;
+
+    // Box dimensions at unscaled size
+    float boxWidth = targetStrWithPadding + padding * 2;
+    float boxHeight = mc.fontRendererObj.FONT_HEIGHT + 12 + padding * 2;
+
+    // --- Initialization: Convert offset → absolute screen coordinates ---
+    // The default drag.position (70, 30) stores an offset from screen center.
+    // We convert it to absolute (top-left corner) once.
+    // After conversion, the absolute coordinates (e.g. ~824, ~525 at 1080p)
+    // are saved to config. On next launch, position.x will be > scaledWidth/3
+    // so this check will correctly skip conversion.
+    if (!positionInitialized) {
+      float centerX = scaledResolution.getScaledWidth() / 2f;
+      float centerY = scaledResolution.getScaledHeight() / 2f;
+
+      // Detect if position is still the relative offset (small value)
+      // vs already-converted absolute coordinates (large value).
+      // At any reasonable resolution, absolute X is always > scaledWidth/3.
+      if (this.drag.position.x < scaledResolution.getScaledWidth() / 3f) {
+        // position.x is still the offset — convert to absolute
+        double absX = centerX - boxWidth / 2f + this.drag.position.x;
+        double absY = centerY + 15f + this.drag.position.y - padding;
+        this.drag.position.x = absX;
+        this.drag.position.y = absY;
+        this.drag.targetPosition.x = absX;
+        this.drag.targetPosition.y = absY;
+      }
+      // If position is already absolute (from config restore), keep it as-is.
+      positionInitialized = true;
+    }
+
+    // Absolute screen top-left corner (unscaled)
+    float absX = (float) this.drag.position.x;
+    float absY = (float) this.drag.position.y;
+
+    int alpha =
+        (fadeTimer == null)
+            ? 255
+            : Math.max(0, 255 - (int) (fadeTimer.getElapsedTime() * 255 / 400));
+
+    // Update drag scale for DragManager hit-testing
+    this.drag.scale.x = boxWidth;
+    this.drag.scale.y = boxHeight;
+
+    if (alpha > 0) {
+      int maxAlphaOutline = Math.min(alpha, 110);
+      int maxAlphaBackground = Math.min(alpha, 210);
+
+      float sc = this.scale.getValue();
+      float invSc = 1.0f / sc;
 
       GlStateManager.pushMatrix();
-      GlStateManager.scale(this.scale.getValue(), this.scale.getValue(), 0.0F);
-      GlStateManager.translate(posX, posY, -450.0F);
-      RenderUtil.enableRenderState();
-      int backgroundColor =
-          new Color(0.0F, 0.0F, 0.0F, (float) this.background.getValue() / 100.0F).getRGB();
-      int outlineColor =
-          this.outline.getValue() ? targetColor.getRGB() : new Color(0, 0, 0, 0).getRGB();
-      ShapeUtil.drawOutlineRect(
-          0.0F, 0.0F, barTotalWidth, 27.0F, 1.5F, backgroundColor, outlineColor);
-      ShapeUtil.drawRect(
-          headIconOffset + 2.0F,
-          22.0F,
-          barTotalWidth - 2.0F,
-          25.0F,
-          ColorUtil.darker(healthBarColor, 0.2F).getRGB());
-      ShapeUtil.drawRect(
-          headIconOffset + 2.0F,
-          22.0F,
-          headIconOffset + 2.0F + healthRatio * (barTotalWidth - 2.0F - headIconOffset - 2.0F),
-          25.0F,
-          healthBarColor.getRGB());
-      RenderUtil.disableRenderState();
-      GlStateManager.disableDepth();
-      GlStateManager.enableBlend();
-      GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-      mc.fontRendererObj.drawString(
-          targetNameText, headIconOffset + 2.0F, 2.0F, -1, this.shadow.getValue());
-      mc.fontRendererObj.drawString(
-          healthText, headIconOffset + 2.0F, 12.0F, -1, this.shadow.getValue());
-      if (this.indicator.getValue()) {
-        mc.fontRendererObj.drawString(
-            statusText,
-            barTotalWidth - 2.0F - (float) statusTextWidth,
-            2.0F,
-            healthDeltaColor.getRGB(),
-            this.shadow.getValue());
-        mc.fontRendererObj.drawString(
-            healthDiffText,
-            barTotalWidth - 2.0F - (float) healthDiffWidth,
-            12.0F,
-            ColorUtil.darker(healthDeltaColor, 0.8F).getRGB(),
-            this.shadow.getValue());
+      if (sc != 1.0F) {
+        GL11.glScalef(sc, sc, 1.0F);
       }
-      if (this.head.getValue() && this.headTexture != null) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F);
-        mc.getTextureManager().bindTexture(this.headTexture);
-        net.minecraft.client.gui.Gui.drawScaledCustomSizeModalRect(
-            2, 2, 8.0F, 8.0F, 8, 8, 23, 23, 64.0F, 64.0F);
-        net.minecraft.client.gui.Gui.drawScaledCustomSizeModalRect(
-            2, 2, 40.0F, 8.0F, 8, 8, 23, 23, 64.0F, 64.0F);
-        GlStateManager.color(1.0F, 1.0F, 1.0F);
+
+      // Convert absolute coords to GL-scaled space (GL will multiply back by sc)
+      float n6 = absX * invSc;
+      float n7 = absY * invSc;
+      float n8 = (absX + boxWidth) * invSc;
+      float n9 = (absY + boxHeight - 13f) * invSc;
+
+      // Text position inside the box (in GL-scaled space)
+      float x = n6 + padding * invSc;
+      float y = n7 + padding * invSc;
+
+      switch (mode.getValue()) {
+        case 0: // Modern - bloom + blur
+          float bloomRadius = (fadeTimer == null) ? 2f : (2f * alpha / 255f);
+          float blurRadius = (fadeTimer == null) ? 3f : (3f * alpha / 255f);
+          BlurUtils.prepareBloom();
+          RoundedUtils.drawRound(
+              n6,
+              n7,
+              Math.abs(n6 - n8),
+              Math.abs(n7 - (n9 + 13f * invSc)),
+              8.0f,
+              true,
+              new Color(0, 0, 0, maxAlphaBackground));
+          BlurUtils.bloomEnd(3, bloomRadius);
+          BlurUtils.prepareBlur();
+          RoundedUtils.drawRound(
+              n6,
+              n7,
+              Math.abs(n6 - n8),
+              Math.abs(n7 - (n9 + 13f * invSc)),
+              8.0f,
+              true,
+              new Color(mergeAlpha(Color.black.getRGB(), maxAlphaOutline)));
+          BlurUtils.blurEnd(2, blurRadius);
+          break;
+        case 1: // Legacy - gradient outline
+          drawRoundedGradientOutlinedRectangle(
+              n6,
+              n7,
+              n8,
+              n9 + 13f * invSc,
+              10.0f,
+              mergeAlpha(Color.black.getRGB(), maxAlphaOutline),
+              mergeAlpha(new Color(0x70CEFF).getRGB(), alpha),
+              mergeAlpha(new Color(0x4D8DFF).getRGB(), alpha));
+          break;
       }
-      GlStateManager.disableBlend();
-      GlStateManager.enableDepth();
+
+      float n13 = n6 + 6f * invSc;
+      float n14 = n8 - 6f * invSc;
+      float n15 = n9;
+
+      // Bar background
+      drawRoundedRectangle(
+          n13, n15, n14, n15 + 5f * invSc, 4.0f, mergeAlpha(Color.black.getRGB(), maxAlphaOutline));
+
+      int mergedGradientLeft = mergeAlpha(new Color(0x70CEFF).getRGB(), maxAlphaBackground);
+      int mergedGradientRight = mergeAlpha(new Color(0x4D8DFF).getRGB(), maxAlphaBackground);
+
+      float healthBar = n14 + (n13 - n14) * (float) (1 - health);
+
+      // Health bar smooth animation
+      boolean smoothBack = false;
+      if (healthBar != lastHealthBar
+          && Math.abs(lastHealthBar - n13) >= 3f * invSc
+          && healthBarTimer != null) {
+        float diff = lastHealthBar - healthBar;
+        if (diff > 0) {
+          lastHealthBar = lastHealthBar - getTimedProgress(diff, 400);
+        } else {
+          smoothBack = true;
+          lastHealthBar = lastHealthBar + getTimedProgress(-diff, 400);
+        }
+      } else {
+        lastHealthBar = healthBar;
+      }
+
+      if (healthColor.getValue()) {
+        Color healthBlend = ColorUtil.getHealthBlend((float) health);
+        mergedGradientLeft =
+            mergedGradientRight = mergeAlpha(healthBlend.getRGB(), maxAlphaBackground);
+      }
+
+      if (lastHealthBar > n14) {
+        lastHealthBar = n14;
+      }
+
+      switch (mode.getValue()) {
+        case 0: // Modern
+          drawRoundedRectangle(
+              n13,
+              n15,
+              lastHealthBar,
+              n15 + 5f * invSc,
+              4.0f,
+              mergeAlpha(
+                  ColorUtil.darker(new Color(mergedGradientRight), 0.25f).getRGB(),
+                  maxAlphaBackground));
+          drawRoundedGradientRect(
+              n13,
+              n15,
+              smoothBack ? lastHealthBar : healthBar,
+              n15 + 5f * invSc,
+              4.0f,
+              mergedGradientLeft,
+              mergedGradientLeft,
+              mergedGradientRight,
+              mergedGradientRight);
+          break;
+        case 1: // Legacy
+          drawRoundedGradientRect(
+              n13,
+              n15,
+              lastHealthBar,
+              n15 + 5f * invSc,
+              4.0f,
+              mergedGradientLeft,
+              mergedGradientLeft,
+              mergedGradientRight,
+              mergedGradientRight);
+          break;
+      }
+
+      GL11.glPushMatrix();
+      GL11.glEnable(GL11.GL_BLEND);
+      int textColor =
+          (new Color(220, 220, 220, 255).getRGB() & 0xFFFFFF)
+              | (MathHelper.clamp_int(alpha + 15, 0, 255) << 24);
+      mc.fontRendererObj.drawString(string, x, y, textColor, shadow.getValue());
+      GL11.glDisable(GL11.GL_BLEND);
+      GL11.glPopMatrix();
+
       GlStateManager.popMatrix();
+    } else {
+      target = null;
+      healthBarTimer = null;
     }
   }
 
-  private void drawCleanStyle(EntityLivingBase entity) {
-    String targetName = TeamUtil.stripName(entity);
-    String targetPrefix = "Target: ";
-    String healthPrefix = "Health: ";
-    String healthValue = healthFormat.format(entity.getHealth());
-    String status = getCleanStatus(entity);
-    int targetWidth =
-        mc.fontRendererObj.getStringWidth(
-            targetPrefix + targetName + (status.isEmpty() ? "" : " " + status));
-    int healthWidth = mc.fontRendererObj.getStringWidth(healthPrefix + healthValue);
-    int hudWidth = Math.max(98, Math.max(targetWidth, healthWidth) + 14);
-    int hudHeight = 30;
-
-    float baseX = (float) this.drag.position.x / this.scale.getValue();
-    float baseY = (float) this.drag.position.y / this.scale.getValue();
-    this.drag.scale.x = hudWidth * this.scale.getValue();
-    this.drag.scale.y = hudHeight * this.scale.getValue();
-
-    float sc = this.scale.getValue();
-    GL11.glPushMatrix();
-    GL11.glTranslated(baseX + hudWidth / 2.0F, baseY + hudHeight / 2.0F, 0);
-    GL11.glScalef(sc, sc, 1.0F);
-    GL11.glTranslated(-(baseX + hudWidth / 2.0F), -(baseY + hudHeight / 2.0F), 0);
-    int x = (int) baseX;
-    int y = (int) baseY;
-    int bgColor = (150 << 24) | 0x000000;
-    int whiteColor = 0xFFFFFFFF;
-    int greenColor = 0xFF00FF38;
-    int redColor = 0xFFFF3030;
-    int yellowColor = 0xFFFFFF00;
-    int statusColor =
-        "W".equals(status) ? greenColor : ("L".equals(status) ? redColor : yellowColor);
-    GlStateManager.enableBlend();
-    net.minecraft.client.gui.Gui.drawRect(x, y, x + hudWidth, y + hudHeight, bgColor);
-    drawVerticalGradientRect(x, y, x + 2, y + hudHeight, 0xFFC44DFF, 0xFF4D8DFF);
-    int textX = x + 8;
-    int targetY = y + 5;
-    int healthY = y + 17;
-    mc.fontRendererObj.drawString(targetPrefix, textX, targetY, whiteColor, this.shadow.getValue());
-    int nameX = textX + mc.fontRendererObj.getStringWidth(targetPrefix);
-    mc.fontRendererObj.drawString(targetName, nameX, targetY, whiteColor, this.shadow.getValue());
-    if (!status.isEmpty()) {
-      int statusX = nameX + mc.fontRendererObj.getStringWidth(targetName + " ");
-      mc.fontRendererObj.drawString(status, statusX, targetY, statusColor, this.shadow.getValue());
-    }
-    mc.fontRendererObj.drawString(healthPrefix, textX, healthY, whiteColor, this.shadow.getValue());
-    int healthX = textX + mc.fontRendererObj.getStringWidth(healthPrefix);
-    mc.fontRendererObj.drawString(
-        healthValue, healthX, healthY, greenColor, this.shadow.getValue());
-    GlStateManager.disableBlend();
-    GL11.glPopMatrix();
+  private float getTimedProgress(float total, long duration) {
+    if (healthBarTimer == null) return 0;
+    long elapsed = healthBarTimer.getElapsedTime();
+    float progress = Math.min(1.0f, (float) elapsed / (float) duration);
+    return total * progress;
   }
 
-  private String getCleanStatus(EntityLivingBase entity) {
-    if (mc.thePlayer == null || entity == null) return "N";
-    KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
-    boolean killAuraReady =
-        killAura != null
-            && killAura.isEnabled()
-            && killAura.isAttackAllowed()
-            && killAura.getTarget() == entity
-            && mc.thePlayer.getDistanceToEntity(entity) <= (double) killAura.attackRange.getValue();
-    float playerScore = getCleanFightScore(mc.thePlayer);
-    float targetScore = getCleanFightScore(entity);
-    if (killAuraReady && playerScore >= targetScore * 0.92F) return "W";
-    if (!killAuraReady || playerScore < targetScore * 0.85F) return "L";
-    return "N";
+  private void reset() {
+    fadeTimer = null;
+    target = null;
+    healthBarTimer = null;
+    renderEntity = null;
   }
 
-  private float getCleanFightScore(EntityLivingBase entity) {
-    float health = entity.getHealth() + entity.getAbsorptionAmount();
-    if (entity instanceof EntityPlayer)
-      health += ((EntityPlayer) entity).getTotalArmorValue() * 0.45F;
-    return health;
+  private int mergeAlpha(int rgb, int alpha) {
+    return (MathHelper.clamp_int(alpha, 0, 255) << 24) | (rgb & 0xFFFFFF);
   }
 
-  private void drawVerticalGradientRect(
-      int left, int top, int right, int bottom, int startColor, int endColor) {
-    float startA = (float) (startColor >> 24 & 255) / 255.0F;
-    float startR = (float) (startColor >> 16 & 255) / 255.0F;
-    float startG = (float) (startColor >> 8 & 255) / 255.0F;
-    float startB = (float) (startColor & 255) / 255.0F;
-    float endA = (float) (endColor >> 24 & 255) / 255.0F;
-    float endR = (float) (endColor >> 16 & 255) / 255.0F;
-    float endG = (float) (endColor >> 8 & 255) / 255.0F;
-    float endB = (float) (endColor & 255) / 255.0F;
+  private void drawRoundedGradientOutlinedRectangle(
+      float left,
+      float top,
+      float right,
+      float bottom,
+      float radius,
+      int backgroundColor,
+      int firstColor,
+      int secondColor) {
+    drawRoundedGradientRect(
+        left, top, right, bottom, radius, firstColor, firstColor, secondColor, secondColor);
+    drawRoundedRectangle(
+        left + 1.0F,
+        top + 1.0F,
+        right - 1.0F,
+        bottom - 1.0F,
+        Math.max(0.0F, radius - 1.0F),
+        backgroundColor);
+  }
+
+  private void drawRoundedRectangle(
+      float left, float top, float right, float bottom, float radius, int color) {
+    drawRoundedGradientRect(left, top, right, bottom, radius, color, color, color, color);
+  }
+
+  private void drawRoundedGradientRect(
+      float left,
+      float top,
+      float right,
+      float bottom,
+      float radius,
+      int topLeft,
+      int bottomLeft,
+      int bottomRight,
+      int topRight) {
+    if (right <= left || bottom <= top) return;
     GlStateManager.disableTexture2D();
     GlStateManager.enableBlend();
     GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
     GlStateManager.shadeModel(GL11.GL_SMOOTH);
     GL11.glBegin(GL11.GL_QUADS);
-    GL11.glColor4f(startR, startG, startB, startA);
+    glColor(topLeft);
     GL11.glVertex2f(left, top);
-    GL11.glVertex2f(right, top);
-    GL11.glColor4f(endR, endG, endB, endA);
-    GL11.glVertex2f(right, bottom);
+    glColor(bottomLeft);
     GL11.glVertex2f(left, bottom);
+    glColor(bottomRight);
+    GL11.glVertex2f(right, bottom);
+    glColor(topRight);
+    GL11.glVertex2f(right, top);
     GL11.glEnd();
     GlStateManager.shadeModel(GL11.GL_FLAT);
     GlStateManager.disableBlend();
     GlStateManager.enableTexture2D();
   }
 
-  @EventTarget
-  public void onPacket(PacketEvent event) {
-    if (!this.isEnabled()) return;
-    if (event.getType() == EventType.SEND && event.getPacket() instanceof C02PacketUseEntity) {
-      C02PacketUseEntity packet = (C02PacketUseEntity) event.getPacket();
-      if (packet.getAction() != Action.ATTACK) {
-        return;
-      }
-      Entity entity = packet.getEntityFromWorld(mc.theWorld);
-      if (entity instanceof EntityLivingBase) {
-        if (entity instanceof EntityArmorStand) {
-          return;
-        }
-        this.lastAttackTimer.reset();
-        this.lastTarget = (EntityLivingBase) entity;
-      }
-    }
+  private void glColor(int color) {
+    GL11.glColor4f(
+        (color >> 16 & 255) / 255.0F,
+        (color >> 8 & 255) / 255.0F,
+        (color & 255) / 255.0F,
+        (color >> 24 & 255) / 255.0F);
   }
 }

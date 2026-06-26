@@ -11,7 +11,6 @@ import myau.module.Module;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.ColorProperty;
 import myau.util.render.RenderUtil;
-import myau.util.render.ShapeUtil;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
 import net.minecraft.client.Minecraft;
@@ -152,7 +151,7 @@ public class ChestESP extends Module {
           float opacity =
               (float) ((Tracers) Myau.moduleManager.modules.get(Tracers.class)).opacity.getValue()
                   / 100.0F;
-          ShapeUtil.drawLine3D(
+          RenderUtil.drawLine3D(
               vec,
               (double) chest.getPos().getX() + 0.5,
               (double) chest.getPos().getY() + 0.5,

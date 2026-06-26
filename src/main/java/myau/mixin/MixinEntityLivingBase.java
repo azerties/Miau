@@ -74,7 +74,7 @@ public abstract class MixinEntityLivingBase extends MixinEntity {
         return float1;
       }
       Jesus jesus = (Jesus) Myau.moduleManager.modules.get(Jesus.class);
-      if (jesus.isEnabled() && (!jesus.groundOnly.getValue() || this.onGround)) {
+      if (jesus != null && jesus.isEnabled() && (!jesus.groundOnly.getValue() || this.onGround)) {
         return Math.max(float1, jesus.speed.getValue());
       }
     }

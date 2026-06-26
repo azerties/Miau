@@ -5,6 +5,7 @@ import java.util.MissingFormatArgumentException;
 import myau.Myau;
 import myau.enums.ChatColors;
 import myau.util.animation.*;
+import myau.util.animation.impl.DecelerateAnimation;
 import myau.util.math.*;
 import myau.util.misc.*;
 import myau.util.network.*;
@@ -19,6 +20,7 @@ import net.minecraft.util.IChatComponent;
 
 public class ChatUtil {
   private static final Minecraft mc = Minecraft.getMinecraft();
+  public static Animation openingAnimation = new DecelerateAnimation(175, 1, Direction.BACKWARDS);
 
   public static void display(String message, Object... objects) {
     if (mc.thePlayer != null) {

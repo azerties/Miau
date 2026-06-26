@@ -63,11 +63,11 @@ public abstract class MixinRendererLivingEntity<T extends EntityLivingBase> exte
       T entityLivingBase, CallbackInfoReturnable<Boolean> callbackInfoReturnable) {
     if (Myau.moduleManager != null) {
       NameTags nameTags = (NameTags) Myau.moduleManager.modules.get(NameTags.class);
-      if (nameTags.isEnabled() && nameTags.shouldRenderTags(entityLivingBase)) {
+      if (nameTags != null && nameTags.isEnabled() && nameTags.shouldRenderTags(entityLivingBase)) {
         callbackInfoReturnable.setReturnValue(false);
       } else {
         ESP esp = (ESP) Myau.moduleManager.modules.get(ESP.class);
-        if (esp.isEnabled() && !esp.isOutlineEnabled()) {
+        if (esp != null && esp.isEnabled() && !esp.isOutlineEnabled()) {
           callbackInfoReturnable.setReturnValue(false);
         }
       }
