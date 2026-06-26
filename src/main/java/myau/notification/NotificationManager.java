@@ -12,7 +12,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 
 public class NotificationManager {
-  // Raven-bS compact style constants
+
   private static final float PADDING = 8f;
   private static final float ICON_SIZE = 16f;
   private static final float SPACING = 6f;
@@ -102,14 +102,12 @@ public class NotificationManager {
           activeIndex++;
         }
 
-        // Miau animation: slide-in on first frame
         if (notif.firstFrame) {
           notif.x = scaledWidth + 10;
           notif.y = currentTargetY;
           notif.firstFrame = false;
         }
 
-        // Smooth lerp animation (Miau style)
         notif.x += (targetX - notif.x) * animationSpeed * deltaTime;
         notif.y += (currentTargetY - notif.y) * animationSpeed * deltaTime;
 
@@ -118,7 +116,6 @@ public class NotificationManager {
         }
       }
 
-      // Raven-bS flat render — no bloom, no glow, no progress bar
       for (Notification notif : notifications) {
         renderNotification(notif);
       }
@@ -141,7 +138,6 @@ public class NotificationManager {
 
     int typeColor = notif.getType().getColor();
 
-    // Raven-bS flat dark background
     Gui.drawRect(
         (int) x,
         (int) y,
@@ -149,24 +145,18 @@ public class NotificationManager {
         (int) (y + CONTAINER_HEIGHT),
         new Color(0, 0, 0, 200).getRGB());
 
-    // Raven-bS thin left accent bar
     Gui.drawRect((int) x, (int) y, (int) (x + 2), (int) (y + CONTAINER_HEIGHT), typeColor);
 
-    // Icon — draw a small filled shape instead of relying on Material Icons font
-    // which fails to load at runtime (Fonts.ICONS silently falls back to Minecraft
-    // default font which has no glyphs for Material Icons PUA characters).
     float iconCX = x + PADDING + ICON_SIZE / 2f;
     float iconCY = y + CONTAINER_HEIGHT / 2f;
     float iconRadius = 5f;
 
-    // Outer circle with type color
     RenderUtil.enableRenderState();
     RenderUtil.fillCircle(iconCX, iconCY, iconRadius, 16, typeColor);
-    // Inner white symbol: a small filled circle or diamond
+
     RenderUtil.fillCircle(iconCX, iconCY, iconRadius * 0.45f, 12, 0xFFFFFFFF);
     RenderUtil.disableRenderState();
 
-    // Text
     myau.util.font.Font boldFont = myau.util.font.Fonts.MAIN.get(14, myau.util.font.Weight.BOLD);
     myau.util.font.Font regFont = myau.util.font.Fonts.MAIN.get(12);
     float textX = x + PADDING + ICON_SIZE + SPACING;

@@ -16,9 +16,10 @@ public class BlinkCheck {
   private final Map<String, CheckBuffer> blinkLimitBuffers = new HashMap<>();
 
   private static final long FIFTY_MS_NANOS = 50_000_000L;
-  private static final long CLOCK_ERROR_NANOS = 1_000_000L;
-  private static final long TIMER_OVERFLOW_LIMIT = 80_000_000L;
+  private static final long CLOCK_ERROR_NANOS = 5_000_000L;
+  private static final long TIMER_OVERFLOW_LIMIT = 120_000_000L;
   private static final int BLINK_TICK_LIMIT = 60;
+  private static final int WARM_UP_TICKS = 100;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
@@ -51,7 +52,9 @@ public class BlinkCheck {
     long maxLagNanos = (long) BLINK_TICK_LIMIT * FIFTY_MS_NANOS;
     balanceState[1] = Math.max(-maxLagNanos, Math.min(balanceState[1], FIFTY_MS_NANOS * 20));
 
-    if (balanceState[1] > TIMER_OVERFLOW_LIMIT) {
+    boolean warmUpComplete = data.existedTicks > WARM_UP_TICKS;
+
+    if (warmUpComplete && balanceState[1] > TIMER_OVERFLOW_LIMIT) {
       double ticksAhead = (double) balanceState[1] / FIFTY_MS_NANOS;
       double vl = Math.min(Math.max(ticksAhead * 2.0, 1.0), 5.0);
       if (timerBuffer.flag(vl, 4.0D)) {
@@ -63,9 +66,8 @@ public class BlinkCheck {
       timerBuffer.decay(0.05D);
     }
 
-    if (balanceState[1] < -(long) BLINK_TICK_LIMIT * FIFTY_MS_NANOS / 2) {
-      double ticksBehind = (double) -balanceState[1] / FIFTY_MS_NANOS;
-      if (blinkLimitBuffer.flag(1.5D, 3.0D)) {
+    if (warmUpComplete && balanceState[1] < -(long) BLINK_TICK_LIMIT * FIFTY_MS_NANOS / 2) {
+      if (blinkLimitBuffer.flag(1.5D, 4.0D)) {
         context.receiveSignal(name, "Blink (Limit)");
         blinkLimitBuffer.reset();
       }
@@ -73,7 +75,7 @@ public class BlinkCheck {
       blinkLimitBuffer.decay(0.1D);
     }
 
-    boolean frozen = data.totalDelta < 0.002D && data.yawDelta < 0.03F && data.pitchDelta < 0.03F;
+    boolean frozen = data.totalDelta < 0.001D && data.yawDelta < 0.02F && data.pitchDelta < 0.02F;
     if (frozen) {
       this.frozenTicks.put(name, this.frozenTicks.getOrDefault(name, 0) + 1);
       burstBuffer.decay(0.1D);
@@ -83,13 +85,13 @@ public class BlinkCheck {
     int frozenBefore = this.frozenTicks.getOrDefault(name, 0);
     this.frozenTicks.remove(name);
 
-    boolean catchUpBurst = frozenBefore >= 8 && data.totalDelta > 0.65D && data.totalDelta < 8.0D;
+    boolean catchUpBurst = frozenBefore >= 12 && data.totalDelta > 0.65D && data.totalDelta < 8.0D;
     boolean pulseMove =
-        data.totalDelta > 1.15D && data.totalDelta < 8.0D && data.horizontalDelta > 0.8D;
-    boolean heavyPulse = frozenBefore >= 3 && data.totalDelta > 0.95D && data.totalDelta < 8.0D;
+        data.totalDelta > 1.5D && data.totalDelta < 8.0D && data.horizontalDelta > 1.0D;
+    boolean heavyPulse = frozenBefore >= 5 && data.totalDelta > 1.2D && data.totalDelta < 8.0D;
 
     if (catchUpBurst) {
-      if (burstBuffer.flag(1.5D + Math.min(1.0D, frozenBefore / 20.0D), 3.0D)) {
+      if (burstBuffer.flag(1.5D + Math.min(1.0D, frozenBefore / 20.0D), 4.0D)) {
         context.receiveSignal(name, "Blink");
         burstBuffer.reset();
         pulseBuffer.reset();
@@ -99,12 +101,12 @@ public class BlinkCheck {
     }
 
     if (pulseMove && !player.isCollidedHorizontally && data.airTicks < 8) {
-      if (pulseBuffer.flag(1.0D, 3.5D)) {
+      if (pulseBuffer.flag(1.0D, 4.5D)) {
         context.receiveSignal(name, "Blink");
         pulseBuffer.reset();
       }
     } else if (heavyPulse) {
-      if (pulseBuffer.flag(1.25D, 3.0D)) {
+      if (pulseBuffer.flag(1.0D, 4.0D)) {
         context.receiveSignal(name, "Pulse Blink");
         pulseBuffer.reset();
       }
@@ -121,7 +123,8 @@ public class BlinkCheck {
         || player.isInLava()
         || player.isOnLadder()
         || player.isRiding()
-        || player.capabilities.isFlying;
+        || player.capabilities.isFlying
+        || data.recentlyHurt();
   }
 
   public void reset() {

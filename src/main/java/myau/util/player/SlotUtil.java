@@ -22,7 +22,6 @@ public final class SlotUtil {
 
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  // Rise blacklist: blocks that should never be selected for placement
   public static final List<Block> blacklist =
       Arrays.asList(
           Blocks.enchanting_table,
@@ -201,7 +200,5 @@ public final class SlotUtil {
     return -1;
   }
 
-  private SlotUtil() {
-    // Utility class — no instances
-  }
+  private SlotUtil() {}
 }

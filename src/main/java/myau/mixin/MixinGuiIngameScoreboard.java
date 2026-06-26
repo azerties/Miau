@@ -62,7 +62,6 @@ public abstract class MixinGuiIngameScoreboard {
             (float) scoreboardMod.drag.position.y - scoreboardMod.defaultY,
             0.0f);
 
-        // Cancel vanilla rendering and draw Tenacity-style scoreboard with background
         ci.cancel();
         renderTenacityScoreboard(objective, scaledRes, scoreboardMod);
         openMyauCustomScoreboardRendered = true;
@@ -109,7 +108,6 @@ public abstract class MixinGuiIngameScoreboard {
     int imageY = scaledRes.getScaledHeight() / 2 + list.size() * getFontHeight() / 3;
     int lineCount = 0;
 
-    // Calculate max width
     int maxWidth = getStringWidth(objective.getDisplayName());
     for (Score score : list) {
       ScorePlayerTeam team = scoreboard.getPlayersTeam(score.getPlayerName());
@@ -130,14 +128,11 @@ public abstract class MixinGuiIngameScoreboard {
       int y = imageY - lineCount * getFontHeight();
       int rightEdge = scaledRes.getScaledWidth() - 3 + 2;
 
-      // Draw semi-transparent background for each line
       Gui.drawRect((int) (xOffset - 2), y, rightEdge, y + getFontHeight(), bgColor.getRGB());
 
-      // Draw line text
       boolean shadow = scoreboardMod.textShadow.getValue();
       drawString(playerName, xOffset, y, -1, shadow);
 
-      // Draw score numbers (optionally in red)
       String scoreText;
       if (scoreboardMod.redNumbers.getValue()) {
         scoreText = EnumChatFormatting.RED + "" + score.getScorePoints();
@@ -146,7 +141,6 @@ public abstract class MixinGuiIngameScoreboard {
       }
       drawString(scoreText, rightEdge - getStringWidth(scoreText), y, -1, shadow);
 
-      // Draw title at the top (last iteration = first/header line)
       if (lineCount == list.size()) {
         String title = objective.getDisplayName();
         int titleY = y - getFontHeight() - 1;

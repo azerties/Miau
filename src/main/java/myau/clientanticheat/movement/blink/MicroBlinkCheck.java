@@ -19,14 +19,15 @@ public class MicroBlinkCheck {
   private final Map<String, Long> lastAttackTime = new HashMap<>();
 
   private static final int HISTOGRAM_SIZE = 100;
-  private static final double MIN_FREEZE_DELTA = 0.008D;
+  private static final double MIN_FREEZE_DELTA = 0.003D;
   private static final double MAX_FREEZE_DELTA = 0.04D;
   private static final double MIN_BURST_DELTA = 0.4D;
   private static final double MAX_BURST_DELTA = 8.0D;
-  private static final int MIN_FREEZE_TICKS = 2;
+  private static final int MIN_FREEZE_TICKS = 4;
   private static final int MAX_FREEZE_TICKS = 30;
-  private static final long COMBAT_WINDOW_MS = 1250L;
-  private static final double CHI_SQUARE_THRESHOLD = 5.5D;
+  private static final long COMBAT_WINDOW_MS = 1500L;
+  private static final double CHI_SQUARE_THRESHOLD = 7.0D;
+  private static final int COLD_START_TICKS = 100;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
@@ -57,7 +58,7 @@ public class MicroBlinkCheck {
     }
 
     boolean frozen =
-        data.totalDelta < MIN_FREEZE_DELTA && data.yawDelta < 0.05F && data.pitchDelta < 0.05F;
+        data.totalDelta < MIN_FREEZE_DELTA && data.yawDelta < 0.03F && data.pitchDelta < 0.03F;
     if (frozen) {
       this.frozenTicksMap.put(name, this.frozenTicksMap.getOrDefault(name, 0) + 1);
       buffer.decay(0.01D);
@@ -93,13 +94,13 @@ public class MicroBlinkCheck {
       moveTimestamps.removeLast();
     }
 
-    if (histogram.size() >= 20) {
+    if (histogram.size() >= 40) {
       long countInRange =
           histogram.stream().filter(v -> Math.abs(v - freezeDurationMs) < 15.0D).count();
       double probability = (double) countInRange / histogram.size();
 
-      if (probability < 0.01D && histogram.size() > 30) {
-        if (buffer.flag(2.5D, 5.0D)) {
+      if (probability < 0.01D && histogram.size() > 50) {
+        if (buffer.flag(2.0D, 6.0D)) {
           context.receiveSignal(name, "MicroBlink (Histogram Outlier)");
           buffer.reset();
         }
@@ -108,32 +109,34 @@ public class MicroBlinkCheck {
       }
     }
 
-    boolean nearEntity = data.nearestTarget != null && data.nearestTargetDistance < 8.0D;
+    boolean nearEntity = data.nearestTarget != null && data.nearestTargetDistance < 6.0D;
 
-    int[] contingency = this.chiSquareContingency.computeIfAbsent(name, key -> new int[4]);
-    if (frozenTicks >= MIN_FREEZE_TICKS && nearEntity) {
-      contingency[0]++;
-    } else if (frozenTicks >= MIN_FREEZE_TICKS) {
-      contingency[1]++;
-    } else if (nearEntity) {
-      contingency[2]++;
-    } else {
-      contingency[3]++;
-    }
+    if (data.existedTicks > COLD_START_TICKS) {
+      int[] contingency = this.chiSquareContingency.computeIfAbsent(name, key -> new int[4]);
+      if (frozenTicks >= MIN_FREEZE_TICKS && nearEntity) {
+        contingency[0]++;
+      } else if (frozenTicks >= MIN_FREEZE_TICKS) {
+        contingency[1]++;
+      } else if (nearEntity) {
+        contingency[2]++;
+      } else {
+        contingency[3]++;
+      }
 
-    if (contingency[0] + contingency[1] + contingency[2] + contingency[3] > 50) {
-      double chi2 = computeChiSquare(contingency);
-      if (chi2 > CHI_SQUARE_THRESHOLD && contingency[0] > contingency[1]) {
-        if (entityAlignmentBuffer.flag(2.0D, 4.0D)) {
-          context.receiveSignal(name, "MicroBlink (Entity-Aligned)");
-          entityAlignmentBuffer.reset();
-          for (int i = 0; i < contingency.length; i++) contingency[i] = 0;
+      if (contingency[0] + contingency[1] + contingency[2] + contingency[3] > 80) {
+        double chi2 = computeChiSquare(contingency);
+        if (chi2 > CHI_SQUARE_THRESHOLD && contingency[0] > contingency[1]) {
+          if (entityAlignmentBuffer.flag(1.5D, 5.0D)) {
+            context.receiveSignal(name, "MicroBlink (Entity-Aligned)");
+            entityAlignmentBuffer.reset();
+            for (int i = 0; i < contingency.length; i++) contingency[i] = 0;
+          }
+        } else {
+          entityAlignmentBuffer.decay(0.1D);
         }
       } else {
-        entityAlignmentBuffer.decay(0.1D);
+        entityAlignmentBuffer.decay(0.05D);
       }
-    } else {
-      entityAlignmentBuffer.decay(0.05D);
     }
 
     Long lastAttack = this.lastAttackTime.get(name);
@@ -142,7 +145,7 @@ public class MicroBlinkCheck {
       boolean inCombatWindow = msSinceLastAttack < COMBAT_WINDOW_MS && msSinceLastAttack >= 0;
 
       if (inCombatWindow && frozenTicks >= MIN_FREEZE_TICKS) {
-        if (combatCorrelationBuffer.flag(1.5D, 4.0D)) {
+        if (combatCorrelationBuffer.flag(1.0D, 6.0D)) {
           context.receiveSignal(name, "MicroBlink (Combat-Timed)");
           combatCorrelationBuffer.reset();
         }
@@ -155,7 +158,7 @@ public class MicroBlinkCheck {
         && frozenTicks >= MIN_FREEZE_TICKS
         && frozenTicks <= MAX_FREEZE_TICKS
         && data.startedSwinging()) {
-      if (buffer.flag(1.0D, 4.0D)) {
+      if (buffer.flag(0.5D, 5.0D)) {
         context.receiveSignal(name, "MicroBlink / LagRange");
         buffer.reset();
       }
@@ -192,7 +195,11 @@ public class MicroBlinkCheck {
         || player.ticksExisted < 40
         || data.recentlyTeleported()
         || player.isInWater()
-        || player.isInLava();
+        || player.isInLava()
+        || player.isOnLadder()
+        || player.isRiding()
+        || player.capabilities.isFlying
+        || data.recentlyHurt();
   }
 
   public void reset() {

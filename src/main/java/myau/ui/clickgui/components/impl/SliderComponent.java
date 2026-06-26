@@ -26,7 +26,6 @@ public class SliderComponent extends Component {
   private double targetValue;
   private double displayedValue;
 
-  // For double slider
   public boolean draggingMin = false;
   public boolean draggingMax = false;
   private double targetSecondValue;

@@ -15,7 +15,6 @@ import net.minecraft.world.World;
 public class ScaffoldRotationCheck {
   private final Map<String, CheckBuffer> stabilityBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> speedBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> blockRotationBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> sharpRotationBuffers = new HashMap<>();
   private final Map<String, float[]> yawHistory = new HashMap<>();
   private final Map<String, float[]> pitchHistory = new HashMap<>();
@@ -23,6 +22,7 @@ public class ScaffoldRotationCheck {
   private final Map<String, Long> sharpRotationResets = new HashMap<>();
   private final Map<String, Long> lastBlockPlacement = new HashMap<>();
   private final Map<String, CheckBuffer> backSnapBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> constantYawBuffers = new HashMap<>();
 
   private static final int HISTORY_LENGTH = 6;
 
@@ -34,25 +34,25 @@ public class ScaffoldRotationCheck {
     CheckBuffer stabilityBuffer =
         this.stabilityBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer speedBuffer = this.speedBuffers.computeIfAbsent(name, key -> new CheckBuffer());
-    CheckBuffer blockRotationBuffer =
-        this.blockRotationBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer sharpRotationBuffer =
         this.sharpRotationBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer backSnapBuffer =
         this.backSnapBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer constantYawBuffer =
+        this.constantYawBuffers.computeIfAbsent(name, key -> new CheckBuffer());
 
     ItemStack held = player.getHeldItem();
     boolean holdingBlock = held != null && held.getItem() instanceof ItemBlock;
     if (!holdingBlock || this.isExempt(player, data)) {
       stabilityBuffer.decay(0.5D);
       speedBuffer.decay(0.5D);
-      blockRotationBuffer.decay(0.3D);
       sharpRotationBuffer.decay(0.2D);
       backSnapBuffer.decay(0.2D);
+      constantYawBuffer.decay(0.3D);
       return;
     }
 
-    boolean moving = data.horizontalDelta > 0.12D;
+    boolean moving = data.horizontalDelta > 0.15D;
     boolean hasBlockBelow = this.hasSolidBelow(player, world, 1.0D);
     boolean hasRecentSupport = this.hasSolidBelow(player, world, 1.35D);
     boolean nearEdge =
@@ -60,11 +60,14 @@ public class ScaffoldRotationCheck {
     boolean bridgeContext =
         moving && (nearEdge || !hasBlockBelow || hasRecentSupport && data.pitch > 55.0F);
 
+    boolean sneakBridging = player.isSneaking() && nearEdge && data.pitch > 60.0F;
+    float sensitivityMult = sneakBridging ? 1.5F : 1.0F;
+
     float deltaYaw = data.yawDelta;
     float deltaPitch = data.pitchDelta;
 
     if (bridgeContext) {
-      if (deltaPitch > 0.0F && deltaPitch < 0.1F && deltaYaw > 15.0F) {
+      if (deltaPitch > 0.0F && deltaPitch < 0.01F && deltaYaw > 20.0F * sensitivityMult) {
         stabilityBuffer.flag(1.0D, 4.0D);
       } else {
         stabilityBuffer.decay(0.15D);
@@ -78,12 +81,6 @@ public class ScaffoldRotationCheck {
     } else {
       stabilityBuffer.decay(0.4D);
       speedBuffer.decay(0.4D);
-    }
-
-    if (bridgeContext && data.pitch > 85.0F && data.pitchDelta < 2.0F) {
-      blockRotationBuffer.flag(1.5D, 999.0D);
-    } else {
-      blockRotationBuffer.decay(0.1D);
     }
 
     float[] yawHist = this.yawHistory.computeIfAbsent(name, k -> new float[HISTORY_LENGTH]);
@@ -137,6 +134,29 @@ public class ScaffoldRotationCheck {
       backSnapBuffer.flag(1.5D, 999.0D);
     }
 
+    if (yawMotion(1, yawHist) > 30
+        && pitchMotion(1, pitchHist) > 30
+        && Math.abs(yawMotion(1, yawHist) - yawMotion(2, yawHist)) < 5
+        && Math.abs(pitchMotion(1, pitchHist) - pitchMotion(2, pitchHist)) < 5
+        && Math.abs(yawDiff(yawAt(1, yawHist), yawAt(3, yawHist))) < 3
+        && Math.abs(pitchDiff(pitchAt(1, pitchHist), pitchAt(3, pitchHist))) < 3) {
+      backSnapBuffer.flag(2.5D, 999.0D);
+    }
+
+    if (bridgeContext && recentPlacement) {
+      float yawToCardinal = Math.abs(player.rotationYaw % 90.0F);
+      boolean perfectCardinal = yawToCardinal < 0.5F || yawToCardinal > 89.5F;
+      boolean constantRotation = deltaYaw < 0.02F && deltaPitch < 0.02F;
+
+      if (constantRotation && perfectCardinal && data.horizontalDelta > 0.15D) {
+        constantYawBuffer.flag(0.8D, 999.0D);
+      } else {
+        constantYawBuffer.decay(0.15D);
+      }
+    } else {
+      constantYawBuffer.decay(0.2D);
+    }
+
     if (stabilityBuffer.get() > 3.0D) {
       context.receiveSignal(name, "Scaffold (Rotation Stability)");
       stabilityBuffer.reset();
@@ -145,17 +165,17 @@ public class ScaffoldRotationCheck {
       context.receiveSignal(name, "Scaffold (Rotation Speed)");
       speedBuffer.reset();
     }
-    if (blockRotationBuffer.get() > 3.0D) {
-      context.receiveSignal(name, "Scaffold (Block Rotation)");
-      blockRotationBuffer.reset();
-    }
     if (sharpRotationBuffer.get() > 3.0D) {
       context.receiveSignal(name, "Scaffold (Sharp Rotation)");
       sharpRotationBuffer.reset();
     }
-    if (backSnapBuffer.get() > 3.0D) {
+    if (backSnapBuffer.get() > 3.5D) {
       context.receiveSignal(name, "Scaffold (Back Snap)");
       backSnapBuffer.reset();
+    }
+    if (constantYawBuffer.get() > 6.0D) {
+      context.receiveSignal(name, "Scaffold (Constant Yaw)");
+      constantYawBuffer.reset();
     }
   }
 
@@ -226,7 +246,6 @@ public class ScaffoldRotationCheck {
   public void reset() {
     this.stabilityBuffers.clear();
     this.speedBuffers.clear();
-    this.blockRotationBuffers.clear();
     this.sharpRotationBuffers.clear();
     this.yawHistory.clear();
     this.pitchHistory.clear();
@@ -234,5 +253,6 @@ public class ScaffoldRotationCheck {
     this.sharpRotationResets.clear();
     this.lastBlockPlacement.clear();
     this.backSnapBuffers.clear();
+    this.constantYawBuffers.clear();
   }
 }

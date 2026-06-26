@@ -376,7 +376,6 @@ public class CategoryComponent {
     cachedHoverAnim = 0f;
     cachedRenderModuleY = renderModuleY;
 
-    // Draw translucent background with gradient outline (raven-bS style)
     drawRoundedGradientOutlinedRectangle(
         this.renderX - 2,
         this.renderY,
@@ -387,7 +386,6 @@ public class CategoryComponent {
         REGULAR_OUTLINE,
         REGULAR_OUTLINE2);
 
-    // Lift everything via glTranslatef
     GL11.glPushMatrix();
     GL11.glTranslatef(0f, -liftY, 0f);
 
@@ -749,7 +747,7 @@ public class CategoryComponent {
     GL11.glEnable(GL11.GL_BLEND);
     GL11.glDisable(GL11.GL_TEXTURE_2D);
     GL11.glEnable(GL11.GL_LINE_SMOOTH);
-    // Filled background
+
     GL11.glBegin(GL11.GL_TRIANGLE_FAN);
     glColor(n6);
     for (int i = 0; i <= 90; i += 3) {
@@ -777,7 +775,7 @@ public class CategoryComponent {
           (double) (y + radius) + Math.cos(n12) * radius);
     }
     GL11.glEnd();
-    // Gradient outline
+
     GL11.glPushMatrix();
     GL11.glShadeModel(GL11.GL_SMOOTH);
     GL11.glLineWidth(2.0f);

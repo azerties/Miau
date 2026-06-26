@@ -92,7 +92,7 @@ public class NoSlow extends Module {
   }
 
   public float getMotionMultiplier() {
-    if (this.mode.getValue() == 5) { // Grim 1.9
+    if (this.mode.getValue() == 5) {
       return 0.35f;
     }
     return 1.0f;

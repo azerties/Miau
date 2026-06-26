@@ -24,29 +24,24 @@ import org.lwjgl.input.Mouse;
 public class AutoTool extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  // ── Timing group ──
   public final FloatProperty activationTime = new FloatProperty("Activation time", 0f, 0f, 1000f);
   public final FloatProperty hoverDelay = new FloatProperty("Hover delay", 0f, 0f, 1000f);
 
-  // ── Conditions group ──
   public final BooleanProperty onlyWhileCrouching =
       new BooleanProperty("Only while crouching", false);
   public final BooleanProperty requireLeftMouse = new BooleanProperty("Require Left mouse", true);
 
-  // ── Swap group ──
   public final BooleanProperty switchBackWhenDone =
       new BooleanProperty("Switch back when done", true);
   public final BooleanProperty overrideSwapBack = new BooleanProperty("Override swap back", true);
   public final BooleanProperty spoofItem = new BooleanProperty("Spoof item", false);
 
-  // ── Held item blacklist ──
   public final BooleanProperty ignoredHeldItemsToggle =
       new BooleanProperty("Held item blacklist", false);
-  // Whitelist / Blacklist by block (using block names as strings)
+
   public final BooleanProperty blockWhitelistToggle = new BooleanProperty("Block whitelist", false);
   public final BooleanProperty blockBlacklistToggle = new BooleanProperty("Block blacklist", false);
 
-  // ── State ──
   private boolean hasSwapped;
   public int previousSlot = -1;
   private int tickCounter;
@@ -81,7 +76,6 @@ public class AutoTool extends Module {
       return;
     }
 
-    // Compute hover position from player's look
     MovingObjectPosition hoverResult = mc.objectMouseOver;
     BlockPos hoverPos =
         hoverResult != null && hoverResult.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
@@ -130,7 +124,6 @@ public class AutoTool extends Module {
       return;
     }
 
-    // Recompute swap position
     MovingObjectPosition swapResult = mc.objectMouseOver;
     BlockPos swapPos =
         swapResult != null && swapResult.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
@@ -169,8 +162,6 @@ public class AutoTool extends Module {
     e.setCancelled(true);
   }
 
-  // ── Helper methods ──
-
   private void updateLeftMouseState(boolean leftMouseDown, int currentTick) {
     if (leftMouseDown) {
       if (leftMouseDownSinceTick == -1) {
@@ -194,7 +185,7 @@ public class AutoTool extends Module {
   private boolean isUseBlocked() {
     boolean useActive = isBindDown(mc.gameSettings.keyBindUseItem) || mc.thePlayer.isUsingItem();
     if (ignoredHeldItemsToggle.getValue() && mc.thePlayer.getHeldItem() != null) {
-      return true; // Block usage if blacklist toggled (simplified — ravenbS uses ItemListSetting)
+      return true;
     }
     return useActive;
   }
@@ -261,7 +252,7 @@ public class AutoTool extends Module {
     if (currentItem == -1 || currentItem == mc.thePlayer.inventory.currentItem) {
       return;
     }
-    // Spoof item: prevent item renderer from updating/reset animation when tool swaps
+
     if (spoofItem.getValue()) {
       ((IMixinItemRenderer) mc.getItemRenderer()).setCancelUpdate(true);
       ((IMixinItemRenderer) mc.getItemRenderer()).setCancelReset(true);
@@ -271,7 +262,6 @@ public class AutoTool extends Module {
     ((IAccessorPlayerControllerMP) mc.playerController).callSyncCurrentPlayItem();
   }
 
-  // ── spoofItem support ──
   public void preInteractSpoof() {
     if (spoofItem.getValue()
         && previousSlot != mc.thePlayer.inventory.currentItem
@@ -280,8 +270,6 @@ public class AutoTool extends Module {
       ((IMixinItemRenderer) mc.getItemRenderer()).setCancelReset(true);
     }
   }
-
-  // ── Static utility methods (adapted from ravenbS Utils.java) ──
 
   public static boolean nullCheck() {
     return mc.thePlayer != null && mc.theWorld != null;
@@ -324,15 +312,12 @@ public class AutoTool extends Module {
     return speed;
   }
 
-  // ── Block list stores (simplified, uses string lists) ──
   private static final List<String> BLACKLIST_BLOCKS = new ArrayList<>();
   private static final List<String> WHITELIST_BLOCKS = new ArrayList<>();
 
   static {
-    // Blacklist: blocks to NOT swap tools for
     BLACKLIST_BLOCKS.add("minecraft:bed");
     BLACKLIST_BLOCKS.add("minecraft:crafting_table");
     BLACKLIST_BLOCKS.add("minecraft:anvil");
-    // Whitelist: only swap if block matches (empty = allow all)
   }
 }

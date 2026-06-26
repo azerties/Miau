@@ -289,12 +289,6 @@ public class BedNuker extends Module {
     return this.getBreakDelta(blockState, blockPos, slot, mc.thePlayer.onGround);
   }
 
-  // ========================================================================
-  // ADVANCED RAYTRACE — Full AABB face-scanning algorithm
-  // Scans all 6 faces, finds closest reachable visible point, validates
-  // with RotationUtil.rayTrace to prevent head-desync flags.
-  // ========================================================================
-
   /**
    * Computes the best (closest, most visible) hit vector and facing for a target block. Scans all 6
    * faces of the block's actual collision AABB, finds the closest reachable point to the player's
@@ -308,7 +302,6 @@ public class BedNuker extends Module {
     double maxRange = this.range.getValue().doubleValue();
     double maxRangeSq = maxRange * maxRange;
 
-    // Get the block's actual collision bounding box
     IBlockState state = mc.theWorld.getBlockState(pos);
     Block block = state.getBlock();
     AxisAlignedBB aabb = block.getCollisionBoundingBox(mc.theWorld, pos, state);
@@ -319,31 +312,25 @@ public class BedNuker extends Module {
     HitResult best = null;
     double bestDistSq = Double.MAX_VALUE;
 
-    // Scan all 6 faces
     for (EnumFacing face : EnumFacing.values()) {
-      // Check if the adjacent block on this face is air/transparent — only
-      // target faces that are actually exposed to avoid digging through walls
+
       BlockPos adjacent = pos.offset(face);
       Block adjBlock = mc.theWorld.getBlockState(adjacent).getBlock();
       if (adjBlock.isFullBlock() && !(adjBlock instanceof BlockBed)) {
-        continue; // This face is fully occluded by a solid non-bed block
+        continue;
       }
 
-      // Find the closest point on this face to the player's eyes
       Vec3 facePoint = closestPointOnFace(aabb, face, eyes);
       double distSq = eyes.squareDistanceTo(facePoint);
 
-      // Skip if out of range
       if (distSq > maxRangeSq || distSq < 0.001) continue;
 
-      // Calculate the rotation needed to look at this face point
       float[] rots = RotationUtil.calculate(facePoint);
 
-      // Raytrace with that rotation to see if it actually hits our target block
       MovingObjectPosition mop = RotationUtil.rayTrace(rots[0], rots[1], maxRange, 1.0f);
 
       if (mop != null && mop.typeOfHit == MovingObjectType.BLOCK && mop.getBlockPos().equals(pos)) {
-        // This face is directly reachable — use the exact hit point from the raytrace
+
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
           Vec3 hitVec = (mop.hitVec != null) ? mop.hitVec : facePoint;
@@ -392,7 +379,6 @@ public class BedNuker extends Module {
     Vec3 eyes = mc.thePlayer.getPositionEyes(1.0f);
     double maxRangeSq = this.range.getValue().doubleValue() * this.range.getValue().doubleValue();
 
-    // Get the block's actual collision bounding box
     IBlockState state = mc.theWorld.getBlockState(target);
     Block block = state.getBlock();
     AxisAlignedBB aabb = block.getCollisionBoundingBox(mc.theWorld, target, state);
@@ -400,7 +386,6 @@ public class BedNuker extends Module {
       aabb = new AxisAlignedBB(target, target.add(1, 1, 1));
     }
 
-    // Collect sample points across all faces of the AABB
     ArrayList<Vec3> candidates = this.buildRaytraceSamplePoints(aabb);
 
     BlockPos obstruction = null;
@@ -411,13 +396,13 @@ public class BedNuker extends Module {
       MovingObjectPosition mop = mc.theWorld.rayTraceBlocks(eyes, candidate);
 
       if (mop == null || mop.typeOfHit != MovingObjectType.BLOCK) {
-        // No block in the way — line of sight is clear to this point
+
         return null;
       }
 
       BlockPos hitPos = mop.getBlockPos();
       if (hitPos.equals(target)) {
-        // Directly hit the target block — clear!
+
         return null;
       }
 
@@ -433,7 +418,6 @@ public class BedNuker extends Module {
       }
     }
 
-    // All candidate points were blocked by the same (or equivalent) obstruction block
     return obstruction;
   }
 
@@ -450,42 +434,36 @@ public class BedNuker extends Module {
     double maxX = aabb.maxX, maxY = aabb.maxY, maxZ = aabb.maxZ;
     double cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5, cz = (minZ + maxZ) * 0.5;
 
-    // DOWN (y = minY) — 5 points
     points.add(new Vec3(minX + INSET, minY, minZ + INSET));
     points.add(new Vec3(maxX - INSET, minY, minZ + INSET));
     points.add(new Vec3(minX + INSET, minY, maxZ - INSET));
     points.add(new Vec3(maxX - INSET, minY, maxZ - INSET));
     points.add(new Vec3(cx, minY, cz));
 
-    // UP (y = maxY) — 5 points
     points.add(new Vec3(minX + INSET, maxY, minZ + INSET));
     points.add(new Vec3(maxX - INSET, maxY, minZ + INSET));
     points.add(new Vec3(minX + INSET, maxY, maxZ - INSET));
     points.add(new Vec3(maxX - INSET, maxY, maxZ - INSET));
     points.add(new Vec3(cx, maxY, cz));
 
-    // NORTH (z = minZ) — 5 points
     points.add(new Vec3(minX + INSET, minY + INSET, minZ));
     points.add(new Vec3(maxX - INSET, minY + INSET, minZ));
     points.add(new Vec3(minX + INSET, maxY - INSET, minZ));
     points.add(new Vec3(maxX - INSET, maxY - INSET, minZ));
     points.add(new Vec3(cx, cy, minZ));
 
-    // SOUTH (z = maxZ) — 5 points
     points.add(new Vec3(minX + INSET, minY + INSET, maxZ));
     points.add(new Vec3(maxX - INSET, minY + INSET, maxZ));
     points.add(new Vec3(minX + INSET, maxY - INSET, maxZ));
     points.add(new Vec3(maxX - INSET, maxY - INSET, maxZ));
     points.add(new Vec3(cx, cy, maxZ));
 
-    // WEST (x = minX) — 5 points
     points.add(new Vec3(minX, minY + INSET, minZ + INSET));
     points.add(new Vec3(minX, maxY - INSET, minZ + INSET));
     points.add(new Vec3(minX, minY + INSET, maxZ - INSET));
     points.add(new Vec3(minX, maxY - INSET, maxZ - INSET));
     points.add(new Vec3(minX, cy, cz));
 
-    // EAST (x = maxX) — 5 points
     points.add(new Vec3(maxX, minY + INSET, minZ + INSET));
     points.add(new Vec3(maxX, maxY - INSET, minZ + INSET));
     points.add(new Vec3(maxX, minY + INSET, maxZ - INSET));
@@ -529,7 +507,7 @@ public class BedNuker extends Module {
     BlockPos obstruction = this.findRaytraceObstruction(this.targetBed);
     if (obstruction != null
         && PlayerUtil.canReach(obstruction, this.range.getValue().doubleValue())) {
-      // Genuine reachable obstruction — switch target to it
+
       this.targetBed = obstruction;
       this.currentHit = this.computeBestHit(this.targetBed);
       this.breakStage = 0;
@@ -538,9 +516,7 @@ public class BedNuker extends Module {
       this.isBed = false;
       return this.currentHit != null;
     }
-    // No reachable obstruction found — the bed might be visible from an
-    // off-center angle. Try a fallback hit on the bed itself so the module
-    // can continue digging even at difficult viewing angles.
+
     HitResult fallbackHit = this.computeFallbackHit(this.targetBed);
     if (fallbackHit != null) {
       this.currentHit = fallbackHit;
@@ -550,7 +526,7 @@ public class BedNuker extends Module {
   }
 
   private BlockPos bfsFindOutermostDefenseBlock(BlockPos[] bedPair) {
-    // Reset reusable containers
+
     this.bfsQueue.clear();
     this.bfsVisited.clear();
     this.bfsCandidates.clear();
@@ -572,26 +548,21 @@ public class BedNuker extends Module {
         BlockPos current = this.bfsQueue.poll();
         if (current == null) break;
 
-        // Expand to all 6 neighbors
         for (EnumFacing f : EnumFacing.values()) {
           BlockPos neighbor = current.offset(f);
           if (!this.bfsVisited.add(neighbor)) continue;
 
           Block nb = mc.theWorld.getBlockState(neighbor).getBlock();
 
-          // Skip air
           if (nb == Blocks.air || nb instanceof BlockAir) continue;
 
-          // Skip bed blocks
           if (nb instanceof BlockBed) {
             this.bfsQueue.add(neighbor);
             continue;
           }
 
-          // Skip unbreakable blocks
           if (nb.getBlockHardness(mc.theWorld, neighbor) < 0) continue;
 
-          // Check if this block has at least one face exposed to air
           boolean hasExposedFace = false;
           for (EnumFacing check : EnumFacing.values()) {
             Block adj = mc.theWorld.getBlockState(neighbor.offset(check)).getBlock();
@@ -603,23 +574,21 @@ public class BedNuker extends Module {
           }
 
           if (hasExposedFace) {
-            // Check reach
+
             Vec3 hitVec =
                 new Vec3(neighbor.getX() + 0.5, neighbor.getY() + 0.5, neighbor.getZ() + 0.5);
             if (eye.squareDistanceTo(hitVec) <= rangeSq) {
               this.bfsCandidates.add(neighbor);
             }
-            // SỬA LỖI CỐT LÕI: Vẫn thêm vào queue để thuật toán tiếp tục loang sang các block bọc
-            // chéo khác
+
             this.bfsQueue.add(neighbor);
           } else {
-            // Not exposed — add to queue for next layer expansion
+
             this.bfsQueue.add(neighbor);
           }
         }
       }
 
-      // Nếu đã tìm thấy các block thuộc lớp ngoài cùng nằm trong tầm Reach, chọn luôn cục tốt nhất
       if (!this.bfsCandidates.isEmpty()) {
         return pickBestCandidate(this.bfsCandidates, bedPair);
       }
@@ -655,15 +624,12 @@ public class BedNuker extends Module {
     Vec3 candCenter =
         new Vec3(candidate.getX() + 0.5, candidate.getY() + 0.5, candidate.getZ() + 0.5);
 
-    // Perpendicular distance from candidate to the player→bed line
     Vec3 los = bc.subtract(eyes);
     double losLen = los.lengthVector();
     if (losLen < 1e-6) return 0;
 
     Vec3 toCand = candCenter.subtract(eyes);
 
-    // Cross product magnitude: |los| * |toCand| * sin(theta)
-    // Perpendicular distance = |cross| / |los|
     Vec3 cross =
         new Vec3(
             los.yCoord * toCand.zCoord - los.zCoord * toCand.yCoord,
@@ -676,17 +642,12 @@ public class BedNuker extends Module {
                 + cross.zCoord * cross.zCoord);
     double perpDist = crossMag / losLen;
 
-    // Penalize blocks behind the player
     double dot =
         toCand.xCoord * los.xCoord + toCand.yCoord * los.yCoord + toCand.zCoord * los.zCoord;
     if (dot < 0) return 100;
 
     return perpDist * 0.3;
   }
-
-  // ========================================================================
-  // Bed detection & scoring
-  // ========================================================================
 
   private BlockPos[] resolveBedPair(BlockPos bedPos) {
     IBlockState state = mc.theWorld.getBlockState(bedPos);
@@ -771,7 +732,6 @@ public class BedNuker extends Module {
           BlockPos[] pair = this.resolveBedPair(newPos);
           if (pair == null) continue;
 
-          // Deduplicate bed pairs
           long pairKey = ((long) pair[0].hashCode() << 32) | (pair[1].hashCode() & 0xFFFFFFFFL);
           if (!seenPairs.add(pairKey)) continue;
 
@@ -807,13 +767,11 @@ public class BedNuker extends Module {
       }
     }
 
-    // Priority 1: Exposed beds — target the bed block itself
     for (BlockPos[] pair : exposedBeds) {
       BlockPos target = this.pickBestBedBlock(pair);
       if (target != null) return target;
     }
 
-    // Priority 2: Covered beds — BFS to find outermost defense block
     for (BlockPos[] pair : coveredBeds) {
       BlockPos target = this.bfsFindOutermostDefenseBlock(pair);
       if (target != null) return target;
@@ -848,8 +806,6 @@ public class BedNuker extends Module {
       }
     }
 
-    // Fallback: if no bed block has a valid hit, check if an obstruction
-    // block is blocking LOS to any bed block and target that instead
     if (bestPos == null) {
       for (BlockPos bp : pair) {
         BlockPos obstruction = this.findRaytraceObstruction(bp);
@@ -858,10 +814,7 @@ public class BedNuker extends Module {
           return obstruction;
         }
       }
-      // Last resort: no obstruction found but computeBestHit couldn't
-      // find a validated angle from off-center. Return the closest
-      // reachable exposed bed block — the digging stage's fallback
-      // (center-based rotation) can handle the actual mining.
+
       BlockPos closestBlock = null;
       double closestDistSq = Double.MAX_VALUE;
       for (BlockPos bp : pair) {
@@ -928,10 +881,6 @@ public class BedNuker extends Module {
     }
   }
 
-  // ========================================================================
-  // Constructor & public API
-  // ========================================================================
-
   public BedNuker() {
     super("BedNuker", false);
   }
@@ -987,7 +936,6 @@ public class BedNuker extends Module {
       return;
     }
 
-    // ----- Phase 4: Scan for new target -----
     if (mc.thePlayer.capabilities.allowEdit && this.instantDelay == 0) {
       BlockPos newTarget = this.findNearestBed();
 
@@ -1017,13 +965,13 @@ public class BedNuker extends Module {
 
     if (this.currentHit == null) {
       if (this.mode.getValue() == 0) {
-        // LEGIT mode: try to clear obstruction before giving up
+
         if (!this.tryClearObstruction()) {
           this.restoreSlot();
           this.resetBreaking();
           return;
         }
-        // Obstruction found — fall through to normal digging path below
+
       } else {
         Vec3 center =
             new Vec3(
@@ -1099,7 +1047,7 @@ public class BedNuker extends Module {
     }
 
     if (this.mode.getValue() == 2) {
-      // ===== INSTANT mode =====
+
       int prevSlot = mc.thePlayer.inventory.currentItem;
       if (slot != prevSlot) {
         mc.thePlayer.inventory.currentItem = slot;
@@ -1113,7 +1061,6 @@ public class BedNuker extends Module {
       PacketUtil.sendPacket(
           new C07PacketPlayerDigging(Action.STOP_DESTROY_BLOCK, this.targetBed, facing));
 
-      // Local block removal
       mc.playerController.onPlayerDestroyBlock(this.targetBed, facing);
       mc.theWorld.playAuxSFX(
           2001, this.targetBed, Block.getStateId(mc.theWorld.getBlockState(this.targetBed)));
@@ -1126,7 +1073,7 @@ public class BedNuker extends Module {
 
       this.breakStage = 2;
     } else if (!mc.thePlayer.isUsingItem()) {
-      // ===== LEGIT / SWAP mode: START_DESTROY =====
+
       this.doSwing();
       PacketUtil.sendPacket(
           new C07PacketPlayerDigging(Action.START_DESTROY_BLOCK, this.targetBed, facing));
@@ -1146,7 +1093,6 @@ public class BedNuker extends Module {
     this.breaking = true;
     this.tickCounter++;
 
-    // Accumulate break progress
     float breakDelta =
         this.getBreakDelta(
             mc.theWorld.getBlockState(this.targetBed), this.targetBed, slot, mc.thePlayer.onGround);
@@ -1155,7 +1101,6 @@ public class BedNuker extends Module {
     }
     this.breakProgress += breakDelta;
 
-    // Ground-speed simulation
     float tick = (float) this.tickCounter;
     IBlockState blockState = mc.theWorld.getBlockState(this.targetBed);
     boolean canBreak = mc.thePlayer.onGround && this.groundSpeed.getValue();
@@ -1163,15 +1108,14 @@ public class BedNuker extends Module {
 
     mc.effectRenderer.addBlockHitEffects(this.targetBed, facing);
 
-    // Check if break threshold is reached
     float threshold = this.getBreakThreshold();
     if (this.breakProgress >= threshold || delta >= threshold) {
       if (this.mode.getValue() == 1) {
-        // ===== SWAP mode: switch to best tool before STOP =====
+
         int prevSlot = mc.thePlayer.inventory.currentItem;
         mc.thePlayer.inventory.currentItem = slot;
         this.syncHeldItem();
-        // Explicit C09 sync — critical for SWAP mode anti-cheat compliance
+
         this.forceSyncHeldItem(slot);
 
         if (mc.thePlayer.isUsingItem()) {
@@ -1184,12 +1128,10 @@ public class BedNuker extends Module {
 
       this.breaking = false;
 
-      // Send STOP_DESTROY
       PacketUtil.sendPacket(
           new C07PacketPlayerDigging(Action.STOP_DESTROY_BLOCK, this.targetBed, facing));
       this.doSwing();
 
-      // Local block removal
       IBlockState blockState_ = mc.theWorld.getBlockState(this.targetBed);
       Block block = blockState_.getBlock();
       if (block.getMaterial() != Material.air) {
@@ -1209,13 +1151,9 @@ public class BedNuker extends Module {
     this.restoreSlot();
     this.resetBreaking();
     if (this.mode.getValue() == 2) {
-      this.instantDelay = 20; // INSTANT mode cooldown
+      this.instantDelay = 20;
     }
   }
-
-  // ========================================================================
-  // Other event handlers
-  // ========================================================================
 
   @EventTarget
   public void onPlayerUpdate(PlayerUpdateEvent event) {
@@ -1239,7 +1177,7 @@ public class BedNuker extends Module {
           && MoveUtil.isForwardPressed()) {
         MoveUtil.fixStrafe(RotationState.getSmoothedYaw());
       }
-      // STRICT move-fix: use fixMovement for full directional correction
+
       if (this.moveFix.getValue() == 2
           && RotationState.isActived()
           && RotationState.getPriority() == 5.0F) {

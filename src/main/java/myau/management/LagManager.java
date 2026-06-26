@@ -24,9 +24,8 @@ public class LagManager {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final Deque<LagPacket> packetQueue;
 
-  // Tick-based delay (original Miau, used by BlockHit)
   private int tickDelay;
-  // Millisecond-based delay (raven-bS style, used by LagRange)
+
   private long msDelay;
   private boolean usingMsDelay;
 
@@ -66,11 +65,11 @@ public class LagManager {
         boolean canRelease;
 
         if (this.usingMsDelay) {
-          // Time-based release: packet leaves when its wait time has expired
+
           canRelease =
               this.msDelay <= 0L || (System.currentTimeMillis() - lp.enqueueTimeMs) >= this.msDelay;
         } else {
-          // Tick-based release: packet leaves when its age exceeds the current delay threshold
+
           canRelease = this.tickDelay <= 0 || lp.delay > this.tickDelay;
         }
 
@@ -103,8 +102,6 @@ public class LagManager {
   public boolean handlePacket(Packet<?> packet) {
     this.flushQueue();
 
-    // FastTrack bypass: if this exact packet instance is in the fast track set,
-    // remove it and let it through (prevents flushed packets from re-queuing)
     if (this.fastTrackSet != null && this.fastTrackSet.remove(packet)) {
       if (packet instanceof C03PacketPlayer) {
         C03PacketPlayer c03 = (C03PacketPlayer) packet;
@@ -115,12 +112,10 @@ public class LagManager {
       return false;
     }
 
-    // Critical packets always go through immediately
     if (packet instanceof C00PacketKeepAlive || packet instanceof C01PacketChatMessage) {
       return false;
     }
 
-    // Check whether queuing is active
     boolean shouldQueue = this.usingMsDelay ? this.msDelay > 0L : this.tickDelay > 0;
 
     if (shouldQueue) {
@@ -177,7 +172,7 @@ public class LagManager {
       if (mc.thePlayer.isDead) {
         this.resetDelay();
       }
-      // Tick-based mode: age the packets (ms mode relies on wall-clock time)
+
       if (!this.usingMsDelay) {
         this.incrementDelays();
       }

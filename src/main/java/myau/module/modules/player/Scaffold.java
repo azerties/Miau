@@ -55,7 +55,6 @@ public class Scaffold extends Module {
         0.78125, 0.84375, 0.90625, 0.96875
       };
 
-  // ===== EXISTING MIAU FIELDS =====
   private int rotationTick = 0;
   private int lastSlot = -1;
   private int blockCount = -1;
@@ -75,7 +74,6 @@ public class Scaffold extends Module {
   private final java.util.Map<net.minecraft.util.BlockPos, myau.util.time.TimerUtil>
       blockRenderHighlights = new java.util.HashMap<>();
 
-  // ===== RISE NEW FIELDS =====
   private float targetYaw, targetPitch;
   private float yawDrift, pitchDrift;
   private int directionalChange;
@@ -183,8 +181,6 @@ public class Scaffold extends Module {
     super("Scaffold", false);
   }
 
-  // ===== EXISTING MIAU HELPERS =====
-
   public int getSlot() {
     return Myau.slotComponent.getItemIndex();
   }
@@ -197,13 +193,13 @@ public class Scaffold extends Module {
     int sprint = this.sprintMode.getValue();
     switch (sprint) {
       case 0:
-        return true; // NONE
-      case 1: // VANILLA
+        return true;
+      case 1:
         return mc.thePlayer.onGround
             ? !this.jumpSprint.getValue()
             : !(this.diaSprint.getValue() && this.isDiagonal(this.getCurrentYaw()));
       case 2:
-        return false; // LEGIT — handled separately in onLivingUpdate
+        return false;
       default:
         return false;
     }
@@ -353,8 +349,7 @@ public class Scaffold extends Module {
   }
 
   private int findBlock() {
-    // Simple hotbar search matching old working Miau-main logic
-    // SlotUtil.findBlock() is too restrictive (stackSize > 5 threshold)
+
     for (int i = 0; i < 9; i++) {
       ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
       if (stack != null && stack.stackSize > 0 && ItemUtil.isBlock(stack)) {
@@ -364,8 +359,6 @@ public class Scaffold extends Module {
     return -1;
   }
 
-  // ===== RISE HELPER METHODS =====
-
   private void calculateSneaking() {
     if (ticksOnAir == 0) ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak).setPressed(false);
     this.sneakingTicks--;
@@ -373,7 +366,7 @@ public class Scaffold extends Module {
     if (!this.sneak.getValue() && pause <= 0) return;
 
     int ahead = this.startSneaking.getValue();
-    int place = 0; // placeDelay not ported as bounds number, simplified
+    int place = 0;
     int after = this.stopSneaking.getValue();
 
     if (pause > 0) {
@@ -430,7 +423,6 @@ public class Scaffold extends Module {
       }
     }
 
-    // Backup rotations
     float[] backup =
         RotationUtil.calculate(new Vec3(blockFace.getX(), blockFace.getY(), blockFace.getZ()));
     MovingObjectPosition checkBackup = RayCastUtil.rayCast(targetYaw, targetPitch, 4.5F);
@@ -451,8 +443,6 @@ public class Scaffold extends Module {
             new BlockPos(
                 mc.thePlayer.posX, Math.floor(mc.thePlayer.posY) + down, mc.thePlayer.posZ));
   }
-
-  // ===== EVENT HANDLERS =====
 
   @EventTarget
   public void onRender(Render2DEvent event) {
@@ -517,7 +507,7 @@ public class Scaffold extends Module {
     boolean shaders = hud != null && hud.shaders.getValue();
 
     if (shaders) {
-      // Blur pass — frosted-glass background
+
       BlurUtils.prepareBlur();
       GlStateManager.pushMatrix();
       GlStateManager.translate(centerX, centerY, 0);
@@ -527,7 +517,6 @@ public class Scaffold extends Module {
       GlStateManager.popMatrix();
       BlurUtils.blurEnd(2, 3);
 
-      // Bloom pass — soft glow outline
       BlurUtils.prepareBloom();
       GlStateManager.pushMatrix();
       GlStateManager.translate(centerX, centerY, 0);
@@ -699,8 +688,6 @@ public class Scaffold extends Module {
 
     if (this.rotationTick > 0) this.rotationTick--;
 
-    // ===== KEEP-Y HANDLING (Miau's system, fully preserved) =====
-    // ===== OFF-GROUND / ON-GROUND TICK TRACKING =====
     if (mc.thePlayer.onGround) {
       this.onGroundTicks++;
       this.offGroundTicks = 0;
@@ -726,7 +713,6 @@ public class Scaffold extends Module {
 
     if (!this.canPlace()) return;
 
-    // ===== BLOCK SLOT MANAGEMENT (spoofItem style via SlotComponent) =====
     int blockSlot = this.findBlock();
     if (blockSlot != -1) Myau.slotComponent.setSlot(blockSlot);
     ItemStack stack = Myau.slotComponent.getItemStack();
@@ -746,7 +732,6 @@ public class Scaffold extends Module {
       }
     }
 
-    // ===== YAW / ROTATION SETUP =====
     float currentYaw = this.getCurrentYaw();
     float yawDiffTo180 = RotationUtil.wrapAngleDiff(currentYaw - 180.0F, event.getYaw());
     float diagonalYaw =
@@ -756,39 +741,33 @@ public class Scaffold extends Module {
                 currentYaw - 135.0F * ((currentYaw + 180.0F) % 90.0F < 45.0F ? 1.0F : -1.0F),
                 event.getYaw());
 
-    // ---- Rotation modes ----
-    // Initialize target yaw/pitch
     targetYaw = this.yaw;
     targetPitch = this.pitch;
     float snappedYaw = 0;
 
-    // Timer (Rise)
     if (timerProp.getValue() != 1.0F)
       ((IAccessorMinecraft) mc).getTimer().timerSpeed = timerProp.getValue();
 
-    // ---- Calculate rotations based on mode ----
     int mode = this.rotationMode.getValue();
 
     if (mode >= 5) {
-      // ===== RISE MODES: GODBRIDGE / EAGLE / BREESILY / SNAP =====
+
       this.canRotate = true;
 
       switch (mode) {
         case 5:
-          { // GODBRIDGE
-            // Auto right-click (like Rise)
+          {
             ItemStack held = mc.thePlayer.inventory.getCurrentItem();
             if (held != null && held.getItem() instanceof ItemBlock && ticksOnAir > 0) {
               ((IAccessorMinecraft) mc).callRightClickMouse();
             }
-            // Godbridge yaw: quantize to 90 degrees
+
             targetYaw =
                 (mc.thePlayer.rotationYaw - mc.thePlayer.rotationYaw % 90)
                     - 180
                     + 45 * (mc.thePlayer.rotationYaw > 0 ? 1 : -1);
             targetPitch = 76.4F;
 
-            // Drift randomization
             directionalChange++;
             if (Math.abs(MathHelper.wrapAngleTo180_double(targetYaw - (mc.thePlayer.rotationYaw)))
                 > 10) {
@@ -805,7 +784,7 @@ public class Scaffold extends Module {
             break;
           }
         case 6:
-          { // EAGLE
+          {
             float yawWrapped = (mc.thePlayer.rotationYaw + 10000000) % 360;
             float staticYaw = (yawWrapped - 180) - (yawWrapped % 90) + 45;
             float staticPitch = 78;
@@ -830,14 +809,13 @@ public class Scaffold extends Module {
             targetYaw = staticYaw + yawDrift / 2;
             targetPitch = staticPitch + pitchDrift / 2;
 
-            // Auto right-click
             ItemStack held = mc.thePlayer.inventory.getCurrentItem();
             if (Math.random() > (mc.thePlayer.onGround ? 0.5 : 0.2)
                 && held != null
                 && held.getItem() instanceof ItemBlock) {
               ((IAccessorMinecraft) mc).callRightClickMouse();
             }
-            // Auto sneak on edge
+
             mc.thePlayer.movementInput.sneak = mc.theWorld != null;
             if (this.offGroundTicks >= 4 && MoveUtil.isMoving()) {
               ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak).setPressed(true);
@@ -847,7 +825,7 @@ public class Scaffold extends Module {
             break;
           }
         case 7:
-          { // BREESILY
+          {
             if (enumFacing != null) {
               if (enumFacing.getEnumFacing() == EnumFacing.UP) {
                 targetPitch = 90;
@@ -871,15 +849,15 @@ public class Scaffold extends Module {
             break;
           }
         case 8:
-          { // SNAP
+          {
             if (enumFacing != null
                 && blockFace != null
                 && !(ticksOnAir > 0
                     && !overBlockCheck(enumFacing.getEnumFacing(), blockFace, true))) {
               snappedYaw = targetYaw;
-              // Then calculate normal rotation
+
               this.getRotations(Integer.parseInt(this.yawOffsetProp.getModeString()));
-              // After normal calc, snap back to movement yaw if valid
+
               float movementYaw =
                   (float)
                           (Math.toDegrees(
@@ -896,10 +874,10 @@ public class Scaffold extends Module {
       this.pitch = targetPitch;
 
     } else {
-      // ===== MIAU MODES: NONE / DEFAULT / BACKWARDS / SIDEWAYS / GRIM_TEST =====
+
       if (!this.canRotate) {
         switch (mode) {
-          case 1: // DEFAULT
+          case 1:
             if (this.yaw == -180.0F && this.pitch == 0.0F) {
               this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
               this.pitch = RotationUtil.quantizeAngle(85.0F);
@@ -907,7 +885,7 @@ public class Scaffold extends Module {
               this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
             }
             break;
-          case 2: // BACKWARDS
+          case 2:
             if (this.yaw == -180.0F && this.pitch == 0.0F) {
               this.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
               this.pitch = RotationUtil.quantizeAngle(85.0F);
@@ -916,7 +894,7 @@ public class Scaffold extends Module {
             }
             break;
           case 3:
-          case 4: // SIDEWAYS / GRIM_TEST
+          case 4:
             if (this.yaw == -180.0F && this.pitch == 0.0F) {
               this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
               this.pitch = RotationUtil.quantizeAngle(85.0F);
@@ -927,7 +905,6 @@ public class Scaffold extends Module {
         }
       }
 
-      // ---- Block data / rotation finding loop (Miau's system) ----
       BlockData blockData = this.getBlockData();
       Vec3 hitVec = null;
       if (blockData != null) {
@@ -1042,7 +1019,6 @@ public class Scaffold extends Module {
         if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
       }
 
-      // ---- Place block (Miau modes) ----
       if (blockData != null && hitVec != null && this.rotationTick <= 0) {
         this.place(blockData.blockPos(), blockData.facing(), hitVec);
         if (this.multiplace.getValue()) {
@@ -1082,7 +1058,6 @@ public class Scaffold extends Module {
         }
       }
 
-      // ---- KeepY extra placement ----
       if (this.targetFacing != null) {
         if (this.rotationTick <= 0) {
           int pX = MathHelper.floor_double(mc.thePlayer.posX);
@@ -1107,13 +1082,11 @@ public class Scaffold extends Module {
       }
     }
 
-    // ===== RISE MODES placement (5-8) =====
     if (mode >= 5) {
-      // Apply rotation to event for Godbridge/Eagle/Breesily/Snap
+
       event.setRotation(this.yaw, this.pitch, 3);
       if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
 
-      // Expand
       if (this.expand.getValue() > 0) {
         double dir =
             MoveUtil.direction(
@@ -1133,16 +1106,14 @@ public class Scaffold extends Module {
                           mc.thePlayer.posZ + (Math.cos(dir) * (r + 1))))
                   .getBlock()
               instanceof BlockAir) {
-            // offset applied via expand - block finding handles this
+
             break;
           }
         }
       }
 
-      // ---- Get block data for placement (Rise modes) ----
       BlockData bd = this.getBlockData();
 
-      // Rise-style target block/enum facing for rotation calculation
       if (bd != null) {
         this.targetBlock =
             new Vec3(bd.blockPos().getX(), bd.blockPos().getY(), bd.blockPos().getZ());
@@ -1160,10 +1131,8 @@ public class Scaffold extends Module {
                     bd.facing().getDirectionVec().getY(),
                     bd.facing().getDirectionVec().getZ());
 
-        // BadPackets check
         boolean badPackets = BadPacketsComponent.bad(false, true, false, false, true);
 
-        // Ticks on air
         if (!mc.gameSettings.keyBindJump.isKeyDown() || MoveUtil.isMoving()) {
           if (doesNotContainBlock(1)) {
             ticksOnAir++;
@@ -1172,10 +1141,8 @@ public class Scaffold extends Module {
           }
         }
 
-        // CanPlace flag
-        boolean canPlaceNow = !badPackets && ticksOnAir > 0; // simplified placeDelay
+        boolean canPlaceNow = !badPackets && ticksOnAir > 0;
 
-        // Raycast check
         if (canPlaceNow
             && (rayCast.getValue() == 0
                 || overBlockCheck(bd.facing(), blockFace, rayCast.getValue() == 2))) {
@@ -1193,7 +1160,7 @@ public class Scaffold extends Module {
             && mc.objectMouseOver.getBlockPos().equals(blockFace)
             && blockFace != null
             && mc.objectMouseOver.sideHit == EnumFacing.UP
-            && rayCast.getValue() == 2 // Strict
+            && rayCast.getValue() == 2
             && !(mc.theWorld
                     .getBlockState(
                         new BlockPos(mc.thePlayer.posX, mc.thePlayer.posY - 1, mc.thePlayer.posZ))
@@ -1202,7 +1169,6 @@ public class Scaffold extends Module {
           ((IAccessorMinecraft) mc).callRightClickMouse();
         }
 
-        // Same Y tracking (for keepY)
         if (mc.gameSettings.keyBindJump.isKeyDown() && mc.thePlayer.posY % 1 > 0.5) {
           startY = MathHelper.floor_double(mc.thePlayer.posY);
         }
@@ -1224,13 +1190,8 @@ public class Scaffold extends Module {
   public void onStrafe(StrafeEvent event) {
     if (!this.isEnabled()) return;
 
-    // Diagonal speed for non-zero yawOffset (Rise)
-    // Note: MoveUtil doesn't have useDiagonalSpeed, handled via motion directly
-    if (!this.yawOffsetProp.getModeString().equals("0") && this.moveFix.getValue() == 0) {
-      // Diagonal movement handled naturally by moveFix
-    }
+    if (!this.yawOffsetProp.getModeString().equals("0") && this.moveFix.getValue() == 0) {}
 
-    // Tower modes (Miau's system, extended with NORMAL)
     if (!mc.thePlayer.isCollidedHorizontally
         && mc.thePlayer.hurtTime <= 5
         && !mc.thePlayer.isPotionActive(Potion.jump)
@@ -1239,7 +1200,7 @@ public class Scaffold extends Module {
       int yState = (int) (mc.thePlayer.posY % 1.0 * 100.0);
 
       switch (this.tower.getValue()) {
-        case 1: // VANILLA
+        case 1:
           switch (this.towerTick) {
             case 0:
               if (mc.thePlayer.onGround) {
@@ -1276,7 +1237,7 @@ public class Scaffold extends Module {
               this.towerTick = 0;
               return;
           }
-        case 2: // EXTRA
+        case 2:
           switch (this.towerTick) {
             case 0:
               if (mc.thePlayer.onGround) {
@@ -1365,7 +1326,7 @@ public class Scaffold extends Module {
               this.towerDelay = 0;
               return;
           }
-        case 4: // NORMAL (Rise's NormalTower)
+        case 4:
           if (mc.thePlayer.onGround) {
             mc.thePlayer.motionY = 0.42F;
           }
@@ -1384,7 +1345,6 @@ public class Scaffold extends Module {
   public void onMoveInput(MoveInputEvent event) {
     if (!this.isEnabled()) return;
 
-    // Move fix (existing Miau)
     if (this.moveFix.getValue() == 1
         && RotationState.isActived()
         && RotationState.getPriority() == 3.0F
@@ -1392,12 +1352,10 @@ public class Scaffold extends Module {
       MoveUtil.fixStrafe(RotationState.getSmoothedYaw());
     }
 
-    // KeepY auto-jump (existing Miau)
     if (mc.thePlayer.onGround && this.stage > 0 && MoveUtil.isForwardPressed()) {
       mc.thePlayer.movementInput.jump = true;
     }
 
-    // Sneak slowdown (Rise's calculateSneaking in MoveInputEvent)
     if (this.sneak.getValue()) {
       float speed = this.sneakingSpeed.getValue();
       if (speed > 0.2F && mc.thePlayer.movementInput.sneak) {
@@ -1411,7 +1369,6 @@ public class Scaffold extends Module {
   public void onLivingUpdate(LivingUpdateEvent event) {
     if (!this.isEnabled()) return;
 
-    // Speed control (existing Miau)
     float speed = this.getSpeed();
     if (speed != 1.0F) {
       if (mc.thePlayer.movementInput.moveForward != 0.0F
@@ -1423,27 +1380,23 @@ public class Scaffold extends Module {
       mc.thePlayer.movementInput.moveStrafe *= speed;
     }
 
-    // Sprint control (existing + new modes)
     if (this.shouldStopSprint()) {
       mc.thePlayer.setSprinting(false);
     }
 
-    // LEGIT sprint: stop if yaw diff > 90 (Rise)
-    if (this.sprintMode.getValue() == 3) { // LEGIT
+    if (this.sprintMode.getValue() == 3) {
       float diff = Math.abs(MathHelper.wrapAngleTo180_float(mc.thePlayer.rotationYaw - this.yaw));
       if (diff > 90) {
         mc.thePlayer.setSprinting(false);
       }
     }
 
-    // Slow handling from calculateSneaking (Rise)
     if (slow > 0) {
       slow--;
       mc.thePlayer.movementInput.moveForward = 0;
       mc.thePlayer.movementInput.moveStrafe = 0;
     }
 
-    // Sneak calculate (Rise)
     this.calculateSneaking();
   }
 
@@ -1486,7 +1439,6 @@ public class Scaffold extends Module {
     if (event.getType() != EventType.SEND) return;
     Packet<?> packet = event.getPacket();
 
-    // Track placements for sneak system (Rise)
     if (packet instanceof C08PacketPlayerBlockPlacement) {
       C08PacketPlayerBlockPlacement p = (C08PacketPlayerBlockPlacement) packet;
       if (!p.getPosition().equals(new BlockPos(-1, -1, -1))) {
@@ -1494,8 +1446,6 @@ public class Scaffold extends Module {
       }
     }
   }
-
-  // ===== LIFECYCLE =====
 
   @Override
   public void onEnabled() {
@@ -1511,7 +1461,6 @@ public class Scaffold extends Module {
     this.towerDelay = 0;
     this.towering = false;
 
-    // Rise field init
     this.targetYaw = mc.thePlayer.rotationYaw - 180;
     this.targetPitch = 90;
     this.pitchDrift = (float) ((Math.random() - 0.5) * (Math.random() - 0.5) * 10);
@@ -1527,7 +1476,6 @@ public class Scaffold extends Module {
     this.offGroundTicks = 0;
     this.onGroundTicks = 0;
 
-    // Reset bad packets
     BadPacketsComponent.reset();
   }
 
@@ -1537,17 +1485,13 @@ public class Scaffold extends Module {
       mc.thePlayer.inventory.currentItem = this.lastSlot;
     }
 
-    // Reset timer
     if (timerProp.getValue() != 1.0F) {
       ((IAccessorMinecraft) mc).getTimer().timerSpeed = 1.0F;
     }
 
-    // Reset sneak key
     ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak)
         .setPressed(Keyboard.isKeyDown(mc.gameSettings.keyBindSneak.getKeyCode()));
   }
-
-  // ===== INNER CLASS =====
 
   public static class BlockData {
     private final BlockPos blockPos;

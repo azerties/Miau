@@ -14,11 +14,8 @@ import org.lwjgl.input.Keyboard;
 public class AutoBuy extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  // ── Purchase delay ──
   public final IntProperty purchaseDelay = new IntProperty("Purchase Delay", 100, 100, 400);
 
-  // ── Item properties ──
-  // Wool
   public final IntProperty woolKeybind = new IntProperty("Wool Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty woolQuickslot =
       new ModeProperty(
@@ -27,7 +24,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty woolTurbo = new BooleanProperty("Wool Turbo", false);
 
-  // Stone Sword
   public final IntProperty stoneSwordKeybind =
       new IntProperty("Stone Sword Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty stoneSwordQuickslot =
@@ -37,7 +33,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty stoneSwordTurbo = new BooleanProperty("Stone Sword Turbo", false);
 
-  // Iron Sword
   public final IntProperty ironSwordKeybind =
       new IntProperty("Iron Sword Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty ironSwordQuickslot =
@@ -47,7 +42,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty ironSwordTurbo = new BooleanProperty("Iron Sword Turbo", false);
 
-  // Golden Apple
   public final IntProperty goldenAppleKeybind =
       new IntProperty("Golden Apple Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty goldenAppleQuickslot =
@@ -57,7 +51,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty goldenAppleTurbo = new BooleanProperty("Golden Apple Turbo", false);
 
-  // Fireball
   public final IntProperty fireballKeybind =
       new IntProperty("Fireball Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty fireballQuickslot =
@@ -67,7 +60,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty fireballTurbo = new BooleanProperty("Fireball Turbo", false);
 
-  // TNT
   public final IntProperty tntKeybind = new IntProperty("TNT Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty tntQuickslot =
       new ModeProperty(
@@ -76,7 +68,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty tntTurbo = new BooleanProperty("TNT Turbo", false);
 
-  // Ender Pearl
   public final IntProperty enderPearlKeybind =
       new IntProperty("Ender Pearl Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty enderPearlQuickslot =
@@ -86,7 +77,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty enderPearlTurbo = new BooleanProperty("Ender Pearl Turbo", false);
 
-  // Pickaxe
   public final IntProperty pickaxeKeybind =
       new IntProperty("Pickaxe Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty pickaxeQuickslot =
@@ -96,7 +86,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty pickaxeTurbo = new BooleanProperty("Pickaxe Turbo", false);
 
-  // Axe
   public final IntProperty axeKeybind = new IntProperty("Axe Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty axeQuickslot =
       new ModeProperty(
@@ -105,7 +94,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty axeTurbo = new BooleanProperty("Axe Turbo", false);
 
-  // Shears
   public final IntProperty shearsKeybind =
       new IntProperty("Shears Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty shearsQuickslot =
@@ -115,7 +103,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty shearsTurbo = new BooleanProperty("Shears Turbo", false);
 
-  // Chainmail Armor
   public final IntProperty chainmailArmorKeybind =
       new IntProperty("Chainmail Armor Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty chainmailArmorQuickslot =
@@ -126,7 +113,6 @@ public class AutoBuy extends Module {
   public final BooleanProperty chainmailArmorTurbo =
       new BooleanProperty("Chainmail Armor Turbo", false);
 
-  // Iron Armor
   public final IntProperty ironArmorKeybind =
       new IntProperty("Iron Armor Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty ironArmorQuickslot =
@@ -136,7 +122,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty ironArmorTurbo = new BooleanProperty("Iron Armor Turbo", false);
 
-  // Diamond Sword
   public final IntProperty diamondSwordKeybind =
       new IntProperty("Diamond Sword Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty diamondSwordQuickslot =
@@ -147,7 +132,6 @@ public class AutoBuy extends Module {
   public final BooleanProperty diamondSwordTurbo =
       new BooleanProperty("Diamond Sword Turbo", false);
 
-  // Knockback Stick
   public final IntProperty stickKeybind =
       new IntProperty("Knockback Stick Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty stickQuickslot =
@@ -157,7 +141,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty stickTurbo = new BooleanProperty("Knockback Stick Turbo", false);
 
-  // Arrows
   public final IntProperty arrowsKeybind =
       new IntProperty("Arrows Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty arrowsQuickslot =
@@ -167,7 +150,6 @@ public class AutoBuy extends Module {
           new String[] {"Disabled", "1", "2", "3", "4", "5", "6", "7", "8", "9"});
   public final BooleanProperty arrowsTurbo = new BooleanProperty("Arrows Turbo", false);
 
-  // Diamond Armor
   public final IntProperty diamondArmorKeybind =
       new IntProperty("Diamond Armor Keybind", 0, 0, Integer.MAX_VALUE);
   public final ModeProperty diamondArmorQuickslot =
@@ -178,7 +160,6 @@ public class AutoBuy extends Module {
   public final BooleanProperty diamondArmorTurbo =
       new BooleanProperty("Diamond Armor Turbo", false);
 
-  // ── Upgrade properties (no quickslot/turbo) ──
   public final IntProperty sharpnessKeybind =
       new IntProperty("Sharpness Keybind", 0, 0, Integer.MAX_VALUE);
   public final IntProperty protectionKeybind =
@@ -189,7 +170,6 @@ public class AutoBuy extends Module {
   public final IntProperty featherFallingKeybind =
       new IntProperty("Feather Falling Keybind", 0, 0, Integer.MAX_VALUE);
 
-  // ── Runtime state ──
   private final Map<String, String> itemDisplayNames = new LinkedHashMap<>();
   private final List<String> items = new ArrayList<>();
   private final Map<String, Integer> locations = new HashMap<>();
@@ -197,7 +177,6 @@ public class AutoBuy extends Module {
   private final Map<String, Boolean> keyStates = new HashMap<>();
   private final List<int[]> clickList = new ArrayList<>();
 
-  // ── Property lookup maps ──
   private final Map<String, IntProperty> keybindMap = new HashMap<>();
   private final Map<String, ModeProperty> quickslotMap = new HashMap<>();
   private final Map<String, BooleanProperty> turboMap = new HashMap<>();
@@ -249,7 +228,6 @@ public class AutoBuy extends Module {
         diamondArmorQuickslot,
         diamondArmorTurbo);
 
-    // Upgrades
     registerUpgradeItem("upg iron_sword", "Sharpness", sharpnessKeybind);
     registerUpgradeItem("upg iron_chestplate", "Protection", protectionKeybind);
     registerUpgradeItem("upg iron_pickaxe", "Mining Fatigue", miningFatigueKeybind);
@@ -290,7 +268,6 @@ public class AutoBuy extends Module {
     if (!this.isEnabled()) return;
     if (mc.thePlayer == null || mc.theWorld == null) return;
 
-    // ── Screen detection ──
     if (!(mc.currentScreen instanceof GuiChest)) {
       locations.clear();
       clickList.clear();
@@ -314,18 +291,15 @@ public class AutoBuy extends Module {
 
     long now = System.currentTimeMillis();
 
-    // ── Phase 1: Scan chest slots for item locations ──
     for (String item : items) {
       String searchItem = item;
 
-      // Filter items by screen type
       if (isQuickBuy && item.startsWith("upg ")) continue;
       if (isUpgrades) {
         if (!item.startsWith("upg ")) continue;
-        searchItem = item.substring(4); // Remove "upg " prefix
+        searchItem = item.substring(4);
       }
 
-      // Determine item type sets (for pickaxe/axe variants)
       Set<String> itemTypes = null;
       if (isQuickBuy) {
         if (searchItem.equals("pickaxe")) itemTypes = PICKAXE_TYPES;
@@ -339,7 +313,7 @@ public class AutoBuy extends Module {
         if (stack == null || stack.getItem() == null) continue;
 
         String unlocalizedName = stack.getItem().getUnlocalizedName();
-        // Strip "tile." or "item." prefix to get clean name
+
         String cleanName = unlocalizedName.replace("tile.", "").replace("item.", "");
 
         if (itemTypes != null && !itemTypes.contains(cleanName)) continue;
@@ -350,9 +324,8 @@ public class AutoBuy extends Module {
       }
     }
 
-    // ── Phase 2: Handle keybinds and queue clicks ──
     for (String item : items) {
-      // Skip items not relevant to current screen
+
       if (isQuickBuy && item.startsWith("upg ")) continue;
       if (isUpgrades && !item.startsWith("upg ")) continue;
 
@@ -360,7 +333,7 @@ public class AutoBuy extends Module {
       if (keybindProp == null) continue;
 
       int keyCode = keybindProp.getValue();
-      if (keyCode == 0) continue; // No keybind set
+      if (keyCode == 0) continue;
 
       boolean keyDown = isKeyDown(keyCode);
       boolean lastKeyState = keyStates.getOrDefault(item, false);
@@ -370,14 +343,13 @@ public class AutoBuy extends Module {
         continue;
       }
 
-      // Determine hotbar slot and turbo mode
       int hotbarSlot = -1;
       boolean turbo = false;
 
       if (!item.startsWith("upg ")) {
         ModeProperty slotProp = quickslotMap.get(item);
         if (slotProp != null && slotProp.getValue() > 0) {
-          hotbarSlot = slotProp.getValue() - 1; // 1-indexed → 0-indexed
+          hotbarSlot = slotProp.getValue() - 1;
         }
         BooleanProperty turboProp = turboMap.get(item);
         if (turboProp != null) {
@@ -388,7 +360,6 @@ public class AutoBuy extends Module {
       long cooldown = item.startsWith("upg ") ? 300 : 90;
       long lastTime = purchases.getOrDefault(item, 0L);
 
-      // Turbo: allow holding; Non-turbo: require release-repress
       if (!turbo && lastKeyState) continue;
       if (now - lastTime < cooldown) continue;
 
@@ -401,7 +372,6 @@ public class AutoBuy extends Module {
       }
     }
 
-    // ── Phase 3: Process click queue with delay ──
     int delayTicks = Math.max(1, purchaseDelay.getValue() / 50);
     if (mc.thePlayer.ticksExisted % delayTicks == 0) {
       if (!clickList.isEmpty()) {
@@ -410,10 +380,10 @@ public class AutoBuy extends Module {
         int hotbarSlot = click[1];
 
         if (hotbarSlot >= 0) {
-          // Mode 2: Swap with hotbar slot
+
           mc.playerController.windowClick(container.windowId, slot, hotbarSlot, 2, mc.thePlayer);
         } else {
-          // Mode 0: Regular left click
+
           mc.playerController.windowClick(container.windowId, slot, 0, 0, mc.thePlayer);
         }
       }

@@ -136,6 +136,9 @@ public class KillAura extends Module {
   public final ModeProperty debugLog;
   public final BooleanProperty tickLookahead;
   public final BooleanProperty smartKill;
+  public final BooleanProperty tacticalKD;
+  public final FloatProperty kdOffset;
+  private int ticks = 255;
 
   public final BooleanProperty targetPlayers = new BooleanProperty("target-players", true);
   public final BooleanProperty targetInvisibles =
@@ -147,6 +150,29 @@ public class KillAura extends Module {
   public final BooleanProperty targetSilverfish = new BooleanProperty("target-silverfish", false);
   public final BooleanProperty targetTeams = new BooleanProperty("target-teams", true);
 
+<<<<<<< HEAD
+=======
+  private static final int KD_DIRECTIONS = 24;
+  private static final int KD_VOID_RINGS = 7;
+  private static final int KD_VOID_DEPTH = 8;
+  private static final double KD_RING_STEP = 0.5;
+  private static final double KD_WALL_BEHIND_DIST = 1.2;
+  private static final double KD_WALL_SIDE_STEP = 0.6;
+
+  private static final double[] KD_COS = new double[KD_DIRECTIONS];
+  private static final double[] KD_SIN = new double[KD_DIRECTIONS];
+
+  static {
+    for (int i = 0; i < KD_DIRECTIONS; i++) {
+      double theta = Math.PI * 2.0 * i / KD_DIRECTIONS;
+      KD_COS[i] = Math.cos(theta);
+      KD_SIN[i] = Math.sin(theta);
+    }
+  }
+
+  private int kdHitCounter = 0;
+
+>>>>>>> 39727357af0e559a2b8ba93d7b26a8f03abfc6d4
   // HitSelect state
   private boolean hsSprintState = false;
   private boolean hsSet = false;
@@ -882,6 +908,8 @@ public class KillAura extends Module {
     this.debugLog = new ModeProperty("debug-log", 0, new String[] {"NONE", "HEALTH"});
     this.tickLookahead = new BooleanProperty("tick-lookahead", false);
     this.smartKill = new BooleanProperty("smart-kill", true);
+    this.tacticalKD = new BooleanProperty("tactical-kd", false);
+    this.kdOffset = new FloatProperty("kd-offset", 45.0F, 15.0F, 90.0F);
   }
 
   public EntityLivingBase getTarget() {
@@ -1437,6 +1465,31 @@ public class KillAura extends Module {
               event.setPervRotation(rotations[0], 1);
             }
           }
+          // ----------------------------------------
+          //  KNOCKBACK DISPLACEMENT INTERCEPT
+          // ----------------------------------------
+          if (attack
+              && this.tacticalKD.getValue()
+              && this.target.getEntity() instanceof EntityPlayer) {
+
+            EntityPlayer kdTarget = (EntityPlayer) this.target.getEntity();
+            float kdYaw = this.getTacticalKDYaw(kdTarget, event.getNewYaw());
+            float kdPitch = this.getTacticalKDPitch(kdTarget, event.getNewPitch());
+
+            // Raycast verification - revert to normal if KD yaw would miss
+            if (RayCastUtil.getEntityIntercept(
+                    kdTarget, kdYaw, kdPitch, this.attackRange.getValue())
+                != null) {
+              // Apply sensitivity patch for more natural rotation
+              float[] patched =
+                  RotationUtil.applySensitivityPatch(
+                      kdYaw, kdPitch, mc.thePlayer.prevRotationYaw, mc.thePlayer.prevRotationPitch);
+              event.setRotation(patched[0], patched[1], 1);
+            } else {
+              event.setRotation(kdYaw, event.getNewPitch(), 1);
+            }
+            this.kdHitCounter++;
+          }
           if (attack) {
             attacked = this.performAttack(event.getNewYaw(), event.getNewPitch());
           }
@@ -1797,16 +1850,65 @@ public class KillAura extends Module {
           GL11.glPopMatrix();
           GlStateManager.resetColor();
         } else if (this.showTarget.getValue() == 3) {
-          Color color;
+          boolean wasHurtRecently = false;
           if (player.hurtTime > 0) {
+<<<<<<< HEAD
             color = new Color(16733525); // red
           } else {
             color = new Color(5635925); // green
+=======
+            wasHurtRecently = true;
+            this.ticks = 0;
+>>>>>>> 39727357af0e559a2b8ba93d7b26a8f03abfc6d4
           }
+          if (this.ticks <= 23) {
+            wasHurtRecently = true;
+          }
+          this.ticks++;
 
-          RenderUtil.enableRenderState();
-          RenderUtil.drawEntityBox(player, color.getRed(), color.getGreen(), color.getBlue());
-          RenderUtil.disableRenderState();
+          Color color =
+              wasHurtRecently
+                  ? Color.red
+                  : ((HUD) Myau.moduleManager.modules.get(HUD.class))
+                      .getColor(System.currentTimeMillis());
+          GL11.glPushMatrix();
+          GL11.glEnable(3042);
+          GL11.glLineWidth(1.8F);
+          GL11.glBlendFunc(770, 771);
+          GL11.glEnable(2848);
+          GlStateManager.depthMask(true);
+
+          GL11.glEnable(GL11.GL_BLEND);
+          GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+          GL11.glDisable(GL11.GL_TEXTURE_2D);
+          GL11.glEnable(GL11.GL_LINE_SMOOTH);
+          GL11.glDisable(GL11.GL_DEPTH_TEST);
+          GL11.glDepthMask(false);
+
+          float width = player.width / 1.15F;
+          float height = player.height + (player.isSneaking() ? -0.2F : 0.1F);
+          AxisAlignedBB aabb =
+              new AxisAlignedBB(
+                  x - width + 0.1D,
+                  y,
+                  z - width + 0.1D,
+                  x + width - 0.1D,
+                  y + height + 0.1D,
+                  z + width - 0.1D);
+
+          RenderUtil.drawBoundingBox(
+              aabb, color.getRed(), color.getGreen(), color.getBlue(), 60, 1.8F);
+
+          GL11.glDisable(GL11.GL_LINE_SMOOTH);
+          GL11.glEnable(GL11.GL_TEXTURE_2D);
+          GL11.glEnable(GL11.GL_DEPTH_TEST);
+          GL11.glDepthMask(true);
+          GL11.glDisable(GL11.GL_BLEND);
+
+          GL11.glDisable(3042);
+          GL11.glDisable(2848);
+          GL11.glPopMatrix();
+          GlStateManager.resetColor();
         }
       }
     }
@@ -1859,7 +1961,7 @@ public class KillAura extends Module {
     this.hitRegistered = false;
     this.attackDelayMS = 0L;
     this.blockTick = 0;
-
+    this.ticks = 255;
     this.rightHoldActive = false;
   }
 
@@ -1878,6 +1980,10 @@ public class KillAura extends Module {
     this.hsSavedSlowdown = 0;
     this.hsAttackTime = -1L;
     this.hsCurrentShouldAttack = false;
+<<<<<<< HEAD
+=======
+    this.kdHitCounter = 0;
+>>>>>>> 39727357af0e559a2b8ba93d7b26a8f03abfc6d4
   }
 
   @Override
@@ -1910,6 +2016,216 @@ public class KillAura extends Module {
     };
   }
 
+<<<<<<< HEAD
+=======
+  private float getTacticalKDYaw(EntityPlayer target, float currentYaw) {
+    float voidPushYaw = this.scanVoidPushKD(target, currentYaw);
+    if (!Float.isNaN(voidPushYaw)) {
+      return voidPushYaw;
+    }
+
+    float voidYaw = this.scanVoidKD(target);
+    if (!Float.isNaN(voidYaw)) {
+      return voidYaw;
+    }
+
+    Float wallYaw = this.scanWallKD(target);
+    if (wallYaw != null) {
+      return wallYaw;
+    }
+
+    Float nearWallYaw = this.scanNearWallKD(target, currentYaw);
+    if (nearWallYaw != null) {
+      return nearWallYaw;
+    }
+
+    float velYaw = this.predictVelocityKD(target, currentYaw);
+    if (!Float.isNaN(velYaw)) {
+      return velYaw;
+    }
+
+    return this.zigzagKD(currentYaw, target);
+  }
+
+  private float scanVoidKD(EntityPlayer target) {
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
+      final double radius = ring * KD_RING_STEP;
+
+      for (int dir = 0; dir < KD_DIRECTIONS; dir++) {
+        final double wx = target.posX + KD_COS[dir] * radius;
+        final double wz = target.posZ + KD_SIN[dir] * radius;
+
+        if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
+          return RotationUtil.calculate(new Vec3(wx, target.posY, wz))[0];
+        }
+      }
+    }
+    return Float.NaN;
+  }
+
+  private float scanVoidPushKD(EntityPlayer target, float aimYaw) {
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return Float.NaN;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
+      final double radius = ring * KD_RING_STEP;
+      final double wx = target.posX + nx * radius;
+      final double wz = target.posZ + nz * radius;
+
+      if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
+        return aimYaw;
+      }
+    }
+    return Float.NaN;
+  }
+
+  private boolean isVoidColumn(double x, double y, double z, BlockPos.MutableBlockPos cursor) {
+    final int bx = MathHelper.floor_double(x);
+    final int bz = MathHelper.floor_double(z);
+    final int startY = MathHelper.floor_double(y) - 1;
+    final int bottomY = Math.max(0, startY - KD_VOID_DEPTH);
+
+    for (int by = startY; by >= bottomY; by--) {
+      cursor.set(bx, by, bz);
+      if (!mc.theWorld.isAirBlock(cursor)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private Float scanWallKD(EntityPlayer target) {
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return null;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+    final double sx = -nz;
+    final double sz = nx;
+
+    final double baseX = target.posX + nx * KD_WALL_BEHIND_DIST;
+    final double baseZ = target.posZ + nz * KD_WALL_BEHIND_DIST;
+    final int baseY = MathHelper.floor_double(target.posY);
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+    for (int side = -1; side <= 1; side++) {
+      final double cx = baseX + sx * side * KD_WALL_SIDE_STEP;
+      final double cz = baseZ + sz * side * KD_WALL_SIDE_STEP;
+
+      final int bx = MathHelper.floor_double(cx);
+      final int bz = MathHelper.floor_double(cz);
+
+      boolean solid = false;
+      for (int by = baseY; by < baseY + 2; by++) {
+        if (by < 0 || by >= 256) continue;
+        cursor.set(bx, by, bz);
+        if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
+          solid = true;
+          break;
+        }
+      }
+      if (!solid) continue;
+
+      final double wallCX = bx + 0.5;
+      final double wallCZ = bz + 0.5;
+      final double normDx = target.posX - wallCX;
+      final double normDz = target.posZ - wallCZ;
+      final double normLen = Math.sqrt(normDx * normDx + normDz * normDz);
+      if (normLen < 0.01) continue;
+
+      final float normalYaw = (float) Math.toDegrees(Math.atan2(normDz, normDx)) - 90.0F;
+      final boolean slideRight = (target.ticksExisted & 2) == 0;
+      return normalYaw + (slideRight ? 90.0F : -90.0F);
+    }
+    return null;
+  }
+
+  private Float scanNearWallKD(EntityPlayer target, float aimYaw) {
+    if (mc.thePlayer == null) return null;
+
+    // Direction vector from player ? target
+    final double dx = target.posX - mc.thePlayer.posX;
+    final double dz = target.posZ - mc.thePlayer.posZ;
+    final double dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.01) return null;
+
+    final double nx = dx / dist;
+    final double nz = dz / dist;
+
+    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+    final int px = MathHelper.floor_double(mc.thePlayer.posX);
+    final int py = MathHelper.floor_double(mc.thePlayer.posY + 0.5);
+    final int pz = MathHelper.floor_double(mc.thePlayer.posZ);
+
+    // Check both sides (perpendicular to player?target vector)
+    for (int side : new int[] {-1, 1}) {
+      final double sx = -nz * side;
+      final double sz = nx * side;
+
+      for (int d = 1; d <= 3; d++) {
+        final int bx = px + (int) Math.round(sx * d);
+        final int bz = pz + (int) Math.round(sz * d);
+
+        for (int by = py - 1; by <= py + 1; by++) {
+          if (by < 0 || by >= 256) continue;
+          cursor.set(bx, by, bz);
+          if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
+            // Wall beside player ? aim to push target into wall
+            return aimYaw + side * 45.0F;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private float predictVelocityKD(EntityPlayer target, float aimYaw) {
+    // Determine which direction the target is moving
+    final double velX = target.posX - target.prevPosX;
+    final double velZ = target.posZ - target.prevPosZ;
+    final double vel = Math.sqrt(velX * velX + velZ * velZ);
+
+    if (vel < 0.03) return Float.NaN;
+
+    // Heading the target is moving toward
+    final float velYaw = (float) Math.toDegrees(Math.atan2(velZ, velX)) - 90.0F;
+    final float diff = MathHelper.wrapAngleTo180_float(velYaw - aimYaw);
+
+    // Only offset if they're moving away (positive knockback direction)
+    if (Math.abs(diff) < 90.0F && Math.abs(diff) > 5.0F) {
+      return aimYaw + diff * 0.35F;
+    }
+    return Float.NaN;
+  }
+
+  private float getTacticalKDPitch(EntityPlayer target, float currentPitch) {
+    // If target is airborne ? tilt pitch for extra vertical displacement
+    if (!target.onGround && target.hurtTime <= 0 && target.fallDistance > 0.5F) {
+      return Math.min(currentPitch + 8.0F, 15.0F);
+    }
+    return currentPitch;
+  }
+
+  private float zigzagKD(float currentYaw, EntityPlayer target) {
+    final boolean phase = ((this.kdHitCounter / 2) & 1) == 0;
+    float offset = phase ? this.kdOffset.getValue() : -this.kdOffset.getValue();
+    offset += (target.ticksExisted % 3) * 2.0F - 3.0F;
+    return currentYaw + offset;
+  }
+
+>>>>>>> 39727357af0e559a2b8ba93d7b26a8f03abfc6d4
   private long getPing() {
     if (mc.getNetHandler() != null
         && mc.thePlayer != null

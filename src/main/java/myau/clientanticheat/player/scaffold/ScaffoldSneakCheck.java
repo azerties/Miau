@@ -16,7 +16,6 @@ import net.minecraft.world.World;
 public class ScaffoldSneakCheck {
   private final Map<String, CheckBuffer> supportBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> rotationBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> pitchBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> edgeBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> sneakTimingBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> speedBuffers = new HashMap<>();
@@ -50,7 +49,6 @@ public class ScaffoldSneakCheck {
     CheckBuffer supportBuffer = this.supportBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer rotationBuffer =
         this.rotationBuffers.computeIfAbsent(name, key -> new CheckBuffer());
-    CheckBuffer pitchBuffer = this.pitchBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer edgeBuffer = this.edgeBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer sneakTimingBuffer =
         this.sneakTimingBuffers.computeIfAbsent(name, key -> new CheckBuffer());
@@ -63,7 +61,6 @@ public class ScaffoldSneakCheck {
     if (!holdingBlock || this.isExempt(player, data)) {
       supportBuffer.decay(0.5D);
       rotationBuffer.decay(0.5D);
-      pitchBuffer.decay(0.5D);
       edgeBuffer.decay(0.5D);
       sneakTimingBuffer.decay(0.3D);
       speedBuffer.decay(0.3D);
@@ -71,7 +68,7 @@ public class ScaffoldSneakCheck {
       return;
     }
 
-    boolean moving = data.horizontalDelta > 0.12D;
+    boolean moving = data.horizontalDelta > 0.15D;
     boolean hasBlockBelow = this.hasSolidBelow(player, world, 1.0D);
     boolean hasRecentSupport = this.hasSolidBelow(player, world, 1.35D);
     boolean nearEdge =
@@ -79,25 +76,19 @@ public class ScaffoldSneakCheck {
     boolean bridgeContext =
         moving && (nearEdge || !hasBlockBelow || hasRecentSupport && data.pitch > 55.0F);
 
-    if (bridgeContext && data.horizontalDelta > 0.18D && hasRecentSupport) {
+    if (bridgeContext && data.horizontalDelta > 0.22D && hasRecentSupport) {
       supportBuffer.flag(1.0D, 999.0D);
     } else {
       supportBuffer.decay(0.25D);
     }
 
     if (bridgeContext
-        && (data.yawAcceleration > 45.0F
-            || data.pitchAcceleration > 18.0F
-            || data.yawDelta > 110.0F)) {
+        && (data.yawAcceleration > 60.0F
+            || data.pitchAcceleration > 25.0F
+            || data.yawDelta > 140.0F)) {
       rotationBuffer.flag(1.25D, 999.0D);
     } else {
       rotationBuffer.decay(0.3D);
-    }
-
-    if (bridgeContext && data.pitch > 63.0F && data.pitchDelta < 0.35F && data.yawDelta < 3.5F) {
-      pitchBuffer.flag(0.9D, 999.0D);
-    } else {
-      pitchBuffer.decay(0.2D);
     }
 
     if (nearEdge && moving && !player.isSneaking() && data.groundTicks > 3) {
@@ -232,12 +223,11 @@ public class ScaffoldSneakCheck {
     }
 
     boolean failed =
-        supportBuffer.get() > 5.0D && rotationBuffer.get() > 2.0D
-            || supportBuffer.get() > 6.0D && pitchBuffer.get() > 5.0D
-            || edgeBuffer.get() > 8.0D && pitchBuffer.get() > 3.0D
-            || sneakTimingBuffer.get() > 5.0D
-            || speedBuffer.get() > 4.0D && edgeBuffer.get() > 3.0D
-            || roundedRotationBuffer.get() > 6.0D;
+        supportBuffer.get() > 6.0D && rotationBuffer.get() > 3.0D
+            || edgeBuffer.get() > 10.0D
+            || sneakTimingBuffer.get() > 6.0D
+            || speedBuffer.get() > 5.0D && edgeBuffer.get() > 4.0D
+            || roundedRotationBuffer.get() > 7.0D;
     if (failed) {
       long now = System.currentTimeMillis();
       long last = this.lastFlag.getOrDefault(name, 0L);
@@ -246,7 +236,6 @@ public class ScaffoldSneakCheck {
         this.lastFlag.put(name, now);
         supportBuffer.reset();
         rotationBuffer.reset();
-        pitchBuffer.reset();
         edgeBuffer.reset();
         sneakTimingBuffer.reset();
         speedBuffer.reset();
@@ -268,9 +257,12 @@ public class ScaffoldSneakCheck {
     if (blocks == null || blocks.size() < 3) return false;
     int lastX = 0, lastY = 0, lastZ = 0;
     boolean lockedX = false, lockedZ = false, first = true;
+    int yTolerance = 1;
     for (BlockPos pos : blocks) {
       if (!first) {
-        if (lastY != pos.getY()) return false;
+        if (lastY != pos.getY()) {
+          if (yTolerance-- <= 0) return false;
+        }
         if (lastX == pos.getX()) lockedX = true;
         else if (lockedX) return false;
         if (lastZ == pos.getZ()) lockedZ = true;
@@ -323,7 +315,6 @@ public class ScaffoldSneakCheck {
   public void reset() {
     this.supportBuffers.clear();
     this.rotationBuffers.clear();
-    this.pitchBuffers.clear();
     this.edgeBuffers.clear();
     this.sneakTimingBuffers.clear();
     this.speedBuffers.clear();

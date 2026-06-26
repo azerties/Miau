@@ -18,7 +18,6 @@ public class ShaderUtils {
   public final int programID;
   private final Map<String, Integer> uniformLocations = new HashMap<>();
 
-  // GLSL shader sources
   private static final String KAWASE_UP_GLOW =
       "#version 120\n"
           + "uniform sampler2D inTexture, textureToCheck;\n"
@@ -183,7 +182,6 @@ public class ShaderUtils {
           + "    gl_FragColor = vec4(sum.rgb * 0.125, 1.0);\n"
           + "}";
 
-  // Rounded rect shaders
   private static final String ROUNDED_RECT =
       "#version 120\n"
           + "\n"

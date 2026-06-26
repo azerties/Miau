@@ -17,14 +17,15 @@ public class ScaffoldPlacementCheck {
   private final Map<String, CheckBuffer> flickBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> snapBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> microPitchBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> hitboxSnapBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> noRotBuffers = new HashMap<>();
   private final Map<String, Long> lastFlag = new HashMap<>();
   private final Map<String, Float> lastPitch = new HashMap<>();
+  private final Map<String, Float> lastYaw = new HashMap<>();
   private final Map<String, LinkedList<BlockPos>> lastBlocksPlaced = new HashMap<>();
-  private final Map<String, Double> micropicthVl = new HashMap<>();
+  private final Map<String, Double> micropitchVl = new HashMap<>();
   private final Map<String, LinkedList<Long>> placeSpeedHistory = new HashMap<>();
   private final Map<String, Long> lastPlaceTime = new HashMap<>();
-  private final Map<String, Long> lastHardFaultClick = new HashMap<>();
+  private final Map<String, Integer> lockedRotationTicks = new HashMap<>();
 
   private static final int ROTATION_FLICK_HISTORY = 8;
 
@@ -37,8 +38,7 @@ public class ScaffoldPlacementCheck {
     CheckBuffer snapBuffer = this.snapBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer microPitchBuffer =
         this.microPitchBuffers.computeIfAbsent(name, key -> new CheckBuffer());
-    CheckBuffer hitboxSnapBuffer =
-        this.hitboxSnapBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer noRotBuffer = this.noRotBuffers.computeIfAbsent(name, key -> new CheckBuffer());
 
     ItemStack held = player.getHeldItem();
     boolean holdingBlock = held != null && held.getItem() instanceof ItemBlock;
@@ -46,11 +46,12 @@ public class ScaffoldPlacementCheck {
       flickBuffer.decay(0.5D);
       snapBuffer.decay(0.5D);
       microPitchBuffer.decay(0.3D);
-      hitboxSnapBuffer.decay(0.3D);
+      noRotBuffer.decay(0.3D);
+      this.lockedRotationTicks.remove(name);
       return;
     }
 
-    boolean moving = data.horizontalDelta > 0.12D;
+    boolean moving = data.horizontalDelta > 0.15D;
     boolean hasBlockBelow = this.hasSolidBelow(player, world, 1.0D);
     boolean hasRecentSupport = this.hasSolidBelow(player, world, 1.35D);
     boolean nearEdge =
@@ -58,21 +59,28 @@ public class ScaffoldPlacementCheck {
     boolean bridgeContext =
         moving && (nearEdge || !hasBlockBelow || hasRecentSupport && data.pitch > 55.0F);
 
-    if (bridgeContext && data.pitchDelta > 20.0F && Math.abs(data.pitchAcceleration) > 15.0F) {
+    boolean sneakBridging = player.isSneaking() && nearEdge && data.pitch > 60.0F;
+    float flickThresholdMult = sneakBridging ? 1.5F : 1.0F;
+
+    if (bridgeContext
+        && data.pitchDelta > 25.0F * flickThresholdMult
+        && Math.abs(data.pitchAcceleration) > 20.0F * flickThresholdMult) {
       flickBuffer.flag(1.25D, 999.0D);
     } else {
       flickBuffer.decay(0.2D);
     }
 
     float divisorY = data.pitchDelta % 1.5F;
-    if (bridgeContext && data.pitchDelta > 2.0F && divisorY == 0.0F) {
+    if (bridgeContext && data.pitchDelta > 3.0F && divisorY == 0.0F && !sneakBridging) {
       snapBuffer.flag(1.5D, 999.0D);
     } else {
       snapBuffer.decay(0.25D);
     }
 
     float prevPitch = this.lastPitch.getOrDefault(name, data.pitch);
+    float prevYaw = this.lastYaw.getOrDefault(name, data.yaw);
     this.lastPitch.put(name, data.pitch);
+    this.lastYaw.put(name, data.yaw);
     float pitchDiff = Math.abs(data.pitch - prevPitch);
 
     LinkedList<Long> placeSpeedHist =
@@ -93,16 +101,17 @@ public class ScaffoldPlacementCheck {
       avg /= placeSpeedHist.size();
 
       boolean inOneLine = isOneLine(this.lastBlocksPlaced.get(name));
-      double vl = this.micropicthVl.getOrDefault(name, 0.0D);
+      double vl = this.micropitchVl.getOrDefault(name, 0.0D);
 
       if (pitchDiff > 3
           && pitchDiff < 20
           && data.pitch > 70
-          && avg < 400
-          && (inOneLine || placeInterval < 800)) {
+          && avg < 350
+          && (inOneLine || placeInterval < 800)
+          && !sneakBridging) {
         vl += Math.min(20, pitchDiff / 0.5);
         if (data.pitch > 89.5F) vl += 5;
-        if (vl > 100) {
+        if (vl > 150) {
           microPitchBuffer.flag(2.0D, 999.0D);
           vl -= 10;
         }
@@ -110,7 +119,7 @@ public class ScaffoldPlacementCheck {
         vl *= 0.99;
         vl -= 0.01;
       }
-      this.micropicthVl.put(name, vl);
+      this.micropitchVl.put(name, vl);
     }
 
     if (data.startedSwinging() && bridgeContext) {
@@ -123,37 +132,55 @@ public class ScaffoldPlacementCheck {
               MathHelper.floor_double(player.posZ + data.deltaZ * 2));
       blockHistory.addFirst(pos);
       if (blockHistory.size() > 10) blockHistory.removeLast();
+    }
 
-      if (blockHistory.size() >= 3 && isOneLine(blockHistory)) {
+    boolean rotationLocked = data.yawDelta < 0.01F && data.pitchDelta < 0.01F && data.pitch > 50.0F;
 
-        if (data.pitchDelta < 0.5F && data.pitch > 60.0F && data.pitch < 100.0F) {
-          hitboxSnapBuffer.flag(1.0D, 999.0D);
-        } else {
-          hitboxSnapBuffer.decay(0.15D);
-        }
+    if (rotationLocked && bridgeContext) {
+      int lockedTicks = this.lockedRotationTicks.getOrDefault(name, 0) + 1;
+      this.lockedRotationTicks.put(name, lockedTicks);
+    } else {
+      int current = this.lockedRotationTicks.getOrDefault(name, 0);
+      if (current > 0) {
+        this.lockedRotationTicks.put(name, Math.max(0, current - 2));
       }
+    }
+
+    if (data.startedSwinging() && bridgeContext) {
+      int lockedTicks = this.lockedRotationTicks.getOrDefault(name, 0);
+      boolean rapidPlacing = placeInterval < 500;
+      boolean isInLine = isOneLine(this.lastBlocksPlaced.get(name));
+
+      if (lockedTicks > 6 && rapidPlacing && isInLine && !sneakBridging) {
+        noRotBuffer.flag(1.5D, 999.0D);
+      } else if (lockedTicks > 12 && rapidPlacing) {
+        noRotBuffer.flag(1.0D, 999.0D);
+      } else {
+        noRotBuffer.decay(0.1D);
+      }
+    } else {
+      noRotBuffer.decay(0.15D);
     }
 
     boolean failed =
         flickBuffer.get() > 4.0D
-            || snapBuffer.get() > 3.0D
+            || snapBuffer.get() > 3.5D
             || microPitchBuffer.get() > 3.0D
-            || hitboxSnapBuffer.get() > 5.0D;
+            || noRotBuffer.get() > 5.0D;
     if (failed) {
       long flagNow = System.currentTimeMillis();
       long last = this.lastFlag.getOrDefault(name, 0L);
       if (flagNow - last > 2500L) {
         if (flickBuffer.get() > 4.0D) context.receiveSignal(name, "Scaffold (Rotation Flick)");
-        else if (snapBuffer.get() > 3.0D) context.receiveSignal(name, "Scaffold (Angle Snap)");
+        else if (snapBuffer.get() > 3.5D) context.receiveSignal(name, "Scaffold (Angle Snap)");
         else if (microPitchBuffer.get() > 3.0D)
           context.receiveSignal(name, "Scaffold (Micro Pitch)");
-        else if (hitboxSnapBuffer.get() > 5.0D)
-          context.receiveSignal(name, "Scaffold (Hitbox Snap)");
+        else if (noRotBuffer.get() > 5.0D) context.receiveSignal(name, "Scaffold (No Rotation)");
         this.lastFlag.put(name, flagNow);
         flickBuffer.reset();
         snapBuffer.reset();
         microPitchBuffer.reset();
-        hitboxSnapBuffer.reset();
+        noRotBuffer.reset();
       }
     }
   }
@@ -171,9 +198,12 @@ public class ScaffoldPlacementCheck {
     if (blocks == null || blocks.size() < 3) return false;
     int lastX = 0, lastY = 0, lastZ = 0;
     boolean lockedX = false, lockedZ = false, first = true;
+    int yTolerance = 1;
     for (BlockPos pos : blocks) {
       if (!first) {
-        if (lastY != pos.getY()) return false;
+        if (lastY != pos.getY()) {
+          if (yTolerance-- <= 0) return false;
+        }
         if (lastX == pos.getX()) lockedX = true;
         else if (lockedX) return false;
         if (lastZ == pos.getZ()) lockedZ = true;
@@ -215,13 +245,14 @@ public class ScaffoldPlacementCheck {
     this.flickBuffers.clear();
     this.snapBuffers.clear();
     this.microPitchBuffers.clear();
-    this.hitboxSnapBuffers.clear();
+    this.noRotBuffers.clear();
     this.lastFlag.clear();
     this.lastPitch.clear();
+    this.lastYaw.clear();
     this.lastBlocksPlaced.clear();
-    this.micropicthVl.clear();
+    this.micropitchVl.clear();
     this.placeSpeedHistory.clear();
     this.lastPlaceTime.clear();
-    this.lastHardFaultClick.clear();
+    this.lockedRotationTicks.clear();
   }
 }

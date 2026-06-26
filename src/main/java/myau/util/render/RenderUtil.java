@@ -869,9 +869,6 @@ public class RenderUtil {
     }
   }
 
-  // --- Methods from RenderUtils ---
-
-  // duplicate mc removed
   private static Frustum frustum = new Frustum();
 
   private static final FloatBuffer MODELVIEW = BufferUtils.createFloatBuffer(16);

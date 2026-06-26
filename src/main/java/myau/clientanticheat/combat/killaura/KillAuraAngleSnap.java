@@ -99,7 +99,6 @@ public class KillAuraAngleSnap {
       flickBuffer.decay(0.3D);
     }
 
-    // Divisor-based flick
     float divisorX = deltaYaw % 1.5F;
     float divisorY = deltaPitch % 1.5F;
     if (deltaYaw > 5.0F && divisorX == 0.0F && divisorY == 0.0F) {

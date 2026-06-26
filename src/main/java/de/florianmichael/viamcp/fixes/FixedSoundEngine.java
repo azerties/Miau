@@ -38,9 +38,6 @@ public class FixedSoundEngine {
     IBlockState iblockstate = world.getBlockState(pos);
     Block block = iblockstate.getBlock();
 
-    // Moving playAusSFX out of else-statement to play sound correctly (For some reason
-    // block.getMaterial() always returns Material.air on 1.9+ protocols)
-    // This should also function correctly on 1.8.x protocol, so no need for base version checks
     world.playAuxSFX(2001, pos, Block.getStateId(iblockstate));
 
     if (block.getMaterial() == Material.air) {
@@ -92,8 +89,7 @@ public class FixedSoundEngine {
 
         if (ViaLoadingBase.getInstance().getTargetVersion().getOriginalVersion()
             != ViaMCP.NATIVE_VERSION) {
-          // Using playSoundAtPos instead of playSoundEffect (I have no understanding as to why
-          // playSoundEffect is not functioning properly on 1.9+ protocols)
+
           mc.theWorld.playSoundAtPos(
               pos.add(0.5, 0.5, 0.5),
               iblock.getBlock().stepSound.getPlaceSound(),

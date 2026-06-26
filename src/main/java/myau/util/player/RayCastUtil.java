@@ -136,20 +136,17 @@ public class RayCastUtil {
     final int renderDistance = 16 * mc.gameSettings.renderDistanceChunks;
     final float[] rotations = RotationUtil.calculate(entity);
 
-    // Early exit if entity is outside FOV
     if (MoveUtil.wrappedDifference(mc.thePlayer.rotationYaw, rotations[0])
         > mc.gameSettings.fovSetting) {
       return false;
     }
 
-    // For non-player entities (mobs, etc.): simple center point raycast
     if (!(entity instanceof EntityPlayer)) {
       MovingObjectPosition mop =
           RayCastUtil.rayCast(rotations[0], rotations[1], renderDistance, 0.2f);
       return mop != null && mop.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY;
     }
 
-    // For player entities: multi-point scan across bounding box (3x3x3 grid)
     AxisAlignedBB bb = entity.getEntityBoundingBox();
     double width = bb.maxX - bb.minX;
     double height = bb.maxY - bb.minY;

@@ -198,12 +198,9 @@ public class ModuleComponent extends Component {
       if (hoverAlpha == 0) {
         hoverTimer = null;
       }
-      // Removed module hover background as requested
     }
 
-    if (hasModuleHeader() && enableAlpha > 0.01f) {
-      // Removed module active background as requested
-    }
+    if (hasModuleHeader() && enableAlpha > 0.01f) {}
 
     int r = (int) (192 + (255 - 192) * enableAlpha);
     int g = (int) (192 + (255 - 192) * enableAlpha);

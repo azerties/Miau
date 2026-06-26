@@ -38,7 +38,6 @@ public abstract class MixinGuiIngame_ChatOffset {
     }
   }
 
-  // First method called in render order - cache animation here
   @Inject(method = "renderPlayerStats", at = @At("HEAD"))
   private void onRenderPlayerStatsPre(ScaledResolution scaledRes, CallbackInfo ci) {
     openMyau$cachedAnim = ChatUtil.openingAnimation.getOutput().floatValue();
