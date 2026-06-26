@@ -19,7 +19,6 @@ public class Scoreboard extends Module {
   public float defaultX = 0;
   public float defaultY = 0;
 
-  // Tenacity-style properties
   public final IntProperty yOffset = new IntProperty("Y Offset", 0, -250, 250);
   public final BooleanProperty customFont = new BooleanProperty("Custom Font", false);
   public final BooleanProperty textShadow = new BooleanProperty("Text Shadow", true);
@@ -76,7 +75,6 @@ public class Scoreboard extends Module {
     this.defaultX = baseX;
     this.defaultY = baseY;
 
-    // Ensure drag property is initialized reasonably if it's 0,0
     if (this.drag.position.x == 0 && this.drag.position.y == 0 && this.drag.targetPosition.x == 0) {
       this.drag.position.x = baseX;
       this.drag.position.y = baseY;

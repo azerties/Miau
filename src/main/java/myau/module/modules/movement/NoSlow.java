@@ -2,13 +2,11 @@ package myau.module.modules.movement;
 
 import java.util.ArrayList;
 import java.util.List;
-import myau.Myau;
 import myau.event.EventTarget;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.RightClickMouseEvent;
 import myau.event.impl.UpdateEvent;
 import myau.module.Module;
-import myau.module.modules.combat.KillAura;
 import myau.module.modules.movement.noslow.*;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.ModeProperty;
@@ -81,9 +79,7 @@ public class NoSlow extends Module {
     if (heldItem == null || !(heldItem.getItem() instanceof net.minecraft.item.ItemSword)) {
       return false;
     }
-    KillAura aura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
-    boolean auraBlocking = aura != null && aura.isEnabled() && aura.isPlayerBlocking();
-    return mc.thePlayer.isUsingItem() || auraBlocking;
+    return mc.thePlayer.isUsingItem();
   }
 
   public boolean isAnyActive() {
@@ -96,7 +92,7 @@ public class NoSlow extends Module {
   }
 
   public float getMotionMultiplier() {
-    if (this.mode.getValue() == 5) { // Grim 1.9
+    if (this.mode.getValue() == 5) {
       return 0.35f;
     }
     return 1.0f;

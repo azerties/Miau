@@ -68,7 +68,6 @@ public abstract class MixinItemRenderer implements IMixinItemRenderer {
   protected abstract void renderPlayerArm(
       AbstractClientPlayer clientPlayer, float equipProgress, float swingProgress);
 
-  // ─── spoofItem support ─────────────────────────────────────────────────
   private ItemStack originalItemToRender;
   public boolean cancelUpdate = false;
   public boolean cancelReset = false;
@@ -141,7 +140,7 @@ public abstract class MixinItemRenderer implements IMixinItemRenderer {
    */
   @Overwrite
   public void renderItemInFirstPerson(float partialTicks) {
-    // spoofItem: swap itemToRender before rendering
+
     originalItemToRender = itemToRender;
     itemToRender = getSpoofedItem(originalItemToRender);
 
@@ -198,7 +197,6 @@ public abstract class MixinItemRenderer implements IMixinItemRenderer {
     GlStateManager.disableRescaleNormal();
     RenderHelper.disableStandardItemLighting();
 
-    // spoofItem: restore original itemToRender after rendering
     itemToRender = originalItemToRender;
   }
 

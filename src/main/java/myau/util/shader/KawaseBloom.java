@@ -108,7 +108,6 @@ public class KawaseBloom {
     ShaderUtils.drawQuads();
     GlStateManager.bindTexture(0);
 
-    // Restore GL states to defaults
     GlStateManager.alphaFunc(GL_GREATER, 0.1F);
     GlStateManager.disableBlend();
   }

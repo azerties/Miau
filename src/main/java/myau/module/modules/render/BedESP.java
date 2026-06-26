@@ -49,7 +49,6 @@ public class BedESP extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   private static final float DEFENSE_AUTO_SCALE_THRESHOLD = 8.0F;
 
-  // ---- Properties (ravenbS style) ----
   public final FloatProperty range = new FloatProperty("Range", 10.0f, 2.0f, 200.0f);
   public final FloatProperty scanSpeed = new FloatProperty("Scan speed", 8.0f, 1.0f, 32.0f);
   public final BooleanProperty firstBed = new BooleanProperty("Only render first bed", false);
@@ -110,8 +109,6 @@ public class BedESP extends Module {
   public BedESP() {
     super("BedESP", false);
   }
-
-  // ── Event handlers ──
 
   @Override
   public void onEnabled() {
@@ -275,8 +272,6 @@ public class BedESP extends Module {
     }
   }
 
-  // ── Bed pair collection (uses SharedBlockHighlightCache like ravenbS) ──
-
   private List<BlockPos[]> collectActiveBedPairs(
       SharedBlockHighlightCache cache, double px, double py, double pz, double rangeSq) {
     List<BlockPos[]> candidatePairs = new ArrayList<>();
@@ -376,8 +371,6 @@ public class BedESP extends Module {
     return new BlockPos[] {foot, foot.offset(facing)};
   }
 
-  // ── Render ──
-
   private void renderBed(BlockPos[] blocks, float height) {
     boolean exposed = showExposedOutline.getValue() && isBedExposed(blocks);
     double x = blocks[0].getX() - mc.getRenderManager().viewerPosX;
@@ -407,7 +400,7 @@ public class BedESP extends Module {
     } else {
       axisAlignedBB = new AxisAlignedBB(x, y, z, x + 1.0, y + height, z + 2.0);
     }
-    // Use Miau's RenderUtil.drawBoundingBox (same signature as ravenbS RenderUtils.drawBoundingBox)
+
     RenderUtil.drawBoundingBox(axisAlignedBB, r, g, b, drawA);
     if (exposed) {
       java.awt.Color outlineColor = Themes.getCurrentTheme().getAccentColor();
@@ -442,8 +435,6 @@ public class BedESP extends Module {
     }
     return false;
   }
-
-  // ── Defense overlay rendering ──
 
   private void renderDefenseOverlay(BlockPos[] blocks, float blockHeight) {
     DefenseOverlaySnapshot snapshot = defenseSnapshots.get(blocks[0].toLong());
@@ -591,8 +582,6 @@ public class BedESP extends Module {
     GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_TEXTURE_ENV_MODE, GL11.GL_MODULATE);
     GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
   }
-
-  // ── Defense snapshot computation ──
 
   private DefenseOverlaySnapshot computeDefenseSnapshot(BlockPos foot, BlockPos head) {
     LayerOffsets[] layers = getLayerOffsets(foot, head);
@@ -758,7 +747,6 @@ public class BedESP extends Module {
               secondZ = startZ + breadth;
             }
 
-            // Treat each physical block position as belonging to the first shell that reaches it.
             addOffset(offsets, seenAcrossLayers, firstX, firstY, firstZ);
             addOffset(offsets, seenAcrossLayers, secondX, secondY, secondZ);
 
@@ -913,8 +901,6 @@ public class BedESP extends Module {
     float scaledValue = baseScale * (effectiveDistance / DEFENSE_AUTO_SCALE_THRESHOLD);
     return Math.max(baseScale, scaledValue);
   }
-
-  // ── Inner classes (identical to ravenbS) ──
 
   private static final class DefenseOverlaySnapshot {
     private final long headKey;

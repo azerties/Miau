@@ -24,12 +24,10 @@ public class Animation {
     this.finished = true;
   }
 
-  // Tenacity Integration fields
   public myau.util.time.TimerUtil timerUtil = new myau.util.time.TimerUtil();
   protected double endPoint;
   protected Direction direction;
 
-  // Tenacity constructors
   public Animation(int ms, double endPoint) {
     this(ms, endPoint, Direction.FORWARDS);
   }
@@ -85,7 +83,6 @@ public class Animation {
     }
   }
 
-  // Tenacity Integration Methods
   public boolean finished(Direction direction) {
     return isDone() && this.direction.equals(direction);
   }

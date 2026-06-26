@@ -211,13 +211,14 @@ public class BackTrack extends Module {
               mc.thePlayer.getDistance(
                   targetMixin.getTrueX(), targetMixin.getTrueY(), targetMixin.getTrueZ());
           double dist = mc.thePlayer.getDistance(target.posX, target.posY, target.posZ);
+          double boxDist = RotationUtil.distanceToBox(target.getEntityBoundingBox());
 
           if (trueDist <= 6f
               && (!smart.getValue() || trueDist >= dist)
-              && (style.getValue() == 0 || !globalTimer.hasTimeElapsed(getSupposedDelay()))) {
+              && (style.getValue() == 1 || !globalTimer.hasTimeElapsed(getSupposedDelay()))) {
             shouldRender = true;
 
-            if (dist >= distance.getValue() && dist <= distance.getSecondValue()) {
+            if (boxDist >= distance.getValue() && boxDist <= distance.getSecondValue()) {
               handlePackets();
             } else {
               handlePacketsRange();

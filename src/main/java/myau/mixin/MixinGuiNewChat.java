@@ -165,7 +165,7 @@ public abstract class MixinGuiNewChat {
                 myau.Myau.moduleManager.getModule(myau.module.modules.render.HUD.class);
       }
     } catch (Exception e) {
-      // silently ignore - don't break the render pipeline
+
     }
   }
 }

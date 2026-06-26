@@ -45,9 +45,7 @@ public class ViaLoadingBase {
       new Platform(
           "ViaVersion",
           () -> true,
-          () -> {
-            // Empty
-          },
+          () -> {},
           protocolVersions -> protocolVersions.addAll(ViaVersionPlatformImpl.createVersionList()));
   public static final Platform PLATFORM_VIA_BACKWARDS =
       new Platform(

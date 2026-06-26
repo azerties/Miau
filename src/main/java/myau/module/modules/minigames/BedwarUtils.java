@@ -131,7 +131,6 @@ public class BedwarUtils extends Module {
     }
   }
 
-  // Detect own team bed color from scoreboard teams on Hypixel
   public static TeamBedColor detectOwnTeamColor() {
     if (mc.thePlayer == null || mc.getNetHandler() == null) return null;
     NetworkPlayerInfo selfInfo = mc.getNetHandler().getPlayerInfo(mc.thePlayer.getUniqueID());
@@ -144,8 +143,6 @@ public class BedwarUtils extends Module {
     return TeamBedColor.fromColorCode(code);
   }
 
-  // Get the own bed position from the BedTracker (if available)
-  // Populated when BedwarUtils is enabled and bedTracker is on
   private static BlockPos trackedOwnBed = null;
 
   public static BlockPos getTrackedOwnBed() {
@@ -708,7 +705,6 @@ public class BedwarUtils extends Module {
     EntityPlayer player = (EntityPlayer) entity;
     if (player == mc.thePlayer || player.isDead) return;
 
-    // Check teammate filter
     if (!this.trackTeammates.getValue() && TeamUtil.isSameTeam(player)) return;
 
     ItemStack item = packet.getItemStack();
@@ -723,13 +719,11 @@ public class BedwarUtils extends Module {
     long now = System.currentTimeMillis();
     int delayMs = this.alertDelay.getValue() * 1000;
 
-    // Track upgrades on equipment
     if (this.trackUpgrades.getValue()
         && item.hasTagCompound()
         && item.getTagCompound().hasKey("ench", 9)) {
       NBTTagList enchants = (NBTTagList) item.getTagCompound().getTag("ench");
 
-      // Slot 0 (held) with sword = Sharpened Swords
       if (slot == 0
           && item.getItem() instanceof ItemSword
           && hasEnchantment(enchants, "sharpness")) {
@@ -741,7 +735,6 @@ public class BedwarUtils extends Module {
         }
       }
 
-      // Slot 2 (leggings) with protection = Reinforced Armor
       if (slot == 2
           && item.getItem() instanceof ItemArmor
           && hasEnchantment(enchants, "protection")) {
@@ -754,11 +747,9 @@ public class BedwarUtils extends Module {
       }
     }
 
-    // Track equipment items
     String trackedItemKey = this.getTrackedItemKey(item, slot);
     if (trackedItemKey == null) return;
 
-    // Handle armor upgrades (slot 2 = leggings)
     if (slot == 2 && this.isArmorTracked(trackedItemKey)) {
       Map<String, Long> playerCooldowns =
           this.alertCooldowns.getOrDefault(playerName, new ConcurrentHashMap<>());
@@ -773,7 +764,6 @@ public class BedwarUtils extends Module {
       return;
     }
 
-    // Handle held items (slot 0)
     if (slot == 0 && this.isHeldItemTracked(trackedItemKey)) {
       Map<String, Long> playerCooldowns =
           this.alertCooldowns.getOrDefault(playerName, new ConcurrentHashMap<>());
@@ -791,17 +781,16 @@ public class BedwarUtils extends Module {
     String formatted = player.getDisplayName().getFormattedText();
     if (formatted.length() < 2) return null;
     String code = formatted.substring(1, 2);
-    // Valid color codes for bedwars teams
+
     if ("c9aebfd8".contains(code)) return code;
     return null;
   }
 
   private boolean hasEnchantment(NBTTagList enchants, String name) {
-    // Check if any enchantment has the given name (simplified)
-    // In practice we'd check the enchantment IDs, but this is a simplified approach
+
     for (int i = 0; i < enchants.tagCount(); i++) {
       short id = enchants.getCompoundTagAt(i).getShort("id");
-      // Sharpness = 16, Protection = 0
+
       if (name.equals("sharpness") && id == 16) return true;
       if (name.equals("protection") && id == 0) return true;
     }
@@ -835,7 +824,6 @@ public class BedwarUtils extends Module {
       if (rawName.contains("prismarine_shard")) return "prismarine_shard";
       if (rawName.contains("obsidian")) return "obsidian";
 
-      // By display name
       if (this.trackBow.getValue()) {
         if (item.getItem() instanceof ItemBow) return "Bow";
         if (lowerDisplay.contains("machine gun bow")) return "Machine Gun Bow";
@@ -888,7 +876,7 @@ public class BedwarUtils extends Module {
 
   private boolean isHeldItemTracked(String key) {
     if (key == null) return false;
-    // These are always tracked when enabled
+
     if (key.equals("iron_sword")
         || key.equals("diamond_sword")
         || key.equals("diamond_pickaxe")
@@ -903,7 +891,7 @@ public class BedwarUtils extends Module {
         || key.equals("diamond_leggings")) {
       return true;
     }
-    // Check categories
+
     if (key.equals("Bow") || key.equals("Machine Gun Bow") || key.equals("Devastator Bow")) {
       return this.trackBow.getValue();
     }
@@ -925,13 +913,13 @@ public class BedwarUtils extends Module {
   }
 
   private String getItemAlertDisplayColor(String itemKey) {
-    // Build reverse lookup from the itemDisplayColors map
+
     for (Map.Entry<String, String> entry : this.itemDisplayColors.entrySet()) {
       if (entry.getValue().equals(itemKey)) {
         return entry.getKey();
       }
     }
-    // Fallback: color by item type
+
     if (itemKey.contains("diamond")) return "&bDiamond";
     if (itemKey.contains("iron")) return "&fIron";
     if (itemKey.contains("chainmail")) return "&fChainmail";

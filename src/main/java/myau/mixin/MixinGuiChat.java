@@ -45,10 +45,10 @@ public abstract class MixinGuiChat extends GuiScreen {
 
   @Inject(method = "keyTyped", at = @At("HEAD"), cancellable = true)
   private void onKeyTyped(char typedChar, int keyCode, CallbackInfo ci) throws IOException {
-    if (keyCode == 1) { // Escape
+    if (keyCode == 1) {
       ChatUtil.openingAnimation.setDirection(Direction.BACKWARDS);
       ci.cancel();
-    } else if (keyCode == 28 || keyCode == 156) { // Enter
+    } else if (keyCode == 28 || keyCode == 156) {
       String s = this.inputField.getText().trim();
       if (s.length() > 0) {
         this.sendChatMessage(s);
@@ -60,7 +60,7 @@ public abstract class MixinGuiChat extends GuiScreen {
 
   @Inject(method = "drawScreen", at = @At("HEAD"), cancellable = true)
   private void onDrawScreenHead(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-    // Cache animation state once for both HEAD and RETURN
+
     openMyau$cachedAnimOut = ChatUtil.openingAnimation.getOutput().floatValue();
 
     if (ChatUtil.openingAnimation.finished(Direction.BACKWARDS)) {
@@ -68,7 +68,7 @@ public abstract class MixinGuiChat extends GuiScreen {
       ci.cancel();
       return;
     }
-    // Set the inputField Y position based on animation for the original drawTextBox call
+
     this.inputField.yPosition = (int) (this.height - (12 * openMyau$cachedAnimOut));
   }
 
@@ -79,7 +79,6 @@ public abstract class MixinGuiChat extends GuiScreen {
     float bgHeight = 14 * openMyau$cachedAnimOut;
     float bgY = this.height - bgHeight;
 
-    // Draw rounded chat background with semi-transparent black
     GlStateManager.disableDepth();
     RoundedUtils.drawRound(2, bgY, this.width - 4, 12, 4, new Color(0, 0, 0, 150));
     GlStateManager.enableDepth();

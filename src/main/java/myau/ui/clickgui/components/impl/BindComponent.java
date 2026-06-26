@@ -161,10 +161,14 @@ public class BindComponent extends Component {
   }
 
   public boolean overSetting(int mouseX, int mouseY) {
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     float rowX = moduleComponent.categoryComponent.getX();
     float rowY = moduleComponent.categoryComponent.getModuleY() + o;
     float rowW = moduleComponent.categoryComponent.getWidth();
-    return mouseX > rowX && mouseX < rowX + rowW && mouseY > rowY - 1 && mouseY < rowY + 12;
+    return mouseX > rowX
+        && mouseX < rowX + rowW
+        && mouseY > rowY - 1
+        && mouseY < rowY + 12 * fontScale;
   }
 
   public String getKeyAsStr() {
@@ -191,11 +195,12 @@ public class BindComponent extends Component {
   }
 
   private void drawString(Font renderer, String s) {
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     int color = Themes.getCurrentTheme().getAccentColor(new Vector2d(this.x, this.y)).getRGB();
     renderer.draw(
         s,
         (float) ((this.moduleComponent.categoryComponent.getX() + 4) * 2) + xOffset,
-        (float) ((this.moduleComponent.categoryComponent.getY() + this.o + 3) * 2),
+        (float) ((this.moduleComponent.categoryComponent.getY() + this.o + 3 * fontScale) * 2),
         color,
         true);
   }

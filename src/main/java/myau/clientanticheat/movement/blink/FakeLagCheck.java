@@ -19,14 +19,11 @@ public class FakeLagCheck {
   private final Map<String, Boolean> wasLaggingLastTick = new HashMap<>();
   private final Map<String, Long> lastMovementTimestamp = new HashMap<>();
 
-  private static final double FAKELAG_TIMING_VARIANCE_THRESHOLD = 1.5D;
+  private static final double FAKELAG_TIMING_VARIANCE_THRESHOLD = 2.0D;
   private static final int INTERVAL_SAMPLE_SIZE = 20;
   private static final int COMBAT_DISTANCE = 8;
-  private static final double MIN_LAG_VELOCITY = 0.15D;
-  private static final double MAX_LAG_VELOCITY = 15.0D;
   private static final double MIN_PULSE_VELOCITY = 0.65D;
   private static final double MAX_PULSE_VELOCITY = 8.0D;
-  private static final long MOVEMENT_TIMEOUT_MS = 200L;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
@@ -51,11 +48,11 @@ public class FakeLagCheck {
     boolean pulseFluctuation =
         data.horizontalDelta > MIN_PULSE_VELOCITY
             && data.horizontalDelta < MAX_PULSE_VELOCITY
-            && data.lastHorizontalDelta < 0.05D
-            && data.horizontalDelta > data.lastHorizontalDelta * 8.0D;
+            && data.lastHorizontalDelta < 0.04D
+            && data.horizontalDelta > data.lastHorizontalDelta * 12.0D;
 
     if (pulseFluctuation && !player.isCollidedHorizontally && data.airTicks < 8) {
-      if (pulseBuffer.flag(1.0D, 3.5D)) {
+      if (pulseBuffer.flag(1.0D, 4.5D)) {
         context.receiveSignal(name, "FakeLag (Pulse)");
         pulseBuffer.reset();
       }
@@ -69,19 +66,16 @@ public class FakeLagCheck {
     Long lastMoveTime = this.lastMovementTimestamp.get(name);
 
     boolean isLagging =
-        data.totalDelta > MIN_LAG_VELOCITY
-            && data.totalDelta < MAX_LAG_VELOCITY
-            && data.stillTicks > 2;
+        data.horizontalDelta < 0.03D && data.stillTicks > 4 && !data.recentlyTeleported();
 
-    if (isLagging && !data.recentlyTeleported()) {
+    if (isLagging) {
       this.lagTickCounter.put(name, this.lagTickCounter.getOrDefault(name, 0) + 1);
     } else {
       int lagTicks = this.lagTickCounter.getOrDefault(name, 0);
-      if (lagTicks > 2 && data.totalDelta > MIN_PULSE_VELOCITY) {
+      if (lagTicks > 3 && data.totalDelta > MIN_PULSE_VELOCITY) {
         if (lastMoveTime != null) {
           long idleMs = now - lastMoveTime;
-          double idleSeconds = idleMs / 1000.0D;
-          if (idleMs > 150L && idleMs < 3000L) {
+          if (idleMs > 200L && idleMs < 3000L) {
             intervals.add((double) idleMs);
             if (intervals.size() > INTERVAL_SAMPLE_SIZE) {
               intervals.removeFirst();
@@ -96,12 +90,12 @@ public class FakeLagCheck {
       this.lastMovementTimestamp.put(name, now);
     }
 
-    if (intervals.size() >= 6) {
+    if (intervals.size() >= 8) {
       double stddev = StatisticalUtils.standardDeviation(intervals);
       double cv = StatisticalUtils.coefficientOfVariation(intervals);
 
       if (cv > 0.5D && stddev > FAKELAG_TIMING_VARIANCE_THRESHOLD) {
-        if (timingVarianceBuffer.flag(1.5D, 4.0D)) {
+        if (timingVarianceBuffer.flag(1.5D, 5.0D)) {
           context.receiveSignal(name, "FakeLag (Timing Variance)");
           timingVarianceBuffer.reset();
           intervals.clear();
@@ -128,11 +122,11 @@ public class FakeLagCheck {
     boolean wasLagging = this.wasLaggingLastTick.getOrDefault(name, false);
     this.wasLaggingLastTick.put(name, isLagging);
 
-    boolean lagJustStarted = isLagging && !wasLagging && data.stillTicks > 3;
-    boolean isNearEntity = this.nearEntityTickCounter.getOrDefault(name, 0) > 1;
+    boolean lagJustStarted = isLagging && !wasLagging && data.stillTicks > 5;
+    boolean isNearEntity = this.nearEntityTickCounter.getOrDefault(name, 0) > 3;
 
-    if (lagJustStarted && isNearEntity && data.stillTicks <= 20) {
-      if (entityAlignedBuffer.flag(2.0D, 4.0D)) {
+    if (lagJustStarted && isNearEntity && data.stillTicks <= 25) {
+      if (entityAlignedBuffer.flag(1.5D, 5.0D)) {
         context.receiveSignal(name, "FakeLag (Entity-Aligned)");
         entityAlignedBuffer.reset();
       }
@@ -144,7 +138,7 @@ public class FakeLagCheck {
         isNearEntity && data.totalDelta > MIN_PULSE_VELOCITY && lagJustStarted;
 
     if (catchUpNearEntity) {
-      if (pulseBuffer.flag(1.5D, 3.0D)) {
+      if (pulseBuffer.flag(1.5D, 4.0D)) {
         context.receiveSignal(name, "FakeLag (Combat Catch-up)");
         pulseBuffer.reset();
       }
@@ -159,7 +153,8 @@ public class FakeLagCheck {
         || player.isInLava()
         || player.isOnLadder()
         || player.isRiding()
-        || player.capabilities.isFlying;
+        || player.capabilities.isFlying
+        || data.recentlyHurt();
   }
 
   public void reset() {

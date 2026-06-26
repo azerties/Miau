@@ -194,6 +194,7 @@ public class FontRenderer extends myau.util.font.Font {
       }
     }
     ((java.nio.Buffer) byteBuffer).flip();
+    int currentTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
     GlStateManager.bindTexture(texture);
     GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
     GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
@@ -207,6 +208,7 @@ public class FontRenderer extends myau.util.font.Font {
         GL11.GL_RGBA,
         GL11.GL_UNSIGNED_BYTE,
         byteBuffer);
+    GlStateManager.bindTexture(currentTexture);
   }
 
   public int draw(final String text, final double x, final double y, final int color) {
@@ -222,36 +224,54 @@ public class FontRenderer extends myau.util.font.Font {
   }
 
   public int drawWithShadow(final String text, final double x, final double y, final int color) {
-    return draw(text, x, y, color, false);
+    return draw(text, x, y, color, true);
   }
 
   public void drawCenteredStringWithShadow(
       final String text, final float x, final float y, final int color) {
-    draw(text, x - (width(text) >> 1), y, color, false);
+    draw(text, x - (width(text) >> 1), y, color, true);
   }
 
   public int draw(String text, double x, double y, final int color, final boolean shadow) {
     if (text == null) {
       return 0;
     }
+    if (shadow) {
+      draw(text, x + 0.5D, y + 0.5D, color, true, true);
+      return draw(text, x, y, color, false, false);
+    } else {
+      return draw(text, x, y, color, false, false);
+    }
+  }
 
+  private int draw(
+      String text,
+      double x,
+      double y,
+      final int color,
+      final boolean shadow,
+      final boolean isShadowPass) {
     double givenX = x;
+    int currentTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+
     GL11.glPushMatrix();
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-    GL11.glEnable(GL11.GL_TEXTURE_2D);
-    GL11.glEnable(GL11.GL_BLEND);
-    GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+    GlStateManager.enableTexture2D();
+    GlStateManager.enableBlend();
+    GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     GL11.glScalef(SCALE, SCALE, SCALE);
 
     x -= MARGIN_WIDTH / SCALE_INVERSE;
     y -= MARGIN_WIDTH / SCALE_INVERSE;
     x *= SCALE_INVERSE;
     y *= SCALE_INVERSE;
-    y -= fontHeight / 5;
 
     final double startX = x;
 
-    ColorUtil.glColor(shadow ? Color.white.getRGB() : color);
+    int renderColor = color;
+    if (isShadowPass) {
+      renderColor = (color & 0xFCFCFC) >> 2 | color & 0xFF000000;
+    }
+    ColorUtil.glColor(renderColor);
     text = text.replaceAll("\247l", "");
     try {
       char[] characters = text.toCharArray();
@@ -272,7 +292,13 @@ public class FontRenderer extends myau.util.font.Font {
           if (i < characters.length) {
             int index = COLOR_CODE_CHARACTERS.indexOf(characters[i]);
             if (index != -1 && index < COLOR_CODES.length) {
-              ColorUtil.glColor(COLOR_CODES[index]);
+              int formatColor = COLOR_CODES[index];
+              if (isShadowPass) {
+                formatColor = (formatColor & 0xFCFCFC) >> 2;
+              }
+              int originalAlpha = (color >> 24) & 0xFF;
+              if (originalAlpha == 0) originalAlpha = 255;
+              ColorUtil.glColor((originalAlpha << 24) | (formatColor & 0x00FFFFFF));
             }
           }
           continue;
@@ -289,10 +315,8 @@ public class FontRenderer extends myau.util.font.Font {
       e.printStackTrace();
     }
 
-    GL11.glDisable(GL11.GL_BLEND);
-    GL11.glDisable(GL11.GL_TEXTURE_2D);
-    GlStateManager.bindTexture(0);
-    GL11.glPopAttrib();
+    GlStateManager.bindTexture(currentTexture);
+    GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f);
     GL11.glPopMatrix();
 
     return (int) (x - givenX);

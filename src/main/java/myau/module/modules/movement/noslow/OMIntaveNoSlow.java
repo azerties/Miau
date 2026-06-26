@@ -45,21 +45,14 @@ public class OMIntaveNoSlow extends NoSlowMode {
 
   @Override
   public void onPacket(PacketEvent event) {
-    if (event.getType() == EventType.RECEIVE
-        && event.getPacket() instanceof S08PacketPlayerPosLook) {
-      this.disable = 0;
-    }
-  }
-
-  private void performBypass() {
-    KillAura aura = (KillAura) Myau.moduleManager.getModule(KillAura.class);
-    if (this.disable > 10
-        && !BadPacketsComponent.bad(false, true, true, false, false)
-        && (aura == null || aura.getTarget() == null)) {
-      int currentSlot = mc.thePlayer.inventory.currentItem;
-      PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
-      PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
-      PacketUtil.sendPacket(new C08PacketPlayerBlockPlacement(mc.thePlayer.getHeldItem()));
+    if (event.getType() == EventType.SEND
+        && event.getPacket() instanceof C08PacketPlayerBlockPlacement) {
+      if (this.getParent().isSwordActive()
+          && !BadPacketsComponent.bad(false, true, true, false, false)) {
+        int currentSlot = mc.thePlayer.inventory.currentItem;
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
+      }
     }
   }
 }

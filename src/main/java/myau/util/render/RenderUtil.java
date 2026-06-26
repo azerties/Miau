@@ -869,9 +869,6 @@ public class RenderUtil {
     }
   }
 
-  // --- Methods from RenderUtils ---
-
-  // duplicate mc removed
   private static Frustum frustum = new Frustum();
 
   private static final FloatBuffer MODELVIEW = BufferUtils.createFloatBuffer(16);
@@ -2319,6 +2316,67 @@ public class RenderUtil {
     GL11.glDisable(3553);
     glEnable(2848);
     GL11.glBegin(9);
+    glColor(color);
+    for (int i = 0; i <= 90; i += 3) {
+      final double n7 = (double) (i * 0.017453292f);
+      GL11.glVertex2d(
+          (double) (x + radius) + Math.sin(n7) * radius * -1.0,
+          (double) (y + radius) + Math.cos(n7) * radius * -1.0);
+    }
+    for (int j = 90; j <= 180; j += 3) {
+      final double n8 = (double) (j * 0.017453292f);
+      GL11.glVertex2d(
+          (double) (x + radius) + Math.sin(n8) * radius * -1.0,
+          (double) (y2 - radius) + Math.cos(n8) * radius * -1.0);
+    }
+    if (x2 - x >= 4.5) {
+      for (int k = 0; k <= 90; k += 1) {
+        final double n9 = (double) (k * 0.017453292f);
+        GL11.glVertex2d(
+            (double) (x2 - radius) + Math.sin(n9) * radius,
+            (double) (y2 - radius) + Math.cos(n9) * radius);
+      }
+      for (int l = 90; l <= 180; l += 1) {
+        final double n10 = (double) (l * 0.017453292f);
+        GL11.glVertex2d(
+            (double) (x2 - radius) + Math.sin(n10) * radius,
+            (double) (y + radius) + Math.cos(n10) * radius);
+      }
+    }
+    GL11.glEnd();
+    glEnable(3553);
+    GL11.glDisable(3042);
+    GL11.glDisable(2848);
+    glEnable(3553);
+    GL11.glPopAttrib();
+    GL11.glPopMatrix();
+    GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f);
+  }
+
+  public static void drawRoundedRectangleOutline(
+      float x, float y, float x2, float y2, float radius, float lineWidth, final int color) {
+    if (x2 <= x) {
+      return;
+    }
+
+    float width = x2 - x;
+
+    if (width < 3) {
+      radius = Math.min(radius, width / 2.0f);
+    }
+
+    x *= 2.0;
+    y *= 2.0;
+    x2 *= 2.0;
+    y2 *= 2.0;
+    GL11.glPushMatrix();
+    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+    GL11.glScaled(0.5, 0.5, 0.5);
+    glEnable(3042);
+    GL11.glDisable(3553);
+    glEnable(2848);
+    GL11.glLineWidth(lineWidth * 2.0f);
+    GL11.glBegin(GL11.GL_LINE_LOOP);
     glColor(color);
     for (int i = 0; i <= 90; i += 3) {
       final double n7 = (double) (i * 0.017453292f);

@@ -96,7 +96,6 @@ public class KawaseBlur {
     GlStateManager.bindTexture(0);
     GlStateManager.disableBlend();
 
-    // Restore alpha func to Minecraft default (GL_GREATER, 0.1)
     GlStateManager.alphaFunc(GL_GREATER, 0.1F);
   }
 
