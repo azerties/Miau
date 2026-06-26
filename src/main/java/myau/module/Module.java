@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import myau.Myau;
 import myau.module.modules.render.HUD;
+import myau.notification.NotificationManager;
 import myau.notification.NotificationType;
 import myau.property.Property;
 import myau.util.client.KeyBindUtil;
@@ -53,20 +54,11 @@ public abstract class Module {
       this.enabled = enabled;
       if (enabled) {
         this.onEnabled();
-        Myau.notificationManager
-            .builder(NotificationType.SUCCESS)
-            .title(this.name)
-            .description("was enabled.")
-            .duration(2000)
-            .buildAndPublish();
+        // Static helper: uses DEFAULT_DURATION (3000 ms) automatically
+        NotificationManager.notify(this.getName(), "Module enabled.", NotificationType.ENABLED);
       } else {
         this.onDisabled();
-        Myau.notificationManager
-            .builder(NotificationType.ERROR)
-            .title(this.name)
-            .description("was disabled.")
-            .duration(2000)
-            .buildAndPublish();
+        NotificationManager.notify(this.getName(), "Module disabled.", NotificationType.DISABLED);
       }
     }
   }

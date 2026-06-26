@@ -14,6 +14,7 @@ import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
 import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
+import myau.util.player.ItemUtil;
 import myau.util.player.MoveUtil;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
@@ -110,11 +111,14 @@ public class AutoBlockIn extends Module {
 
     updateProgress();
 
-    int blockSlot = findBestBlockSlot();
+    // Don't switch off a sword — player expects right-click to block, not place a block
+    if (!ItemUtil.isHoldingSword()) {
+      int blockSlot = findBestBlockSlot();
 
-    if (blockSlot != -1) {
-      if (mc.thePlayer.inventory.currentItem != blockSlot) {
-        mc.thePlayer.inventory.currentItem = blockSlot;
+      if (blockSlot != -1) {
+        if (mc.thePlayer.inventory.currentItem != blockSlot) {
+          mc.thePlayer.inventory.currentItem = blockSlot;
+        }
       }
     }
 

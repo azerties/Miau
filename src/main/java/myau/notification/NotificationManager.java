@@ -1,189 +1,220 @@
 package myau.notification;
 
-import java.awt.Color;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import myau.event.EventTarget;
 import myau.event.impl.Render2DEvent;
-import myau.util.render.RenderUtil;
+import myau.property.properties.DragProperty;
+import myau.util.time.TimerUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.ScaledResolution;
 
+/**
+ * Singleton notification manager for Miau client – Opal-style.
+ *
+ * <p>Maintains a simple {@link ArrayList} of {@link Notification} entries, ordered oldest-first
+ * (newest appended at the end). Rendering and animation state are managed entirely by {@link
+ * NotificationRenderer} via a {@code Map<Notification, Animation>}.
+ *
+ * <h3>Usage</h3>
+ *
+ * <pre>{@code
+ * // Simple push
+ * NotificationManager.getInstance().push("Title", "Message", NotificationType.INFO);
+ *
+ * // Builder API (backward-compatible)
+ * NotificationManager.getInstance()
+ *         .builder(NotificationType.ENABLED)
+ *         .title("KillAura")
+ *         .description("Enabled")
+ *         .buildAndPublish();
+ * }</pre>
+ */
 public class NotificationManager {
-  // Raven-bS compact style constants
-  private static final float PADDING = 8f;
-  private static final float ICON_SIZE = 16f;
-  private static final float SPACING = 6f;
-  private static final float CONTAINER_HEIGHT = 26f;
-  private static final float GAP = 3f;
+
+  // ── Singleton ────────────────────────────────────────────────────────────
+
+  private static volatile NotificationManager instance;
+
+  /** Returns the process-wide singleton instance. Creates it lazily if necessary. */
+  public static NotificationManager getInstance() {
+    if (instance == null) {
+      synchronized (NotificationManager.class) {
+        if (instance == null) {
+          instance = new NotificationManager();
+        }
+      }
+    }
+    return instance;
+  }
+
+  // ── Inner class: Notification (Opal-style data model) ──────────────────
+
+  /** Immutable notification value object with {@link TimerUtil}-based timing. */
+  public static class Notification {
+
+    private final TimerUtil timer = new TimerUtil();
+    private final NotificationType type;
+    private final String title, description;
+    private final int duration;
+
+    Notification(NotificationType type, String title, String description, int duration) {
+      this.type = type;
+      this.title = title;
+      this.description = description;
+      this.duration = duration;
+      timer.reset();
+    }
+
+    public NotificationType getType() {
+      return type;
+    }
+
+    public String getTitle() {
+      return title;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    public String getMessage() {
+      return description;
+    }
+
+    public int getDuration() {
+      return duration;
+    }
+
+    /**
+     * @return {@code true} once the notification has lived past its duration.
+     */
+    public boolean hasExpired() {
+      return timer.hasTimeElapsed(duration, false);
+    }
+
+    /** Milliseconds elapsed since creation. */
+    public long getTime() {
+      return timer.getTime();
+    }
+
+    /**
+     * @deprecated Not used in Opal-style rendering – kept for API compatibility.
+     */
+    @Deprecated
+    public long getStartTime() {
+      return System.currentTimeMillis() - timer.getTime();
+    }
+  }
+
+  public static int DEFAULT_DURATION = 4000;
 
   private final List<Notification> notifications = new ArrayList<>();
-  private long lastRenderTime = System.currentTimeMillis();
-  private boolean initialized = false;
-  public final myau.property.properties.DragProperty drag =
-      new myau.property.properties.DragProperty(
-          "Notifications", new myau.util.vector.Vector2d(100, 100));
 
+  @Deprecated public final DragProperty drag;
+
+  public NotificationManager() {
+    this.drag = new DragProperty("Notifications", new myau.util.vector.Vector2d(0, 0));
+    this.drag.setScale(new myau.util.vector.Vector2d(0, 0));
+    this.drag.structure = false;
+    if (instance == null) {
+      instance = this;
+    }
+  }
+
+  public void push(String title, String message, NotificationType type) {
+    push(title, message, type, DEFAULT_DURATION);
+  }
+
+  public void push(String title, String message, NotificationType type, int duration) {
+    notifications.add(new Notification(type, title, message, duration));
+    System.out.println("[Notification] " + title + " - " + message);
+
+    // Subtle audio feedback — only when a player is in-world
+    try {
+      Minecraft mc = Minecraft.getMinecraft();
+      if (mc.thePlayer != null) {
+        mc.thePlayer.playSound("random.click", 0.3f, 1.8f);
+      }
+    } catch (Exception ignored) {
+      /* no-op outside game world */
+    }
+  }
+
+  /**
+   * Returns the full notification list (oldest first, newest last). Renderer iterates bottom-up for
+   * the Opal stack layout.
+   */
+  public List<Notification> getNotifications() {
+    return notifications;
+  }
+
+  /**
+   * Removes a specific notification from the list. Called by the renderer after the exit animation
+   * completes.
+   */
+  public void remove(Notification notification) {
+    notifications.remove(notification);
+  }
+
+  // ── Static convenience helper ────────────────────────────────────────────
+
+  /**
+   * Push a notification from anywhere without holding a reference to the manager.
+   *
+   * <pre>{@code
+   * NotificationManager.notify("KillAura", "Enabled", NotificationType.ENABLED);
+   * }</pre>
+   *
+   * @param title module or feature name
+   * @param msg short description
+   * @param type visual style
+   */
+  public static void notify(String title, String msg, NotificationType type) {
+    getInstance().push(title, msg, type);
+  }
+
+  // ── Legacy / Builder API ─────────────────────────────────────────────────
+
+  /**
+   * Fluent builder entry-point kept for backward compatibility.
+   *
+   * @param type notification type
+   * @return a new {@link NotificationBuilder}
+   */
   public NotificationBuilder builder(NotificationType type) {
     return new NotificationBuilder(type, this);
   }
 
+  /** Low-level add used by {@link NotificationBuilder#buildAndPublish()}. */
   public void add(Notification notification) {
-    synchronized (notifications) {
-      notifications.add(notification);
-    }
-    System.out.println(
-        "[Notification] " + notification.getTitle() + " - " + notification.getDescription());
+    push(notification.title, notification.description, notification.type, notification.duration);
   }
 
+  // ── Event handler ─────────────────────────────────────────────────────────
+
+  /** Fired by the custom event bus from {@code MixinGuiIngameForge}. */
   @EventTarget
   public void onRender2D(Render2DEvent event) {
     Minecraft mc = Minecraft.getMinecraft();
     if (mc.theWorld == null || mc.thePlayer == null) return;
 
-    ScaledResolution sr = new ScaledResolution(mc);
-    render(sr);
+    // Skip all non-chat overlay screens
+    if (mc.currentScreen != null && !(mc.currentScreen instanceof net.minecraft.client.gui.GuiChat))
+      return;
+
+    // Hand off rendering to NotificationRenderer
+    NotificationRenderer.renderAll(new net.minecraft.client.gui.ScaledResolution(mc));
   }
 
-  public void render(ScaledResolution sr) {
-    Minecraft mc = Minecraft.getMinecraft();
-
-    long currentTime = System.currentTimeMillis();
-    float deltaTime = (currentTime - lastRenderTime) / 1000f;
-    lastRenderTime = currentTime;
-
-    if (deltaTime > 0.1f) deltaTime = 0.1f;
-
-    final float animationSpeed = 12.0f;
-
-    if (!initialized) {
-      drag.position.x = drag.targetPosition.x = sr.getScaledWidth() - 165;
-      drag.position.y = drag.targetPosition.y = sr.getScaledHeight() - 15;
-      initialized = true;
-    }
-
-    if (!(mc.currentScreen instanceof net.minecraft.client.gui.GuiChat
-        || mc.currentScreen instanceof myau.ui.clickgui.ClickGui)) {
-      drag.position.x = drag.targetPosition.x;
-      drag.position.y = drag.targetPosition.y;
-    }
-
-    drag.scale.x = 150;
-    drag.scale.y = 40;
-
-    float anchorX = (float) drag.position.x;
-    float anchorY = (float) drag.position.y;
-
-    float scaledWidth = sr.getScaledWidth();
-
-    synchronized (notifications) {
-      int activeIndex = 0;
-      Iterator<Notification> iterator = notifications.iterator();
-      while (iterator.hasNext()) {
-        Notification notif = iterator.next();
-
-        float containerWidth = getContainerWidth(notif);
-
-        float targetX;
-        if (notif.hasExpired()) {
-          targetX = scaledWidth + 10;
-        } else {
-          targetX = (anchorX + 150f) - containerWidth;
-        }
-
-        float currentTargetY;
-        if (notif.hasExpired()) {
-          currentTargetY = notif.targetY;
-        } else {
-          currentTargetY = anchorY - (activeIndex * (CONTAINER_HEIGHT + GAP)) - CONTAINER_HEIGHT;
-          notif.targetY = currentTargetY;
-          activeIndex++;
-        }
-
-        // Miau animation: slide-in on first frame
-        if (notif.firstFrame) {
-          notif.x = scaledWidth + 10;
-          notif.y = currentTargetY;
-          notif.firstFrame = false;
-        }
-
-        // Smooth lerp animation (Miau style)
-        notif.x += (targetX - notif.x) * animationSpeed * deltaTime;
-        notif.y += (currentTargetY - notif.y) * animationSpeed * deltaTime;
-
-        if (notif.hasExpired() && Math.abs(notif.x - targetX) < 1.0f) {
-          iterator.remove();
-        }
-      }
-
-      // Raven-bS flat render — no bloom, no glow, no progress bar
-      for (Notification notif : notifications) {
-        renderNotification(notif);
-      }
-    }
-  }
-
-  private float getContainerWidth(Notification notif) {
-    myau.util.font.Font boldFont = myau.util.font.Fonts.MAIN.get(14, myau.util.font.Weight.BOLD);
-    myau.util.font.Font regFont = myau.util.font.Fonts.MAIN.get(12);
-    int titleWidth = boldFont.width(notif.getTitle());
-    int descWidth = regFont.width(notif.getDescription());
-    float textWidth = Math.max(titleWidth, descWidth);
-    return Math.max(150f, PADDING + ICON_SIZE + SPACING + textWidth + PADDING);
-  }
-
-  private void renderNotification(Notification notif) {
-    float x = notif.x;
-    float y = notif.y;
-    float containerWidth = getContainerWidth(notif);
-
-    int typeColor = notif.getType().getColor();
-
-    // Raven-bS flat dark background
-    Gui.drawRect(
-        (int) x,
-        (int) y,
-        (int) (x + containerWidth),
-        (int) (y + CONTAINER_HEIGHT),
-        new Color(0, 0, 0, 200).getRGB());
-
-    // Raven-bS thin left accent bar
-    Gui.drawRect((int) x, (int) y, (int) (x + 2), (int) (y + CONTAINER_HEIGHT), typeColor);
-
-    // Icon — draw a small filled shape instead of relying on Material Icons font
-    // which fails to load at runtime (Fonts.ICONS silently falls back to Minecraft
-    // default font which has no glyphs for Material Icons PUA characters).
-    float iconCX = x + PADDING + ICON_SIZE / 2f;
-    float iconCY = y + CONTAINER_HEIGHT / 2f;
-    float iconRadius = 5f;
-
-    // Outer circle with type color
-    RenderUtil.enableRenderState();
-    RenderUtil.fillCircle(iconCX, iconCY, iconRadius, 16, typeColor);
-    // Inner white symbol: a small filled circle or diamond
-    RenderUtil.fillCircle(iconCX, iconCY, iconRadius * 0.45f, 12, 0xFFFFFFFF);
-    RenderUtil.disableRenderState();
-
-    // Text
-    myau.util.font.Font boldFont = myau.util.font.Fonts.MAIN.get(14, myau.util.font.Weight.BOLD);
-    myau.util.font.Font regFont = myau.util.font.Fonts.MAIN.get(12);
-    float textX = x + PADDING + ICON_SIZE + SPACING;
-    float totalTextHeight = boldFont.height() + regFont.height() + 2;
-    float startTextY = y + (CONTAINER_HEIGHT - totalTextHeight) / 2f;
-
-    boldFont.drawWithShadow(notif.getTitle(), textX, startTextY, -1);
-    regFont.drawWithShadow(
-        notif.getDescription(), textX, startTextY + boldFont.height() + 2, 0xFFAAAAAA);
-  }
+  // ── Builder (backward-compat) ────────────────────────────────────────────
 
   public static class NotificationBuilder {
+
     private final NotificationType type;
     private final NotificationManager manager;
     private String title = "";
     private String description = "";
-    private int duration = 2000;
+    private int duration = DEFAULT_DURATION;
 
     public NotificationBuilder(NotificationType type, NotificationManager manager) {
       this.type = type;
@@ -205,8 +236,9 @@ public class NotificationManager {
       return this;
     }
 
+    /** Builds the {@link Notification} and submits it to the manager. */
     public void buildAndPublish() {
-      manager.add(new Notification(type, title, description, duration));
+      manager.push(title, description, type, duration);
     }
   }
 }
