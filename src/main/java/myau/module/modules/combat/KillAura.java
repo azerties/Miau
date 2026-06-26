@@ -880,12 +880,7 @@ public class KillAura extends Module {
     this.cps = new FloatProperty("aps", 14.0F, 14.0F, 1.0F, 20.0F);
     this.autoBlockCps =
         new FloatProperty(
-            "autoblock-aps",
-            8.0F,
-            10.0F,
-            1.0F,
-            10.0F,
-            () -> this.autoBlock.getValue() != 0);
+            "autoblock-aps", 8.0F, 10.0F, 1.0F, 10.0F, () -> this.autoBlock.getValue() != 0);
     this.rotations =
         new ModeProperty(
             "rotations", 1, new String[] {"NONE", "LEGIT/NORMAL", "SNAP", "NCP", "AUTISTIC"});
@@ -1314,7 +1309,8 @@ public class KillAura extends Module {
                   } else if (!this.isPlayerBlocking() || this.smartUpdatedNCPAutoBlock.getValue()) {
                     if (this.smartBlockRate.getValue() >= 100
                         || new Random().nextInt(100) < this.smartBlockRate.getValue()) {
-                      if (this.smartSwitchStartBlock.getValue() && !this.isNoSlowAntiSwitchActive()) {
+                      if (this.smartSwitchStartBlock.getValue()
+                          && !this.isNoSlowAntiSwitchActive()) {
                         PacketUtil.sendPacket(new C09PacketHeldItemChange((item + 1) % 9));
                         PacketUtil.sendPacket(new C09PacketHeldItemChange(item));
                       }
