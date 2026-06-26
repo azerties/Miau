@@ -22,13 +22,18 @@ import myau.util.network.PacketUtil;
 import myau.util.player.*;
 import myau.util.shader.BlurUtils;
 import myau.util.shader.RoundedUtils;
+import myau.util.time.TimerUtil;
 import myau.util.world.BlockUtil;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockAir;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.WorldRenderer;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
@@ -38,6 +43,7 @@ import net.minecraft.potion.Potion;
 import net.minecraft.util.*;
 import net.minecraft.world.WorldSettings.GameType;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 public class Scaffold extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
@@ -65,6 +71,9 @@ public class Scaffold extends Module {
   private EnumFacing targetFacing = null;
   private float animationProgress = 0f;
   private long lastFrame = System.currentTimeMillis();
+  private net.minecraft.util.MovingObjectPosition lastBlockRenderRaytrace = null;
+  private final java.util.Map<net.minecraft.util.BlockPos, myau.util.time.TimerUtil>
+      blockRenderHighlights = new java.util.HashMap<>();
 
   // ===== RISE NEW FIELDS =====
   private float targetYaw, targetPitch;
@@ -125,8 +134,6 @@ public class Scaffold extends Module {
   public final PercentProperty airMotion = new PercentProperty("air-motion", 100);
   public final PercentProperty speedMotion = new PercentProperty("speed-motion", 100);
 
-  public final ModeProperty downwards =
-      new ModeProperty("downwards", 0, new String[] {"OFF", "NORMAL"});
   public final ModeProperty yawOffsetProp =
       new ModeProperty("yaw-offset", 0, new String[] {"0", "45", "-45"});
   public final IntProperty expand = new IntProperty("expand", 0, 0, 4);
@@ -135,15 +142,42 @@ public class Scaffold extends Module {
       new ModeProperty("ray-cast", 0, new String[] {"OFF", "NORMAL", "STRICT"});
   public final BooleanProperty sneak = new BooleanProperty("sneak", false);
   public final IntProperty startSneaking =
-      new IntProperty("start-sneaking", 0, 0, 5, () -> !this.sneak.getValue());
+      new IntProperty("start-sneaking", 0, 0, 5, () -> this.sneak.getValue());
   public final IntProperty stopSneaking =
-      new IntProperty("stop-sneaking", 0, 0, 5, () -> !this.sneak.getValue());
+      new IntProperty("stop-sneaking", 0, 0, 5, () -> this.sneak.getValue());
   public final IntProperty sneakEvery =
-      new IntProperty("sneak-every", 1, 1, 10, () -> !this.sneak.getValue());
+      new IntProperty("sneak-every", 1, 1, 10, () -> this.sneak.getValue());
   public final FloatProperty sneakingSpeed =
-      new FloatProperty("sneaking-speed", 0.2F, 0.2F, 1.0F, () -> !this.sneak.getValue());
+      new FloatProperty("sneaking-speed", 0.2F, 0.2F, 1.0F, () -> this.sneak.getValue());
   public final BooleanProperty ignoreSpeed = new BooleanProperty("ignore-speed", false);
-  public final BooleanProperty upSideDown = new BooleanProperty("up-side-down", false);
+
+  public final BooleanProperty swing = new BooleanProperty("swing", true);
+  public final BooleanProperty itemSpoof = new BooleanProperty("item-spoof", false);
+  public final BooleanProperty blockRender = new BooleanProperty("block-render", false);
+  public final ModeProperty blockRenderColorMode =
+      new ModeProperty(
+          "block-render-color",
+          0,
+          new String[] {"HUD", "CUSTOM"},
+          () -> this.blockRender.getValue());
+  public final ColorProperty blockRenderColor =
+      new ColorProperty(
+          "block-render-custom-color",
+          0xFF55AAFF,
+          () -> this.blockRender.getValue() && this.blockRenderColorMode.getValue() == 1);
+  public final BooleanProperty blockRenderRaytrace =
+      new BooleanProperty("block-render-raytrace", false, () -> this.blockRender.getValue());
+  public final IntProperty blockRenderAlpha =
+      new IntProperty(
+          "block-render-alpha",
+          200,
+          0,
+          255,
+          () -> this.blockRender.getValue() && this.blockRenderRaytrace.getValue());
+  public final BooleanProperty blockRenderOutline =
+      new BooleanProperty("block-render-outline", true, () -> this.blockRender.getValue());
+  public final BooleanProperty blockRenderShade =
+      new BooleanProperty("block-render-shade", false, () -> this.blockRender.getValue());
 
   public Scaffold() {
     super("Scaffold", false);
@@ -251,7 +285,17 @@ public class Scaffold extends Module {
       if (mc.playerController.onPlayerRightClick(
           mc.thePlayer, mc.theWorld, activeItem, blockPos, enumFacing, vec3)) {
         if (mc.playerController.getCurrentGameType() != GameType.CREATIVE) this.blockCount--;
-        PacketUtil.sendPacket(new C0APacketAnimation());
+        if (this.swing.getValue()) {
+          mc.thePlayer.swingItem();
+        } else {
+          PacketUtil.sendPacket(new C0APacketAnimation());
+        }
+        if (this.blockRender.getValue()) {
+          TimerUtil timer = new TimerUtil();
+          timer.reset();
+          this.blockRenderHighlights.put(blockPos.offset(enumFacing), timer);
+          this.lastBlockRenderRaytrace = new MovingObjectPosition(vec3, enumFacing, blockPos);
+        }
       }
     }
   }
@@ -508,11 +552,141 @@ public class Scaffold extends Module {
     float fontY = y + (height / 2f) - (Fonts.MAIN.get(18).height() / 2f);
     float textX = x + 24f;
 
-    Fonts.MAIN
-        .get(18)
-        .drawWithShadow(info, textX, fontY, new Color(200, 200, 200, textAlpha).getRGB());
-
     GlStateManager.popMatrix();
+  }
+
+  @EventTarget
+  public void onRender3D(Render3DEvent event) {
+    if (!this.isEnabled()
+        || !this.blockRender.getValue()
+        || mc.thePlayer == null
+        || mc.theWorld == null) {
+      return;
+    }
+    Color renderColor = this.getBlockRenderColor();
+    if (this.blockRenderRaytrace.getValue()) {
+      java.util.Iterator<java.util.Map.Entry<net.minecraft.util.BlockPos, TimerUtil>> iterator =
+          this.blockRenderHighlights.entrySet().iterator();
+      while (iterator.hasNext()) {
+        java.util.Map.Entry<net.minecraft.util.BlockPos, TimerUtil> entry = iterator.next();
+        long elapsed = entry.getValue().getElapsedTime();
+        int alpha = 210 - (int) (210.0F * elapsed / 750.0F);
+        if (alpha <= 0) {
+          iterator.remove();
+          continue;
+        }
+        this.renderScaffoldBlock(entry.getKey(), this.mergeAlpha(renderColor, alpha));
+      }
+      return;
+    }
+    MovingObjectPosition hitResult = mc.objectMouseOver;
+    if (hitResult != null && hitResult.typeOfHit == MovingObjectPosition.MovingObjectType.MISS) {
+      hitResult = this.lastBlockRenderRaytrace;
+    } else if (hitResult != null) {
+      this.lastBlockRenderRaytrace = hitResult;
+    }
+    if (hitResult == null) hitResult = this.lastBlockRenderRaytrace;
+    if (hitResult != null && hitResult.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+      this.renderScaffoldBlock(
+          hitResult.getBlockPos(), this.mergeAlpha(renderColor, this.blockRenderAlpha.getValue()));
+    }
+  }
+
+  private Color getBlockRenderColor() {
+    if (this.blockRenderColorMode.getValue() == 0) {
+      HUD hud = (HUD) Myau.moduleManager.modules.get(HUD.class);
+      return hud != null ? hud.getColor(System.currentTimeMillis()) : Color.WHITE;
+    }
+    return new Color(this.blockRenderColor.getValue());
+  }
+
+  private int mergeAlpha(Color color, int alpha) {
+    int clampedAlpha = Math.max(0, Math.min(255, alpha));
+    return (clampedAlpha << 24)
+        | (color.getRed() << 16)
+        | (color.getGreen() << 8)
+        | color.getBlue();
+  }
+
+  private void renderScaffoldBlock(BlockPos blockPos, int color) {
+    if (blockPos == null) return;
+    this.renderScaffoldBox(
+        blockPos.getX(),
+        blockPos.getY(),
+        blockPos.getZ(),
+        1.0D,
+        1.0D,
+        1.0D,
+        color,
+        this.blockRenderOutline.getValue(),
+        this.blockRenderShade.getValue());
+  }
+
+  private void renderScaffoldBox(
+      int x,
+      int y,
+      int z,
+      double x2,
+      double y2,
+      double z2,
+      int color,
+      boolean outline,
+      boolean shade) {
+    double xPos = x - mc.getRenderManager().viewerPosX;
+    double yPos = y - mc.getRenderManager().viewerPosY;
+    double zPos = z - mc.getRenderManager().viewerPosZ;
+    GL11.glPushMatrix();
+    GL11.glBlendFunc(770, 771);
+    GL11.glEnable(3042);
+    GL11.glLineWidth(2.0F);
+    GL11.glDisable(GL11.GL_TEXTURE_2D);
+    GL11.glDisable(2929);
+    GL11.glDepthMask(false);
+    float alpha = (color >> 24 & 0xFF) / 255.0F;
+    float red = (color >> 16 & 0xFF) / 255.0F;
+    float green = (color >> 8 & 0xFF) / 255.0F;
+    float blue = (color & 0xFF) / 255.0F;
+    GL11.glColor4f(red, green, blue, alpha);
+    AxisAlignedBB bb = new AxisAlignedBB(xPos, yPos, zPos, xPos + x2, yPos + y2, zPos + z2);
+    if (outline) {
+      RenderGlobal.drawSelectionBoundingBox(bb);
+    }
+    if (shade) {
+      Tessellator tessellator = Tessellator.getInstance();
+      WorldRenderer worldRenderer = tessellator.getWorldRenderer();
+      worldRenderer.begin(7, DefaultVertexFormats.POSITION_COLOR);
+      worldRenderer.pos(bb.minX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.maxY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.minZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.maxX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      worldRenderer.pos(bb.minX, bb.minY, bb.maxZ).color(red, green, blue, alpha).endVertex();
+      tessellator.draw();
+    }
+    GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    GL11.glEnable(GL11.GL_TEXTURE_2D);
+    GL11.glEnable(2929);
+    GL11.glDepthMask(true);
+    GL11.glDisable(3042);
+    GL11.glPopMatrix();
   }
 
   @EventTarget(Priority.HIGH)
@@ -587,11 +761,6 @@ public class Scaffold extends Module {
     // Timer (Rise)
     if (timerProp.getValue() != 1.0F)
       ((IAccessorMinecraft) mc).getTimer().timerSpeed = timerProp.getValue();
-
-    // Downwards (Rise) - modify offset when sneaking pressed
-    if (this.downwards.getValue() == 1 && mc.gameSettings.keyBindSneak.isKeyDown()) {
-      // Handled via offset in blockData / getBlockData target pos
-    }
 
     // ---- Calculate rotations based on mode ----
     int mode = this.rotationMode.getValue();
@@ -782,12 +951,6 @@ public class Scaffold extends Module {
             break;
         }
 
-        // Downwards: offset y by -1 when sneak is pressed
-        if (this.downwards.getValue() == 1 && mc.gameSettings.keyBindSneak.isKeyDown()) {
-          // No change needed for Miau's block finding
-          // But the target Y will be adjusted in getBlockData via stage
-        }
-
         float bestYaw = -180.0F;
         float bestPitch = 0.0F;
         float bestDiff = 0.0F;
@@ -946,11 +1109,6 @@ public class Scaffold extends Module {
       event.setRotation(this.yaw, this.pitch, 3);
       if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
 
-      // Up side down
-      if (this.upSideDown.getValue()) {
-        // handled via offset
-      }
-
       // Expand
       if (this.expand.getValue() > 0) {
         double dir =
@@ -967,7 +1125,7 @@ public class Scaffold extends Module {
                   .getBlockState(
                       new BlockPos(
                           mc.thePlayer.posX + (-Math.sin(dir) * (r + 1)),
-                          mc.thePlayer.posY - 0.5 + (this.upSideDown.getValue() ? 3 : 0),
+                          mc.thePlayer.posY - 0.5,
                           mc.thePlayer.posZ + (Math.cos(dir) * (r + 1))))
                   .getBlock()
               instanceof BlockAir) {
