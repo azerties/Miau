@@ -39,7 +39,7 @@ import net.minecraft.world.World;
 
 public class HackerDetector extends Module implements ClientAntiCheatContext {
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private static final int FLAG_WINDOW_SECONDS = 5;
+  private static final int FLAG_WINDOW_SECONDS = 8;
   private static final int ALERT_COOLDOWN_SECONDS = 5;
 
   public final BooleanProperty scaffold = new BooleanProperty("scaffold", true);
@@ -205,17 +205,17 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
   }
 
   private int maxFlagsFor(String cheatName) {
-    if (cheatName.equals("AutoBlock")) return 4;
-    if (cheatName.equals("Noslow")) return 3;
-    if (cheatName.equals("KillAura")) return 3;
-    if (cheatName.equals("Scaffold")) return 3;
-    if (cheatName.equals("Blink")) return 2;
-    if (cheatName.equals("FakeLag")) return 2;
-    if (cheatName.equals("MicroBlink")) return 2;
-    if (cheatName.equals("Reach")) return 2;
-    if (cheatName.equals("Velocity")) return 2;
-    if (cheatName.equals("AutoClicker")) return 2;
-    return 2;
+    if (cheatName.startsWith("AutoBlock")) return 5;
+    if (cheatName.startsWith("Noslow") || cheatName.startsWith("NoSlow")) return 4;
+    if (cheatName.startsWith("KillAura")) return 4;
+    if (cheatName.startsWith("Scaffold")) return 4;
+    if (cheatName.startsWith("Blink")) return 3;
+    if (cheatName.startsWith("FakeLag")) return 3;
+    if (cheatName.startsWith("MicroBlink")) return 3;
+    if (cheatName.startsWith("Reach")) return 3;
+    if (cheatName.startsWith("Velocity")) return 3;
+    if (cheatName.startsWith("AutoClicker")) return 3;
+    return 3;
   }
 
   private String getFlagKey(String playerName, String cheatName) {

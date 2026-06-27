@@ -13,49 +13,37 @@ public class OmniSprintCheck {
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
-    if (name == null || data == null) return;
+    if (name == null || data == null || data.recentlyTeleported()) return;
 
-    CheckBuffer buffer = this.buffers.computeIfAbsent(name, key -> new CheckBuffer());
-
-    if (isExempt(player, data)) {
-      buffer.decay(0.5D);
+    if (data.recentlyHurt()) {
+      CheckBuffer buffer = this.buffers.get(name);
+      if (buffer != null) buffer.decay(0.3D);
       return;
     }
 
-    if (player.isSprinting() && data.horizontalDelta > 0.1D) {
-      float velocityYaw =
-          (float)
-                  (MathHelper.atan2(player.posZ - player.prevPosZ, player.posX - player.prevPosX)
-                      * 180.0D
-                      / Math.PI)
-              - 90.0F;
-      float playerYaw = player.rotationYaw;
+    CheckBuffer buffer = this.buffers.computeIfAbsent(name, key -> new CheckBuffer());
 
-      float diff = Math.abs(MathHelper.wrapAngleTo180_float(velocityYaw - playerYaw));
+    if (!data.sprinting || !data.onGround) {
+      buffer.decay(0.3D);
+      return;
+    }
 
-      if (diff > 75.0F) {
-        if (buffer.flag(1.0D, 4.0D)) {
-          context.receiveSignal(name, "OmniSprint");
-          buffer.reset();
-        }
-      } else {
-        buffer.decay(0.2D);
+    if (data.horizontalDelta < 0.15D) {
+      buffer.decay(0.2D);
+      return;
+    }
+
+    float movementYaw = (float) (Math.atan2(data.deltaZ, data.deltaX) * 180.0D / Math.PI);
+    float yawDiff = Math.abs(MathHelper.wrapAngleTo180_float(player.rotationYaw - movementYaw));
+
+    if (yawDiff > 85.0F) {
+      if (buffer.flag(1.0D, 999.0D)) {
+        context.receiveSignal(name, "OmniSprint");
+        buffer.reset();
       }
     } else {
-      buffer.decay(0.4D);
+      buffer.decay(0.2D);
     }
-  }
-
-  private boolean isExempt(EntityPlayer player, PlayerCheckData data) {
-    return player.isDead
-        || player.hurtTime > 0
-        || player.ticksExisted < 40
-        || data.recentlyTeleported()
-        || player.isInWater()
-        || player.isInLava()
-        || player.isOnLadder()
-        || player.isRiding()
-        || player.capabilities.isFlying;
   }
 
   public void reset() {

@@ -1,103 +1,125 @@
 package myau.clientanticheat.movement.velocity;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import myau.clientanticheat.CheckBuffer;
-import myau.clientanticheat.CheckDataManager;
 import myau.clientanticheat.ClientAntiCheatContext;
 import myau.clientanticheat.PlayerCheckData;
 import net.minecraft.entity.player.EntityPlayer;
 
 public class VelocityCheck {
-  private final Map<String, Integer> velocityWindows = new HashMap<>();
   private final Map<String, CheckBuffer> horizontalBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> verticalBuffers = new HashMap<>();
+  private final Map<String, LinkedList<Double>> verticalHistory = new HashMap<>();
+  private final Map<String, LinkedList<Double>> horizontalHistory = new HashMap<>();
+
+  private static final int VELOCITY_HISTORY_SIZE = 10;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
-    String key = CheckDataManager.getPlayerKey(player);
     String name = player.getName();
-    if (key == null || name == null || data == null) return;
+    if (name == null || data == null || data.recentlyTeleported()) return;
+
+    if (data.recentlyHurt()) {
+      return;
+    }
+
+    if (data.collidedHorizontally || player.isCollidedVertically) {
+      decayAll(name);
+      return;
+    }
+
+    if (player.isInWater() || player.isInLava() || player.isOnLadder() || player.capabilities.isFlying) {
+      decayAll(name);
+      return;
+    }
 
     CheckBuffer horizontalBuffer =
-        this.horizontalBuffers.computeIfAbsent(key, ignored -> new CheckBuffer());
+        this.horizontalBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer verticalBuffer =
-        this.verticalBuffers.computeIfAbsent(key, ignored -> new CheckBuffer());
-    if (isExempt(player, data)) {
-      reset(key);
-      return;
+        this.verticalBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+
+    LinkedList<Double> verticalSamples =
+        this.verticalHistory.computeIfAbsent(name, key -> new LinkedList<>());
+    LinkedList<Double> horizontalSamples =
+        this.horizontalHistory.computeIfAbsent(name, key -> new LinkedList<>());
+
+    double verticalDelta = Math.abs(data.deltaY);
+    double horizontalDelta = data.horizontalDelta;
+
+    if (data.hurtTicks > 0 && data.hurtTicks < 20) {
+      if (verticalDelta > 0.01D) {
+        verticalSamples.addFirst(verticalDelta);
+        if (verticalSamples.size() > VELOCITY_HISTORY_SIZE) verticalSamples.removeLast();
+
+        if (verticalSamples.size() >= 3 && data.groundTicks < 5) {
+          double expectedVertical = verticalSamples.get(1) > 0.3D ? verticalSamples.get(1) * 0.9D : 0.35D;
+          double minExpected = expectedVertical * 0.7D;
+
+          if (verticalDelta < minExpected && verticalDelta > 0.01D) {
+            double flagWeight = Math.min(3.0D, (minExpected - verticalDelta) * 5.0D + 1.0D);
+            if (verticalBuffer.flag(flagWeight, 3.5D)) {
+              context.receiveSignal(name, "Velocity (Vertical)");
+              verticalBuffer.reset();
+              verticalSamples.clear();
+            }
+          } else {
+            verticalBuffer.decay(0.25D);
+          }
+        }
+      } else {
+        verticalBuffer.decay(0.15D);
+      }
+
+      if (horizontalDelta > 0.25D && data.deltaY < -0.01D) {
+        horizontalSamples.addFirst(horizontalDelta);
+        if (horizontalSamples.size() > VELOCITY_HISTORY_SIZE) horizontalSamples.removeLast();
+
+        if (horizontalSamples.size() >= 3) {
+          double averageHorizontal = 0;
+          for (double v : horizontalSamples) averageHorizontal += v;
+          averageHorizontal /= horizontalSamples.size();
+          double ratio = horizontalDelta / averageHorizontal;
+
+          if (ratio < 0.5D && ratio > 0.01D && averageHorizontal > 0.1D) {
+            double flagWeight = Math.min(3.0D, (0.5D - ratio) * 10.0D + 1.0D);
+            if (horizontalBuffer.flag(flagWeight, 4.0D)) {
+              context.receiveSignal(name, "Velocity (Horizontal)");
+              horizontalBuffer.reset();
+              horizontalSamples.clear();
+            }
+          } else {
+            horizontalBuffer.decay(0.3D);
+          }
+        }
+      } else {
+        horizontalBuffer.decay(0.15D);
+      }
+    } else {
+      if (data.groundTicks > 3) {
+        verticalBuffer.decay(0.2D);
+        horizontalBuffer.decay(0.2D);
+      }
     }
 
-    if (player.hurtTime > 0 || player.hurtResistantTime > 10 || data.sinceHurtTicks == 0) {
-      this.velocityWindows.put(key, 0);
-      horizontalBuffer.reset();
+    if (verticalBuffer.get() > 3.0D && horizontalBuffer.get() > 3.0D) {
+      context.receiveSignal(name, "Velocity (Combined)");
       verticalBuffer.reset();
-      return;
-    }
-
-    if (!this.velocityWindows.containsKey(key)) {
-      horizontalBuffer.decay(0.2D);
-      verticalBuffer.decay(0.2D);
-      return;
-    }
-
-    int ticks = this.velocityWindows.get(key) + 1;
-    this.velocityWindows.put(key, ticks);
-    if (ticks > 14) {
-      this.velocityWindows.remove(key);
-      return;
-    }
-
-    boolean horizontalMissing =
-        ticks >= 2
-            && ticks <= 7
-            && data.horizontalDelta < 0.04D
-            && data.lastHorizontalDelta < 0.08D
-            && !player.isCollidedHorizontally;
-    boolean verticalMissing =
-        ticks >= 1 && ticks <= 4 && data.deltaY <= 0.08D && !data.onGround && data.airTicks <= 5;
-
-    if (horizontalMissing) {
-      if (horizontalBuffer.flag(1.0D, 2.75D)) {
-        context.receiveSignal(name, "Velocity");
-        reset(key);
-        return;
-      }
-    } else {
-      horizontalBuffer.decay(0.45D);
-    }
-
-    if (verticalMissing) {
-      if (verticalBuffer.flag(1.0D, 2.25D)) {
-        context.receiveSignal(name, "Velocity");
-        reset(key);
-      }
-    } else {
-      verticalBuffer.decay(0.45D);
+      horizontalBuffer.reset();
     }
   }
 
-  private boolean isExempt(EntityPlayer player, PlayerCheckData data) {
-    return player == null
-        || player.isDead
-        || player.ticksExisted < 20
-        || data.recentlyTeleported()
-        || player.isInWater()
-        || player.isInLava()
-        || player.isOnLadder()
-        || player.isRiding()
-        || player.capabilities.isFlying
-        || player.capabilities.disableDamage;
-  }
-
-  private void reset(String name) {
-    this.velocityWindows.remove(name);
-    this.horizontalBuffers.remove(name);
-    this.verticalBuffers.remove(name);
+  private void decayAll(String name) {
+    CheckBuffer h = this.horizontalBuffers.get(name);
+    if (h != null) h.decay(0.2D);
+    CheckBuffer v = this.verticalBuffers.get(name);
+    if (v != null) v.decay(0.2D);
   }
 
   public void reset() {
-    this.velocityWindows.clear();
     this.horizontalBuffers.clear();
     this.verticalBuffers.clear();
+    this.verticalHistory.clear();
+    this.horizontalHistory.clear();
   }
 }

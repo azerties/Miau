@@ -1,88 +1,102 @@
 package myau.clientanticheat.combat.reach;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import myau.clientanticheat.CheckBuffer;
 import myau.clientanticheat.ClientAntiCheatContext;
 import myau.clientanticheat.PlayerCheckData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.MathHelper;
+import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 
 public class HitboxRaytraceCheck {
-  private static final double BASE_REACH = 3.05D;
   private final Map<String, CheckBuffer> reachBuffers = new HashMap<>();
+  private final Map<String, LinkedList<Double>> movementVariance = new HashMap<>();
+  private final Map<String, Vec3> lastEyesPosition = new HashMap<>();
+
+  private static final double HITBOX_EXPANSION = 0.5D;
+  private static final double BASE_REACH = 3.8D;
+  private static final double MOVEMENT_TOLERANCE_MULTIPLIER = 2.0D;
 
   public void check(
       EntityPlayer player, World world, PlayerCheckData data, ClientAntiCheatContext context) {
-    if (data == null || data.recentlyTeleported() || !data.startedSwinging()) return;
     String name = player.getName();
-    if (name == null) return;
+    if (name == null || data == null || data.recentlyTeleported()) return;
 
-    double nearest = Double.MAX_VALUE;
-    Vec3 eyes = new Vec3(player.posX, player.posY + player.getEyeHeight(), player.posZ);
-    Vec3 look = player.getLook(1.0F);
-    Vec3 reachVec = eyes.addVector(look.xCoord * 6.0D, look.yCoord * 6.0D, look.zCoord * 6.0D);
-    boolean hasRaytraceHit = false;
-
-    for (EntityPlayer target : world.playerEntities) {
-      if (target == player || target.isDead || target.getName() == null) continue;
-
-      PlayerCheckData targetData = context.getPlayerData(target);
-      if (targetData != null && !targetData.history.isEmpty()) {
-        for (AxisAlignedBB box : targetData.history) {
-          AxisAlignedBB expandedBox = box.expand(0.4D, 0.4D, 0.4D);
-          double distance = distanceToBox(eyes, expandedBox);
-          if (distance < nearest) nearest = distance;
-          if (expandedBox.calculateIntercept(eyes, reachVec) != null) hasRaytraceHit = true;
-        }
-      } else {
-        AxisAlignedBB box = target.getEntityBoundingBox().expand(0.4D, 0.4D, 0.4D);
-        double distance = distanceToBox(eyes, box);
-        if (distance < nearest) nearest = distance;
-        if (box.calculateIntercept(eyes, reachVec) != null) hasRaytraceHit = true;
-      }
+    if (!data.startedSwinging()) {
+      return;
     }
-    if (nearest == Double.MAX_VALUE || nearest > 6.0D) return;
 
     CheckBuffer buffer = this.reachBuffers.computeIfAbsent(name, key -> new CheckBuffer());
 
-    double baseAllowed = 3.6D;
-    double movementTolerance = (data.horizontalDelta + data.lastHorizontalDelta) * 1.5D;
-    double allowed = baseAllowed + movementTolerance + (data.recentlyHurt() ? 0.3D : 0.0D);
+    EntityPlayer target = data.nearestTarget;
+    if (target == null || data.nearestTargetDistance > 7.0D) {
+      buffer.decay(0.2D);
+      return;
+    }
 
-    if (nearest > allowed) {
-      double over = nearest - allowed;
-      if (buffer.flag(1.0D + Math.min(2.0D, over * 2.0D), 4.5D)) {
-        context.receiveSignal(name, "Reach (Distance)");
-        buffer.reset();
-      }
-    } else if (!hasRaytraceHit && nearest > 2.0D) {
-      if (buffer.flag(0.5D, 4.0D)) {
-        context.receiveSignal(name, "Reach (Hitbox)");
-        buffer.reset();
+    Vec3 eyesPos = new Vec3(player.posX, player.posY + player.getEyeHeight(), player.posZ);
+    Double variance = calculateMovementVariance(player);
+
+    AxisAlignedBB targetBB = target.getEntityBoundingBox().expand(HITBOX_EXPANSION, 0.1D, HITBOX_EXPANSION);
+    targetBB = targetBB.offset(
+        (target.posX - target.lastTickPosX) * 2.0D,
+        (target.posY - target.lastTickPosY) * 2.0D,
+        (target.posZ - target.lastTickPosZ) * 2.0D
+    );
+
+    Vec3 lookVec = player.getLook(1.0F);
+    Vec3 maxReachVec = eyesPos.addVector(
+        lookVec.xCoord * BASE_REACH * 2.0D,
+        lookVec.yCoord * BASE_REACH * 2.0D,
+        lookVec.zCoord * BASE_REACH * 2.0D
+    );
+
+    MovingObjectPosition rayTraceResult = targetBB.calculateIntercept(eyesPos, maxReachVec);
+
+    if (rayTraceResult != null) {
+      double distance = eyesPos.distanceTo(rayTraceResult.hitVec);
+
+      double extraTolerance = variance != null ? variance * MOVEMENT_TOLERANCE_MULTIPLIER : 0.0D;
+      double maxReach = BASE_REACH + extraTolerance;
+
+      if (distance > maxReach) {
+        double flagWeight = Math.min(2.0D, (distance - maxReach) * 2.0D);
+        if (buffer.flag(flagWeight, 6.0D)) {
+          context.receiveSignal(
+              name,
+              "Reach",
+              String.format(
+                  "%.2f blocks", distance),
+              (int) (distance * 10));
+          buffer.reset();
+        }
+      } else {
+        buffer.decay(0.15D);
       }
     } else {
-      buffer.decay(0.35D);
+      buffer.decay(0.05D);
     }
   }
 
-  private double distanceToBox(Vec3 point, AxisAlignedBB box) {
-    double x = clamp(point.xCoord, box.minX, box.maxX);
-    double y = clamp(point.yCoord, box.minY, box.maxY);
-    double z = clamp(point.zCoord, box.minZ, box.maxZ);
-    double dx = point.xCoord - x;
-    double dy = point.yCoord - y;
-    double dz = point.zCoord - z;
-    return Math.sqrt(dx * dx + dy * dy + dz * dz);
-  }
+  private Double calculateMovementVariance(EntityPlayer player) {
+    AxisAlignedBB bb = player.getEntityBoundingBox();
+    if (bb == null) return null;
 
-  private double clamp(double value, double min, double max) {
-    return Math.max(min, Math.min(max, value));
+    double speed = Math.hypot(player.posX - player.lastTickPosX, player.posZ - player.lastTickPosZ);
+    if (speed > 0.01D) {
+      return speed * 0.5D;
+    }
+    return 0.0D;
   }
 
   public void reset() {
     this.reachBuffers.clear();
+    this.movementVariance.clear();
+    this.lastEyesPosition.clear();
   }
 }

@@ -1,6 +1,7 @@
 package myau.clientanticheat.combat.killaura;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import myau.clientanticheat.CheckBuffer;
 import myau.clientanticheat.ClientAntiCheatContext;
@@ -10,12 +11,18 @@ import net.minecraft.entity.player.EntityPlayer;
 public class KillAuraNoSwingCheck {
   private final Map<String, CheckBuffer> buffers = new HashMap<>();
   private final Map<String, Integer> lastTargetHurtTime = new HashMap<>();
+  private final Map<String, LinkedList<Integer>> swingProgressHistory = new HashMap<>();
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
     if (name == null || data == null || data.recentlyTeleported()) return;
 
     CheckBuffer buffer = this.buffers.computeIfAbsent(name, key -> new CheckBuffer());
+
+    LinkedList<Integer> swingHistory =
+        this.swingProgressHistory.computeIfAbsent(name, key -> new LinkedList<>());
+    swingHistory.addFirst(player.swingProgressInt);
+    if (swingHistory.size() > 5) swingHistory.removeLast();
 
     if (data.nearestTarget != null && data.nearestTargetDistance < 4.5D) {
       EntityPlayer target = data.nearestTarget;
@@ -25,11 +32,16 @@ public class KillAuraNoSwingCheck {
       boolean targetJustHurt = prevHurtTime == 0 && target.hurtTime > 0;
 
       if (targetJustHurt) {
-        boolean noSwing =
-            player.swingProgress == 0.0F && player.prevSwingProgress == 0.0F && !data.swinging;
+        boolean noSwingRecent = true;
+        for (int sw : swingHistory) {
+          if (sw > 0) {
+            noSwingRecent = false;
+            break;
+          }
+        }
 
-        if (noSwing) {
-          if (buffer.flag(2.0D, 4.0D)) {
+        if (noSwingRecent) {
+          if (buffer.flag(2.0D, 6.0D)) {
             context.receiveSignal(name, "KillAura (No Swing)");
             buffer.reset();
           }
@@ -45,5 +57,6 @@ public class KillAuraNoSwingCheck {
   public void reset() {
     this.buffers.clear();
     this.lastTargetHurtTime.clear();
+    this.swingProgressHistory.clear();
   }
 }

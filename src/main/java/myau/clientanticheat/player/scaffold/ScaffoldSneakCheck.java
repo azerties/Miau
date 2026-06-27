@@ -124,7 +124,7 @@ public class ScaffoldSneakCheck {
                 ? 0L
                 : (long) data.existedTicks - this.lastSneakStartTick.getOrDefault(name, 0L);
         long lastDuration = this.lastSneakDuration.getOrDefault(name, 10L);
-        boolean suspicious = diff <= 2 && lastDuration < 2;
+        boolean suspicious = diff <= 1 && lastDuration < 2;
         if (suspicious) {
           sneakTimingBuffer.flag(diff > 1 ? 1.5D : 2.5D, 999.0D);
         }
@@ -134,7 +134,7 @@ public class ScaffoldSneakCheck {
         long diff =
             placed ? 0L : (long) data.existedTicks - this.lastPlaceTick.getOrDefault(name, 0L);
         long lastDuration = this.lastSneakDuration.getOrDefault(name, 10L);
-        boolean suspicious = diff <= 2 && lastDuration < 2;
+        boolean suspicious = diff <= 1 && lastDuration < 2;
         if (suspicious) {
           sneakTimingBuffer.flag(diff > 1 ? 1.5D : 2.5D, 999.0D);
         }
@@ -224,10 +224,10 @@ public class ScaffoldSneakCheck {
 
     boolean failed =
         supportBuffer.get() > 6.0D && rotationBuffer.get() > 3.0D
-            || edgeBuffer.get() > 10.0D
-            || sneakTimingBuffer.get() > 6.0D
-            || speedBuffer.get() > 5.0D && edgeBuffer.get() > 4.0D
-            || roundedRotationBuffer.get() > 7.0D;
+            || edgeBuffer.get() > 14.0D
+            || sneakTimingBuffer.get() > 7.0D
+            || speedBuffer.get() > 5.0D && edgeBuffer.get() > 5.0D
+            || roundedRotationBuffer.get() > 8.0D;
     if (failed) {
       long now = System.currentTimeMillis();
       long last = this.lastFlag.getOrDefault(name, 0L);

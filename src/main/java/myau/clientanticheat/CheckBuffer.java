@@ -8,8 +8,25 @@ public class CheckBuffer {
     return this.value >= threshold;
   }
 
+  public boolean flagAndDecay(double add, double threshold, double decayRate) {
+    this.value += add;
+    if (this.value >= threshold) {
+      return true;
+    }
+    this.decay(decayRate);
+    return false;
+  }
+
   public void decay(double amount) {
     this.value = Math.max(0.0D, this.value - amount);
+  }
+
+  public void multiDecay(double factor) {
+    if (this.value > 0.0D) {
+      this.value *= factor;
+      this.value -= 0.1D;
+      this.value = Math.max(0.0D, this.value);
+    }
   }
 
   public void reset() {

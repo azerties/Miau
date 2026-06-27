@@ -106,6 +106,7 @@ public class Myau {
     moduleManager.modules.put(AutoAuth.class, new AutoAuth());
     moduleManager.modules.put(AutoBuy.class, new AutoBuy());
     moduleManager.modules.put(AutoHeal.class, new AutoHeal());
+    moduleManager.modules.put(AutoSoup.class, new AutoSoup());
     moduleManager.modules.put(AutoReconnect.class, new AutoReconnect());
     moduleManager.modules.put(AutoTool.class, new AutoTool());
     moduleManager.modules.put(AutoWeapon.class, new AutoWeapon());

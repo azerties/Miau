@@ -60,10 +60,6 @@ public final class StatisticalUtils {
     double m = mean(values);
     double s2 = 0.0;
     double s4 = 0.0;
-    double sum = 0.0;
-    for (Number v : values) {
-      sum += v.doubleValue();
-    }
     for (Number v : values) {
       double diff = v.doubleValue() - m;
       s2 += diff * diff;
@@ -72,7 +68,9 @@ public final class StatisticalUtils {
     if (s2 == 0.0) return 0.0;
     double d2 = (double) n * (n + 1.0) / ((n - 1.0) * (n - 2.0) * (n - 3.0));
     double d3 = 3.0 * Math.pow(n - 1.0, 2.0) / ((n - 2.0) * (n - 3.0));
-    return d2 * (s4 / Math.pow(s2 / sum, 2.0)) - d3;
+    double variance = s2 / n;
+    if (variance == 0.0) return 0.0;
+    return d2 * (s4 / (variance * variance * n)) - d3;
   }
 
   public static double coefficientOfVariation(Collection<? extends Number> values) {
@@ -83,22 +81,28 @@ public final class StatisticalUtils {
 
   public static boolean hasRepetitivePattern(LinkedList<Double> list, double threshold) {
     int length = list.size();
-    if (length < 4) return false;
+    if (length < 6) return false;
+
+    int matchCount = 0;
+    int requiredMatches = length / 3;
 
     for (int patternLength = 2; patternLength <= length / 2; patternLength++) {
-      boolean repetitive = true;
+      matchCount = 0;
       for (int i = 0; i < length - patternLength; i++) {
-        if (!list.get(i).equals(list.get(i + patternLength))) {
-          repetitive = false;
-          break;
+        if (Math.abs(list.get(i) - list.get(i + patternLength)) < threshold) {
+          matchCount++;
         }
       }
-      if (repetitive) return true;
+      if (matchCount >= requiredMatches) return true;
     }
 
+    int consecutiveEqual = 0;
     for (int i = 0; i < length - 1; i++) {
       if (Math.abs(list.get(i) - list.get(i + 1)) <= threshold) {
-        return true;
+        consecutiveEqual++;
+        if (consecutiveEqual >= 4) return true;
+      } else {
+        consecutiveEqual = 0;
       }
     }
     return false;

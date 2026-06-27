@@ -45,6 +45,13 @@ public class FakeLagCheck {
       return;
     }
 
+    if (data.collidedHorizontally) {
+      pulseBuffer.decay(0.3D);
+      timingVarianceBuffer.decay(0.2D);
+      entityAlignedBuffer.decay(0.2D);
+      return;
+    }
+
     boolean pulseFluctuation =
         data.horizontalDelta > MIN_PULSE_VELOCITY
             && data.horizontalDelta < MAX_PULSE_VELOCITY
@@ -66,13 +73,13 @@ public class FakeLagCheck {
     Long lastMoveTime = this.lastMovementTimestamp.get(name);
 
     boolean isLagging =
-        data.horizontalDelta < 0.03D && data.stillTicks > 4 && !data.recentlyTeleported();
+        data.horizontalDelta < 0.03D && data.stillTicks > 8 && !data.recentlyTeleported();
 
     if (isLagging) {
       this.lagTickCounter.put(name, this.lagTickCounter.getOrDefault(name, 0) + 1);
     } else {
       int lagTicks = this.lagTickCounter.getOrDefault(name, 0);
-      if (lagTicks > 3 && data.totalDelta > MIN_PULSE_VELOCITY) {
+      if (lagTicks > 5 && data.totalDelta > MIN_PULSE_VELOCITY) {
         if (lastMoveTime != null) {
           long idleMs = now - lastMoveTime;
           if (idleMs > 200L && idleMs < 3000L) {
@@ -122,10 +129,10 @@ public class FakeLagCheck {
     boolean wasLagging = this.wasLaggingLastTick.getOrDefault(name, false);
     this.wasLaggingLastTick.put(name, isLagging);
 
-    boolean lagJustStarted = isLagging && !wasLagging && data.stillTicks > 5;
+    boolean lagJustStarted = isLagging && !wasLagging && data.stillTicks > 8;
     boolean isNearEntity = this.nearEntityTickCounter.getOrDefault(name, 0) > 3;
 
-    if (lagJustStarted && isNearEntity && data.stillTicks <= 25) {
+    if (lagJustStarted && isNearEntity && data.stillTicks <= 20) {
       if (entityAlignedBuffer.flag(1.5D, 5.0D)) {
         context.receiveSignal(name, "FakeLag (Entity-Aligned)");
         entityAlignedBuffer.reset();

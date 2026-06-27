@@ -22,8 +22,8 @@ public class KillAuraRotationSpeed {
   private final Map<String, CheckBuffer> preAttackBuffers = new HashMap<>();
   private final Map<String, float[]> preAttackYawDeltaHistory = new HashMap<>();
 
-  private static final int ACCURACY_SAMPLE_SIZE = 20;
-  private static final double HIGH_ACCURACY_THRESHOLD = 0.92D;
+  private static final int ACCURACY_SAMPLE_SIZE = 25;
+  private static final double HIGH_ACCURACY_THRESHOLD = 0.95D;
 
   public void check(
       EntityPlayer player,
@@ -35,6 +35,11 @@ public class KillAuraRotationSpeed {
     if (name == null || data == null || data.recentlyTeleported()) return;
 
     if (!data.startedSwinging()) {
+      this.decay(name);
+      return;
+    }
+
+    if (data.recentlyHurt()) {
       this.decay(name);
       return;
     }
@@ -61,22 +66,22 @@ public class KillAuraRotationSpeed {
     if (delay > 0L && delay < 3L) {
       rateBuffer.flag(1.0D, 999.0D);
     } else {
-      rateBuffer.decay(0.35D);
+      rateBuffer.decay(0.4D);
     }
 
     float yawError =
         Math.abs(MathHelper.wrapAngleTo180_float(this.yawTo(player, target) - player.rotationYaw));
     float pitchError = Math.abs(this.pitchTo(player, target) - player.rotationPitch);
-    if (yawError > 35.0F || pitchError > 28.0F) {
+    if (yawError > 45.0F || pitchError > 35.0F) {
       aimBuffer.flag(1.25D, 999.0D);
     } else {
-      aimBuffer.decay(0.45D);
+      aimBuffer.decay(0.5D);
     }
 
-    if (data.yawDelta > 0.0F && Math.abs(data.yawAcceleration) < 0.01F) {
-      linearAimBuffer.flag(1.0D, 6.0D);
+    if (data.yawDelta > 2.0F && Math.abs(data.yawAcceleration) < 0.005F) {
+      linearAimBuffer.flag(1.0D, 7.0D);
     } else {
-      linearAimBuffer.decay(0.2D);
+      linearAimBuffer.decay(0.25D);
     }
 
     Queue<Double> accuracySamples =
@@ -101,10 +106,10 @@ public class KillAuraRotationSpeed {
         varianceSum += (sample - avgAccuracy) * (sample - avgAccuracy);
       }
       double variance = varianceSum / accuracySamples.size();
-      if (variance < 0.002D && avgAccuracy > 0.85D) {
+      if (variance < 0.001D && avgAccuracy > 0.88D) {
         accuracyBuffer.flag(1.0D, 999.0D);
       } else {
-        accuracyBuffer.decay(0.2D);
+        accuracyBuffer.decay(0.25D);
       }
       accuracySamples.clear();
     }
@@ -119,30 +124,30 @@ public class KillAuraRotationSpeed {
     boolean preAttackPattern =
         preAttackHistory[3] < 3.0F
             && preAttackHistory[2] < 3.0F
-            && preAttackHistory[1] > 15.0F
+            && preAttackHistory[1] > 25.0F
             && preAttackHistory[0] < 3.0F
             && delay <= 2L;
 
     if (preAttackPattern) {
       preAttackBuffer.flag(1.5D, 999.0D);
     } else {
-      preAttackBuffer.decay(0.15D);
+      preAttackBuffer.decay(0.2D);
     }
 
-    if (rateBuffer.get() > 4.0D && aimBuffer.get() > 2.0D) {
+    if (rateBuffer.get() > 5.0D && aimBuffer.get() > 3.0D) {
       context.receiveSignal(name, "KillAura (Aim)");
       rateBuffer.reset();
       aimBuffer.reset();
     }
-    if (linearAimBuffer.get() > 4.0D) {
+    if (linearAimBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Robotic Aim)");
       linearAimBuffer.reset();
     }
-    if (accuracyBuffer.get() > 3.0D) {
+    if (accuracyBuffer.get() > 4.0D) {
       context.receiveSignal(name, "KillAura (Accuracy)");
       accuracyBuffer.reset();
     }
-    if (preAttackBuffer.get() > 3.0D) {
+    if (preAttackBuffer.get() > 4.0D) {
       context.receiveSignal(name, "KillAura (Pre-Attack)");
       preAttackBuffer.reset();
     }
@@ -150,15 +155,15 @@ public class KillAuraRotationSpeed {
 
   public void decay(String name) {
     CheckBuffer rate = this.rateBuffers.get(name);
-    if (rate != null) rate.decay(0.15D);
+    if (rate != null) rate.decay(0.2D);
     CheckBuffer aim = this.aimBuffers.get(name);
-    if (aim != null) aim.decay(0.15D);
+    if (aim != null) aim.decay(0.2D);
     CheckBuffer linear = this.linearAimBuffers.get(name);
-    if (linear != null) linear.decay(0.1D);
+    if (linear != null) linear.decay(0.15D);
     CheckBuffer accuracy = this.accuracyBuffers.get(name);
-    if (accuracy != null) accuracy.decay(0.1D);
+    if (accuracy != null) accuracy.decay(0.15D);
     CheckBuffer preAttack = this.preAttackBuffers.get(name);
-    if (preAttack != null) preAttack.decay(0.1D);
+    if (preAttack != null) preAttack.decay(0.15D);
   }
 
   public void reset() {

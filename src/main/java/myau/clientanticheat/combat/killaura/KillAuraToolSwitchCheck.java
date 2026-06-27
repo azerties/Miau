@@ -22,7 +22,7 @@ public class KillAuraToolSwitchCheck {
     CheckBuffer combatSwitchBuffer =
         this.combatSwitchBuffers.computeIfAbsent(name, key -> new CheckBuffer());
 
-    if (data.heldItemChangeTicks > 2) {
+    if (data.heldItemChangeTicks > 4) {
       switchBuffer.flag(1.0D, 999.0D);
     } else {
       switchBuffer.decay(0.25D);
@@ -41,14 +41,14 @@ public class KillAuraToolSwitchCheck {
         combatSwitchBuffer.decay(0.3D);
       }
     } else {
-      combatSwitchBuffer.decay(0.2D);
+      combatSwitchBuffer.decay(0.3D);
     }
 
-    if (switchBuffer.get() > 4.0D) {
+    if (switchBuffer.get() > 6.0D) {
       context.receiveSignal(name, "KillAura (Rapid Switch)");
       switchBuffer.reset();
     }
-    if (combatSwitchBuffer.get() > 4.0D) {
+    if (combatSwitchBuffer.get() > 6.0D) {
       context.receiveSignal(name, "KillAura (Combat Switch)");
       combatSwitchBuffer.reset();
     }

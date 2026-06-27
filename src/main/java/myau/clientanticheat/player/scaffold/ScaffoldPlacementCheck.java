@@ -63,8 +63,8 @@ public class ScaffoldPlacementCheck {
     float flickThresholdMult = sneakBridging ? 1.5F : 1.0F;
 
     if (bridgeContext
-        && data.pitchDelta > 25.0F * flickThresholdMult
-        && Math.abs(data.pitchAcceleration) > 20.0F * flickThresholdMult) {
+        && data.pitchDelta > 35.0F * flickThresholdMult
+        && Math.abs(data.pitchAcceleration) > 30.0F * flickThresholdMult) {
       flickBuffer.flag(1.25D, 999.0D);
     } else {
       flickBuffer.decay(0.2D);
@@ -106,12 +106,12 @@ public class ScaffoldPlacementCheck {
       if (pitchDiff > 3
           && pitchDiff < 20
           && data.pitch > 70
-          && avg < 350
+          && avg < 250
           && (inOneLine || placeInterval < 800)
           && !sneakBridging) {
         vl += Math.min(20, pitchDiff / 0.5);
         if (data.pitch > 89.5F) vl += 5;
-        if (vl > 150) {
+        if (vl > 250) {
           microPitchBuffer.flag(2.0D, 999.0D);
           vl -= 10;
         }
@@ -163,19 +163,19 @@ public class ScaffoldPlacementCheck {
     }
 
     boolean failed =
-        flickBuffer.get() > 4.0D
-            || snapBuffer.get() > 3.5D
-            || microPitchBuffer.get() > 3.0D
-            || noRotBuffer.get() > 5.0D;
+        flickBuffer.get() > 5.0D
+            || snapBuffer.get() > 5.0D
+            || microPitchBuffer.get() > 5.0D
+            || noRotBuffer.get() > 6.0D;
     if (failed) {
       long flagNow = System.currentTimeMillis();
       long last = this.lastFlag.getOrDefault(name, 0L);
       if (flagNow - last > 2500L) {
-        if (flickBuffer.get() > 4.0D) context.receiveSignal(name, "Scaffold (Rotation Flick)");
-        else if (snapBuffer.get() > 3.5D) context.receiveSignal(name, "Scaffold (Angle Snap)");
-        else if (microPitchBuffer.get() > 3.0D)
+        if (flickBuffer.get() > 5.0D) context.receiveSignal(name, "Scaffold (Rotation Flick)");
+        else if (snapBuffer.get() > 5.0D) context.receiveSignal(name, "Scaffold (Angle Snap)");
+        else if (microPitchBuffer.get() > 5.0D)
           context.receiveSignal(name, "Scaffold (Micro Pitch)");
-        else if (noRotBuffer.get() > 5.0D) context.receiveSignal(name, "Scaffold (No Rotation)");
+        else if (noRotBuffer.get() > 6.0D) context.receiveSignal(name, "Scaffold (No Rotation)");
         this.lastFlag.put(name, flagNow);
         flickBuffer.reset();
         snapBuffer.reset();

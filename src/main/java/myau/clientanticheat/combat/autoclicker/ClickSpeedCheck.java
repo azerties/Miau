@@ -13,9 +13,9 @@ public class ClickSpeedCheck {
   private final Map<String, LinkedList<Long>> clickTimestamps = new HashMap<>();
   private final Map<String, LinkedList<Long>> clickIntervals = new HashMap<>();
 
-  private final Map<String, CheckBuffer> deviationBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> entropyBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> kurtosisBuffers = new HashMap<>();
+  private final Map<String, Double> deviationVl = new HashMap<>();
+  private final Map<String, Double> entropyVl = new HashMap<>();
+  private final Map<String, Double> kurtosisVl = new HashMap<>();
   private final Map<String, CheckBuffer> fluctuationBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> repetitiveBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> equalDelayBuffers = new HashMap<>();
@@ -36,7 +36,7 @@ public class ClickSpeedCheck {
   private static final int CLICK_SAMPLE_SIZE = 100;
   private static final int STDDEV_COLLECTION_SIZE = 50;
   private static final int CPS_WINDOW_TICKS = 20;
-  private static final int MIN_CLICKS_FOR_ANALYSIS = 20;
+  private static final int MIN_CLICKS_FOR_ANALYSIS = 25;
   private static final long EQUAL_DELAY_TOLERANCE = 1L;
   private static final long BUFFER_TIMEOUT_MS = 4000L;
   private static final int DEVIATION_META_SAMPLE_SIZE = 3;
@@ -51,6 +51,11 @@ public class ClickSpeedCheck {
     if (name == null) return;
 
     if (data.usingItem || data.usingItemTicks > 0) {
+      return;
+    }
+
+    if (data.breakingBlock || data.recentlyBrokeBlock()) {
+      clearPlayerAnalysis(name);
       return;
     }
 
@@ -69,10 +74,6 @@ public class ClickSpeedCheck {
     LinkedList<Integer> cpsHistory =
         this.cpsWindowHistory.computeIfAbsent(name, k -> new LinkedList<>());
 
-    CheckBuffer deviationBuffer =
-        this.deviationBuffers.computeIfAbsent(name, k -> new CheckBuffer());
-    CheckBuffer entropyBuffer = this.entropyBuffers.computeIfAbsent(name, k -> new CheckBuffer());
-    CheckBuffer kurtosisBuffer = this.kurtosisBuffers.computeIfAbsent(name, k -> new CheckBuffer());
     CheckBuffer fluctuationBuffer =
         this.fluctuationBuffers.computeIfAbsent(name, k -> new CheckBuffer());
     CheckBuffer repetitiveBuffer =
@@ -81,11 +82,8 @@ public class ClickSpeedCheck {
         this.equalDelayBuffers.computeIfAbsent(name, k -> new CheckBuffer());
     CheckBuffer cpsBuffer = this.cpsBuffers.computeIfAbsent(name, k -> new CheckBuffer());
 
-    deviationBuffer.decay(0.02D);
-    entropyBuffer.decay(0.02D);
-    kurtosisBuffer.decay(0.02D);
-    fluctuationBuffer.decay(0.02D);
-    repetitiveBuffer.decay(0.02D);
+    fluctuationBuffer.decay(0.03D);
+    repetitiveBuffer.decay(0.03D);
 
     timestamps.addFirst(currentTick);
     while (timestamps.size() > CLICK_SAMPLE_SIZE) {
@@ -125,42 +123,54 @@ public class ClickSpeedCheck {
 
       if (devSamples.size() >= DEVIATION_META_SAMPLE_SIZE) {
         double metaStd = StatisticalUtils.standardDeviation(devSamples);
-        if (stddev < 1.2D && metaStd < 20.0D) {
-          int vlAdd = stddev < 0.8D ? 3 : 2;
-          if (deviationBuffer.flag(vlAdd, 6.0D)) {
+        double vl = this.deviationVl.getOrDefault(name, 0.0D);
+        if (stddev < 0.8D && metaStd < 15.0D) {
+          int vlAdd = stddev < 0.5D ? 3 : 2;
+          vl += vlAdd;
+          if (vl > 4) {
             context.receiveSignal(name, "AutoClicker (Deviation)");
-            deviationBuffer.reset();
             devSamples.clear();
+            vl *= 0.5D;
           }
-        } else {
-          deviationBuffer.decay(0.15D);
+        } else if (vl > 0) {
+          vl -= 0.2D;
+          vl *= 0.9D;
         }
+        this.deviationVl.put(name, Math.max(0.0D, vl));
       }
     }
 
     if (intervals.size() >= CLICK_SAMPLE_SIZE) {
       double ent = StatisticalUtils.entropy(intervals);
+      double vl = this.entropyVl.getOrDefault(name, 0.0D);
       if (ent >= 0.35D && ent <= 1.0D) {
-        if (entropyBuffer.flag(2.0D, 5.0D)) {
+        vl += 2;
+        if (vl > 3) {
           context.receiveSignal(name, "AutoClicker (Entropy)");
-          entropyBuffer.reset();
+          vl *= 0.5D;
         }
-      } else {
-        entropyBuffer.decay(0.2D);
+      } else if (vl > 0) {
+        vl -= 0.2D;
+        vl *= 0.98D;
       }
+      this.entropyVl.put(name, Math.max(0.0D, vl));
     }
 
     if (intervals.size() >= 25) {
       double kurt = StatisticalUtils.kurtosis(intervals);
       double normalizedKurt = kurt / 1000.0D;
+      double vl = this.kurtosisVl.getOrDefault(name, 0.0D);
       if (normalizedKurt < 6.0D && normalizedKurt > 0.0D) {
-        if (kurtosisBuffer.flag(1.0D, 6.0D)) {
+        vl++;
+        if (vl > 15) {
           context.receiveSignal(name, "AutoClicker (Kurtosis)");
-          kurtosisBuffer.reset();
+          vl *= 0.5D;
         }
-      } else {
-        kurtosisBuffer.decay(0.2D);
+      } else if (vl > 0) {
+        vl -= 0.1D;
+        vl *= 0.98D;
       }
+      this.kurtosisVl.put(name, Math.max(0.0D, vl));
     }
 
     if (intervals.size() >= 10) {
@@ -187,25 +197,25 @@ public class ClickSpeedCheck {
       if (spikes.size() >= 3) {
         double spikeStd = timestampStdDev(spikes);
         if (spikeStd < 1200.0D) {
-          if (fluctuationBuffer.flag(1.5D, 5.0D)) {
+          if (fluctuationBuffer.flag(1.5D, 6.0D)) {
             context.receiveSignal(name, "AutoClicker (Fluctuation)");
             fluctuationBuffer.reset();
             spikes.clear();
           }
         } else {
-          fluctuationBuffer.decay(0.15D);
+          fluctuationBuffer.decay(0.2D);
         }
       }
       if (drops.size() >= 3) {
         double dropStd = timestampStdDev(drops);
         if (dropStd < 1200.0D) {
-          if (fluctuationBuffer.flag(1.5D, 5.0D)) {
+          if (fluctuationBuffer.flag(1.5D, 6.0D)) {
             context.receiveSignal(name, "AutoClicker (Fluctuation)");
             fluctuationBuffer.reset();
             drops.clear();
           }
         } else {
-          fluctuationBuffer.decay(0.15D);
+          fluctuationBuffer.decay(0.2D);
         }
       }
     }
@@ -224,14 +234,14 @@ public class ClickSpeedCheck {
         diffHistory.removeLast();
       }
 
-      if (diffHistory.size() >= 15) {
+      if (diffHistory.size() >= 20) {
         if (StatisticalUtils.hasRepetitivePattern(diffHistory, 0.3D)) {
-          if (repetitiveBuffer.flag(1.5D, 5.0D)) {
+          if (repetitiveBuffer.flag(1.5D, 6.0D)) {
             context.receiveSignal(name, "AutoClicker (Repetitive)");
             repetitiveBuffer.reset();
           }
         } else {
-          repetitiveBuffer.decay(0.15D);
+          repetitiveBuffer.decay(0.2D);
         }
       }
     }
@@ -246,13 +256,13 @@ public class ClickSpeedCheck {
           int consecutive = this.consecutiveEqualDelays.getOrDefault(name, 0) + 1;
           this.consecutiveEqualDelays.put(name, consecutive);
 
-          int streakLimit = 10;
-          if (currentDelay > 1) streakLimit += 2;
-          if (currentDelay > 2) streakLimit += 2;
-          if (currentDelay > 3) streakLimit += 2;
+          int streakLimit = 12;
+          if (currentDelay > 1) streakLimit += 3;
+          if (currentDelay > 2) streakLimit += 3;
+          if (currentDelay > 3) streakLimit += 3;
 
           if (consecutive > streakLimit) {
-            if (equalDelayBuffer.flag(2.0D, 5.0D)) {
+            if (equalDelayBuffer.flag(2.0D, 6.0D)) {
               context.receiveSignal(name, "AutoClicker (Equal Delay)");
               equalDelayBuffer.reset();
               this.consecutiveEqualDelays.put(name, 0);
@@ -261,22 +271,22 @@ public class ClickSpeedCheck {
         } else {
           int consecutive = this.consecutiveEqualDelays.getOrDefault(name, 0);
           if (consecutive > 0) {
-            this.consecutiveEqualDelays.put(name, Math.max(0, consecutive - 1));
+            this.consecutiveEqualDelays.put(name, Math.max(0, consecutive - 2));
           }
-          equalDelayBuffer.decay(0.1D);
+          equalDelayBuffer.decay(0.15D);
         }
       }
 
       this.lastDelayTick.put(name, currentDelay);
     }
 
-    if (cps > 22) {
-      if (cpsBuffer.flag(1.0D, 3.0D)) {
+    if (cps > 25) {
+      if (cpsBuffer.flag(1.0D, 4.0D)) {
         context.receiveSignal(name, "AutoClicker (CPS)");
         cpsBuffer.reset();
       }
     } else {
-      cpsBuffer.decay(0.2D);
+      cpsBuffer.decay(0.3D);
     }
   }
 
@@ -315,14 +325,17 @@ public class ClickSpeedCheck {
     LinkedList<Long> dp = this.dropTimestamps.get(name);
     if (dp != null) dp.clear();
     this.lastCps.remove(name);
+    this.deviationVl.remove(name);
+    this.entropyVl.remove(name);
+    this.kurtosisVl.remove(name);
   }
 
   public void reset() {
     this.clickTimestamps.clear();
     this.clickIntervals.clear();
-    this.deviationBuffers.clear();
-    this.entropyBuffers.clear();
-    this.kurtosisBuffers.clear();
+    this.deviationVl.clear();
+    this.entropyVl.clear();
+    this.kurtosisVl.clear();
     this.fluctuationBuffers.clear();
     this.repetitiveBuffers.clear();
     this.equalDelayBuffers.clear();

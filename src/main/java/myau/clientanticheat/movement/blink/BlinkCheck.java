@@ -17,9 +17,9 @@ public class BlinkCheck {
 
   private static final long FIFTY_MS_NANOS = 50_000_000L;
   private static final long CLOCK_ERROR_NANOS = 5_000_000L;
-  private static final long TIMER_OVERFLOW_LIMIT = 120_000_000L;
+  private static final long TIMER_OVERFLOW_LIMIT = 180_000_000L;
   private static final int BLINK_TICK_LIMIT = 60;
-  private static final int WARM_UP_TICKS = 100;
+  private static final int WARM_UP_TICKS = 200;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
@@ -37,6 +37,15 @@ public class BlinkCheck {
       timerBuffer.decay(0.5D);
       blinkLimitBuffer.decay(0.5D);
       this.timerBalanceData.remove(name);
+      return;
+    }
+
+    if (data.collidedHorizontally) {
+      this.frozenTicks.remove(name);
+      burstBuffer.decay(0.3D);
+      pulseBuffer.decay(0.3D);
+      timerBuffer.decay(0.3D);
+      blinkLimitBuffer.decay(0.3D);
       return;
     }
 
@@ -85,9 +94,9 @@ public class BlinkCheck {
     int frozenBefore = this.frozenTicks.getOrDefault(name, 0);
     this.frozenTicks.remove(name);
 
-    boolean catchUpBurst = frozenBefore >= 12 && data.totalDelta > 0.65D && data.totalDelta < 8.0D;
+    boolean catchUpBurst = frozenBefore >= 18 && data.totalDelta > 0.65D && data.totalDelta < 8.0D;
     boolean pulseMove =
-        data.totalDelta > 1.5D && data.totalDelta < 8.0D && data.horizontalDelta > 1.0D;
+        data.totalDelta > 2.0D && data.totalDelta < 8.0D && data.horizontalDelta > 1.0D;
     boolean heavyPulse = frozenBefore >= 5 && data.totalDelta > 1.2D && data.totalDelta < 8.0D;
 
     if (catchUpBurst) {

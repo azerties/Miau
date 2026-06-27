@@ -25,6 +25,11 @@ public class KillAuraAngleSnap {
       return;
     }
 
+    if (data.recentlyHurt()) {
+      this.decay(name);
+      return;
+    }
+
     CheckBuffer snapPatternBuffer =
         this.snapPatternBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer silentAimBuffer =
@@ -41,15 +46,15 @@ public class KillAuraAngleSnap {
     yawHist[1] = yawHist[0];
     yawHist[0] = deltaYaw;
 
-    boolean threeTickSnap = yawHist[2] < 9.0F && yawHist[1] > 40.0F && yawHist[0] < 9.0F;
-    boolean liteSnap = yawHist[2] < 9.0F && yawHist[1] > 25.0F && yawHist[0] < 9.0F;
+    boolean threeTickSnap = yawHist[2] < 9.0F && yawHist[1] > 55.0F && yawHist[0] < 9.0F;
+    boolean liteSnap = yawHist[2] < 9.0F && yawHist[1] > 35.0F && yawHist[0] < 9.0F;
 
     if (threeTickSnap) {
       snapPatternBuffer.flag(2.0D, 999.0D);
     } else if (liteSnap) {
       snapPatternBuffer.flag(1.0D, 999.0D);
     } else {
-      snapPatternBuffer.decay(0.15D);
+      snapPatternBuffer.decay(0.2D);
     }
 
     float[] movYawHist = this.movementYawHistory.computeIfAbsent(name, key -> new float[2]);
@@ -60,7 +65,7 @@ public class KillAuraAngleSnap {
     float movementYawDelta =
         Math.abs(MathHelper.wrapAngleTo180_float(movYawHist[0] - movYawHist[1]));
     boolean movementStable = movementYawDelta < 5.0F && data.horizontalDelta > 0.1D;
-    boolean aimSnapped = deltaYaw > 30.0F;
+    boolean aimSnapped = deltaYaw > 45.0F;
 
     if (movementStable
         && aimSnapped
@@ -68,10 +73,10 @@ public class KillAuraAngleSnap {
         && data.nearestTargetDistance < 5.0D) {
       silentAimBuffer.flag(1.5D, 999.0D);
     } else {
-      silentAimBuffer.decay(0.2D);
+      silentAimBuffer.decay(0.25D);
     }
 
-    if (data.nearestTarget != null && data.nearestTargetDistance < 6.0D && deltaYaw > 25.0F) {
+    if (data.nearestTarget != null && data.nearestTargetDistance < 6.0D && deltaYaw > 30.0F) {
       float currentYawToTarget = yawToEntity(player, data.nearestTarget);
       float lastYawToTarget =
           yawToEntity(player, data.nearestTarget)
@@ -81,43 +86,43 @@ public class KillAuraAngleSnap {
           Math.abs(MathHelper.wrapAngleTo180_float(player.rotationYaw - currentYawToTarget));
       float lastError = Math.abs(MathHelper.wrapAngleTo180_float(data.lastYaw - lastYawToTarget));
 
-      boolean wasNotLooking = lastError > 20.0F;
-      boolean nowLooking = currentError < 8.0F;
+      boolean wasNotLooking = lastError > 30.0F;
+      boolean nowLooking = currentError < 5.0F;
 
       if (wasNotLooking && nowLooking) {
         entitySnapBuffer.flag(1.5D, 999.0D);
       } else {
-        entitySnapBuffer.decay(0.2D);
+        entitySnapBuffer.decay(0.25D);
       }
     } else {
-      entitySnapBuffer.decay(0.15D);
+      entitySnapBuffer.decay(0.2D);
     }
 
-    if (deltaYaw > 95.0F || data.yawAcceleration > 65.0F) {
+    if (deltaYaw > 120.0F || data.yawAcceleration > 85.0F) {
       flickBuffer.flag(1.0D, 999.0D);
     } else {
-      flickBuffer.decay(0.3D);
+      flickBuffer.decay(0.35D);
     }
 
     float divisorX = deltaYaw % 1.5F;
     float divisorY = deltaPitch % 1.5F;
-    if (deltaYaw > 5.0F && divisorX == 0.0F && divisorY == 0.0F) {
-      flickBuffer.flag(1.0D, 5.0D);
+    if (deltaYaw > 5.0F && Math.abs(divisorX) < 0.001F && Math.abs(divisorY) < 0.001F) {
+      flickBuffer.flag(1.0D, 6.0D);
     }
 
-    if (snapPatternBuffer.get() > 3.0D) {
+    if (snapPatternBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Snap Pattern)");
       snapPatternBuffer.reset();
     }
-    if (silentAimBuffer.get() > 3.0D) {
+    if (silentAimBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Silent Aim)");
       silentAimBuffer.reset();
     }
-    if (entitySnapBuffer.get() > 3.0D) {
+    if (entitySnapBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Entity Snap)");
       entitySnapBuffer.reset();
     }
-    if (flickBuffer.get() > 3.0D) {
+    if (flickBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Rotation Flick)");
       flickBuffer.reset();
     }
@@ -131,13 +136,13 @@ public class KillAuraAngleSnap {
 
   public void decay(String name) {
     CheckBuffer snapPattern = this.snapPatternBuffers.get(name);
-    if (snapPattern != null) snapPattern.decay(0.1D);
+    if (snapPattern != null) snapPattern.decay(0.15D);
     CheckBuffer silentAim = this.silentAimBuffers.get(name);
-    if (silentAim != null) silentAim.decay(0.15D);
+    if (silentAim != null) silentAim.decay(0.2D);
     CheckBuffer entitySnap = this.entitySnapBuffers.get(name);
-    if (entitySnap != null) entitySnap.decay(0.1D);
+    if (entitySnap != null) entitySnap.decay(0.15D);
     CheckBuffer flick = this.flickBuffers.get(name);
-    if (flick != null) flick.decay(0.15D);
+    if (flick != null) flick.decay(0.2D);
   }
 
   public void reset() {

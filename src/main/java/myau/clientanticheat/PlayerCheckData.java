@@ -2,24 +2,15 @@ package myau.clientanticheat;
 
 import java.util.LinkedList;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.potion.Potion;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
 
 public class PlayerCheckData {
   private static final double TELEPORT_DISTANCE_THRESHOLD = 8.0D;
-  private static final int TELEPORT_EXEMPT_TICKS = 4;
+  private static final int TELEPORT_EXEMPT_TICKS = 6;
   private static final int MAX_SINCE_HURT_TICKS = 999;
-  private static final int RECENT_HURT_TICKS = 10;
+  private static final int RECENT_HURT_TICKS = 12;
   private static final int INITIAL_EXEMPT_TICKS = 5;
-  private static final double GROUND_HORIZONTAL_LIMIT = 0.36D;
-  private static final double AIR_HORIZONTAL_LIMIT = 0.62D;
-  private static final double SPRINT_LIMIT_BONUS = 0.08D;
-  private static final double SNEAK_LIMIT_BONUS = 0.02D;
-  private static final double USING_ITEM_LIMIT_BONUS = 0.02D;
-  private static final double SPEED_POTION_LIMIT_BONUS = 0.075D;
-  private static final double JUMP_POTION_LIMIT_BONUS = 0.04D;
-  private static final double RECENT_HURT_LIMIT_BONUS = 0.35D;
 
   public final String name;
 
@@ -53,6 +44,8 @@ public class PlayerCheckData {
   public boolean usingItem;
   public boolean lastSwinging;
   public boolean swinging;
+  public boolean breakingBlock;
+  public boolean collidedHorizontally;
   public int groundTicks;
   public int airTicks;
   public int hurtTicks;
@@ -63,6 +56,7 @@ public class PlayerCheckData {
   public int burstTicks;
   public int usingItemTicks;
   public int swingTicks;
+  public int sinceBreakTicks = 999;
   public float observedFallDistance;
   public final LinkedList<AxisAlignedBB> history = new LinkedList<>();
 
@@ -125,6 +119,15 @@ public class PlayerCheckData {
     this.onGround = player.onGround;
     this.usingItem = player.isUsingItem() || player.isBlocking() || player.isEating();
     this.swinging = player.swingProgress > 0.0F;
+    this.collidedHorizontally = player.isCollidedHorizontally;
+
+    boolean wasBreaking = this.breakingBlock;
+    this.breakingBlock = player.isSwingInProgress && !this.swinging && player.swingProgressInt > 0;
+    if (wasBreaking && !this.breakingBlock) {
+      this.sinceBreakTicks = 0;
+    } else if (!this.breakingBlock) {
+      this.sinceBreakTicks = Math.min(MAX_SINCE_HURT_TICKS, this.sinceBreakTicks + 1);
+    }
 
     this.deltaX = this.x - this.lastX;
     this.deltaY = this.y - this.lastY;
@@ -256,26 +259,16 @@ public class PlayerCheckData {
     return this.sinceHurtTicks <= RECENT_HURT_TICKS || this.hurtTicks > 0;
   }
 
+  public boolean recentlyBrokeBlock() {
+    return this.sinceBreakTicks < 60;
+  }
+
   public boolean startedSwinging() {
     return this.swinging && !this.lastSwinging;
   }
 
   public boolean startedUsingItem() {
     return this.usingItem && !this.lastUsingItem;
-  }
-
-  public double predictedHorizontalLimit(EntityPlayer player) {
-    double limit = this.onGround ? GROUND_HORIZONTAL_LIMIT : AIR_HORIZONTAL_LIMIT;
-    if (player.isSprinting()) limit += SPRINT_LIMIT_BONUS;
-    if (player.isSneaking()) limit += SNEAK_LIMIT_BONUS;
-    if (player.isUsingItem()) limit += USING_ITEM_LIMIT_BONUS;
-    if (player.isPotionActive(Potion.moveSpeed)) {
-      int amplifier = player.getActivePotionEffect(Potion.moveSpeed).getAmplifier() + 1;
-      limit += amplifier * SPEED_POTION_LIMIT_BONUS;
-    }
-    if (player.isPotionActive(Potion.jump)) limit += JUMP_POTION_LIMIT_BONUS;
-    if (this.recentlyHurt()) limit += RECENT_HURT_LIMIT_BONUS;
-    return limit;
   }
 
   private static double gcd(double a, double b) {

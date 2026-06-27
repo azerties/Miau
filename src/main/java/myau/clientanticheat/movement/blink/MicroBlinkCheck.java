@@ -23,11 +23,11 @@ public class MicroBlinkCheck {
   private static final double MAX_FREEZE_DELTA = 0.04D;
   private static final double MIN_BURST_DELTA = 0.4D;
   private static final double MAX_BURST_DELTA = 8.0D;
-  private static final int MIN_FREEZE_TICKS = 4;
+  private static final int MIN_FREEZE_TICKS = 6;
   private static final int MAX_FREEZE_TICKS = 30;
   private static final long COMBAT_WINDOW_MS = 1500L;
-  private static final double CHI_SQUARE_THRESHOLD = 7.0D;
-  private static final int COLD_START_TICKS = 100;
+  private static final double CHI_SQUARE_THRESHOLD = 10.0D;
+  private static final int COLD_START_TICKS = 150;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
@@ -44,6 +44,14 @@ public class MicroBlinkCheck {
       buffer.decay(0.1D);
       entityAlignmentBuffer.decay(0.1D);
       combatCorrelationBuffer.decay(0.1D);
+      return;
+    }
+
+    if (data.collidedHorizontally) {
+      this.frozenTicksMap.remove(name);
+      buffer.decay(0.08D);
+      entityAlignmentBuffer.decay(0.08D);
+      combatCorrelationBuffer.decay(0.08D);
       return;
     }
 
@@ -145,7 +153,7 @@ public class MicroBlinkCheck {
       boolean inCombatWindow = msSinceLastAttack < COMBAT_WINDOW_MS && msSinceLastAttack >= 0;
 
       if (inCombatWindow && frozenTicks >= MIN_FREEZE_TICKS) {
-        if (combatCorrelationBuffer.flag(1.0D, 6.0D)) {
+        if (combatCorrelationBuffer.flag(1.0D, 8.0D)) {
           context.receiveSignal(name, "MicroBlink (Combat-Timed)");
           combatCorrelationBuffer.reset();
         }

@@ -21,15 +21,20 @@ public class KillAuraHeuristicsCheck {
   private final Map<String, CheckBuffer> moduloResetBuffers = new HashMap<>();
   private final Map<String, Float> lastGcdValues = new HashMap<>();
 
-  private static final int STDDEV_SAMPLE_SIZE = 30;
-  private static final double LOW_STDDEV_THRESHOLD = 0.4D;
-  private static final double CONSISTENT_STDDEV_THRESHOLD = 1.2D;
+  private static final int STDDEV_SAMPLE_SIZE = 40;
+  private static final double LOW_STDDEV_THRESHOLD = 0.3D;
+  private static final double CONSISTENT_STDDEV_THRESHOLD = 0.9D;
 
   public void check(EntityPlayer player, PlayerCheckData data, ClientAntiCheatContext context) {
     String name = player.getName();
     if (name == null || data == null || data.recentlyTeleported()) return;
 
     if (!data.startedSwinging()) {
+      this.decay(name);
+      return;
+    }
+
+    if (data.recentlyHurt() || data.collidedHorizontally) {
       this.decay(name);
       return;
     }
@@ -50,10 +55,10 @@ public class KillAuraHeuristicsCheck {
     float accelYaw = Math.abs(data.yawAcceleration);
     float accelPitch = Math.abs(data.pitchAcceleration);
 
-    if (deltaYaw > 2.0F && accelYaw < 0.001F) {
-      constantAimBuffer.flag(1.0D, 5.0D);
+    if (deltaYaw > 2.0F && accelYaw < 0.0005F) {
+      constantAimBuffer.flag(1.0D, 6.0D);
     } else {
-      constantAimBuffer.decay(0.1D);
+      constantAimBuffer.decay(0.15D);
     }
 
     float divisorX = deltaYaw % 1.5F;
@@ -61,18 +66,20 @@ public class KillAuraHeuristicsCheck {
     float divisorGcdX = deltaYaw % 0.05F;
     float divisorGcdY = deltaPitch % 0.05F;
 
-    if (deltaYaw > 5.0F && (divisorX == 0.0F || divisorY == 0.0F)) {
-      moduloBuffer.flag(1.0D, 4.0D);
-    } else if (deltaYaw > 2.0F && divisorGcdX == 0.0F && divisorGcdY == 0.0F) {
-      moduloBuffer.flag(0.5D, 4.0D);
+    if (deltaYaw > 5.0F && (Math.abs(divisorX) < 0.001F || Math.abs(divisorY) < 0.001F)) {
+      moduloBuffer.flag(1.0D, 6.0D);
+    } else if (deltaYaw > 2.0F
+        && Math.abs(divisorGcdX) < 0.001F
+        && Math.abs(divisorGcdY) < 0.001F) {
+      moduloBuffer.flag(0.5D, 6.0D);
     } else {
-      moduloBuffer.decay(0.2D);
+      moduloBuffer.decay(0.25D);
     }
 
-    if (data.sensitivityChangeCount > 3) {
-      sensitivityBuffer.flag(1.0D, 6.0D);
+    if (data.sensitivityChangeCount > 5) {
+      sensitivityBuffer.flag(1.0D, 8.0D);
     } else {
-      sensitivityBuffer.decay(0.15D);
+      sensitivityBuffer.decay(0.2D);
     }
 
     Queue<Float> yawSamples = this.yawDeltaSamples.computeIfAbsent(name, key -> new ArrayDeque<>());
@@ -90,13 +97,13 @@ public class KillAuraHeuristicsCheck {
         if (yawStdDev < LOW_STDDEV_THRESHOLD
             && pitchStdDev < LOW_STDDEV_THRESHOLD
             && deltaYaw > 3.0F) {
-          stdDevBuffer.flag(2.0D, 5.0D);
+          stdDevBuffer.flag(2.0D, 6.0D);
         } else if (yawStdDev < CONSISTENT_STDDEV_THRESHOLD
             && pitchStdDev < CONSISTENT_STDDEV_THRESHOLD
-            && StatisticalUtils.coefficientOfVariation(yawSamples) < 0.08D) {
-          stdDevBuffer.flag(1.0D, 5.0D);
+            && StatisticalUtils.coefficientOfVariation(yawSamples) < 0.06D) {
+          stdDevBuffer.flag(1.0D, 6.0D);
         } else {
-          stdDevBuffer.decay(0.3D);
+          stdDevBuffer.decay(0.4D);
         }
         yawSamples.clear();
         pitchSamples.clear();
@@ -111,12 +118,12 @@ public class KillAuraHeuristicsCheck {
               net.minecraft.util.MathHelper.wrapAngleTo180_float(player.rotationYaw - perfectYaw));
       float pitchError = Math.abs(player.rotationPitch - perfectPitch);
 
-      if (yawError < 0.15F && pitchError < 0.15F && deltaYaw > 5.0F) {
-        exactRotationBuffer.flag(1.5D, 4.0D);
-      } else if (yawError < 0.5F && pitchError < 0.5F && deltaYaw > 10.0F) {
-        exactRotationBuffer.flag(1.0D, 4.0D);
+      if (yawError < 0.08F && pitchError < 0.08F && deltaYaw > 5.0F) {
+        exactRotationBuffer.flag(1.5D, 5.0D);
+      } else if (yawError < 0.3F && pitchError < 0.3F && deltaYaw > 15.0F) {
+        exactRotationBuffer.flag(1.0D, 5.0D);
       } else {
-        exactRotationBuffer.decay(0.25D);
+        exactRotationBuffer.decay(0.3D);
       }
     }
 
@@ -127,36 +134,36 @@ public class KillAuraHeuristicsCheck {
         if (gcdDiff > 0.05F && deltaYaw > 3.0F) {
           float moduloOfOldGcd = deltaYaw % lastGcd;
           if (moduloOfOldGcd < 0.01F || Math.abs(moduloOfOldGcd - lastGcd) < 0.01F) {
-            moduloResetBuffer.flag(1.5D, 4.0D);
+            moduloResetBuffer.flag(1.5D, 5.0D);
           }
         } else {
-          moduloResetBuffer.decay(0.1D);
+          moduloResetBuffer.decay(0.15D);
         }
       }
       this.lastGcdValues.put(name, data.lastSensitivityGcd);
     }
 
-    if (constantAimBuffer.get() > 3.0D) {
+    if (constantAimBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Constant Aim)");
       constantAimBuffer.reset();
     }
-    if (moduloBuffer.get() > 3.0D) {
+    if (moduloBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Modulo)");
       moduloBuffer.reset();
     }
-    if (sensitivityBuffer.get() > 4.0D) {
+    if (sensitivityBuffer.get() > 6.0D) {
       context.receiveSignal(name, "KillAura (Sensitivity)");
       sensitivityBuffer.reset();
     }
-    if (stdDevBuffer.get() > 4.0D) {
+    if (stdDevBuffer.get() > 5.0D) {
       context.receiveSignal(name, "KillAura (Rotation StdDev)");
       stdDevBuffer.reset();
     }
-    if (exactRotationBuffer.get() > 3.0D) {
+    if (exactRotationBuffer.get() > 4.0D) {
       context.receiveSignal(name, "KillAura (Exact Rotation)");
       exactRotationBuffer.reset();
     }
-    if (moduloResetBuffer.get() > 3.0D) {
+    if (moduloResetBuffer.get() > 4.0D) {
       context.receiveSignal(name, "KillAura (Modulo Reset)");
       moduloResetBuffer.reset();
     }
@@ -164,17 +171,17 @@ public class KillAuraHeuristicsCheck {
 
   public void decay(String name) {
     CheckBuffer constantAim = this.constantAimBuffers.get(name);
-    if (constantAim != null) constantAim.decay(0.15D);
+    if (constantAim != null) constantAim.decay(0.2D);
     CheckBuffer modulo = this.moduloBuffers.get(name);
-    if (modulo != null) modulo.decay(0.15D);
+    if (modulo != null) modulo.decay(0.2D);
     CheckBuffer sensitivity = this.sensitivityBuffers.get(name);
-    if (sensitivity != null) sensitivity.decay(0.1D);
+    if (sensitivity != null) sensitivity.decay(0.15D);
     CheckBuffer stdDev = this.stdDevBuffers.get(name);
-    if (stdDev != null) stdDev.decay(0.1D);
+    if (stdDev != null) stdDev.decay(0.15D);
     CheckBuffer exact = this.exactRotationBuffers.get(name);
-    if (exact != null) exact.decay(0.1D);
+    if (exact != null) exact.decay(0.15D);
     CheckBuffer moduloReset = this.moduloResetBuffers.get(name);
-    if (moduloReset != null) moduloReset.decay(0.1D);
+    if (moduloReset != null) moduloReset.decay(0.15D);
   }
 
   private float yawTo(EntityPlayer from, EntityPlayer to) {

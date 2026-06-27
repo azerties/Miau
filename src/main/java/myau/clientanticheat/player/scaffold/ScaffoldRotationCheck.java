@@ -67,13 +67,13 @@ public class ScaffoldRotationCheck {
     float deltaPitch = data.pitchDelta;
 
     if (bridgeContext) {
-      if (deltaPitch > 0.0F && deltaPitch < 0.01F && deltaYaw > 20.0F * sensitivityMult) {
+      if (deltaPitch > 0.0F && deltaPitch < 0.005F && deltaYaw > 20.0F * sensitivityMult) {
         stabilityBuffer.flag(1.0D, 4.0D);
       } else {
         stabilityBuffer.decay(0.15D);
       }
 
-      if (deltaYaw > 120.0F && deltaPitch > 45.0F) {
+      if (deltaYaw > 150.0F && deltaPitch > 60.0F) {
         speedBuffer.flag(1.25D, 5.0D);
       } else {
         speedBuffer.decay(0.2D);
@@ -169,11 +169,11 @@ public class ScaffoldRotationCheck {
       context.receiveSignal(name, "Scaffold (Sharp Rotation)");
       sharpRotationBuffer.reset();
     }
-    if (backSnapBuffer.get() > 3.5D) {
+    if (backSnapBuffer.get() > 4.0D) {
       context.receiveSignal(name, "Scaffold (Back Snap)");
       backSnapBuffer.reset();
     }
-    if (constantYawBuffer.get() > 6.0D) {
+    if (constantYawBuffer.get() > 7.0D) {
       context.receiveSignal(name, "Scaffold (Constant Yaw)");
       constantYawBuffer.reset();
     }
