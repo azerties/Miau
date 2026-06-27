@@ -19,7 +19,6 @@ import myau.module.Module;
 import myau.module.ModuleManager;
 import myau.module.modules.combat.*;
 import myau.module.modules.ghost.*;
-import myau.module.modules.intave.*;
 import myau.module.modules.minigames.AutoBuy;
 import myau.module.modules.minigames.BedwarUtils;
 import myau.module.modules.misc.*;
@@ -186,10 +185,6 @@ public class Myau {
     moduleManager.modules.put(Tracers.class, new Tracers());
     moduleManager.modules.put(Trajectories.class, new Trajectories());
     moduleManager.modules.put(Velocity.class, new Velocity());
-    moduleManager.modules.put(IntaveNoSlow.class, new IntaveNoSlow());
-    moduleManager.modules.put(IntaveVelocity.class, new IntaveVelocity());
-    moduleManager.modules.put(IntaveSpeed.class, new IntaveSpeed());
-    moduleManager.modules.put(IntaveNoFall.class, new IntaveNoFall());
     moduleManager.modules.put(ViewClip.class, new ViewClip());
     moduleManager.modules.put(Wtap.class, new Wtap());
     commandManager.commands.add(new BindCommand());
