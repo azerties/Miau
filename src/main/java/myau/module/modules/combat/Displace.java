@@ -23,6 +23,7 @@ import myau.util.player.MoveUtil;
 import myau.util.player.TeamUtil;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
@@ -620,6 +621,8 @@ public class Displace extends Module {
         bodyEndX, centerY, bodyEndZ, ARROW_BODY_HALF_HEIGHT, viewerX, viewerY, viewerZ);
     GL11.glEnd();
     GL11.glPopAttrib();
+    GL11.glColor4f(1f, 1f, 1f, 1f);
+    GlStateManager.color(1f, 1f, 1f, 1f);
     GL11.glPopMatrix();
   }
 

@@ -154,6 +154,9 @@ tasks.shadowJar {
     destinationDirectory.set(layout.buildDirectory.dir("intermediates"))
     archiveClassifier.set("non-obfuscated-with-deps")
     configurations = listOf(shadowImpl)
+    // Exclude multi-release JAR entries (META-INF/versions/) which contain
+    // Java 9+ class files that break Forge's ASM 5.0.3 mod discovery
+    exclude("META-INF/versions/**")
     doLast {
         configurations.forEach {
             println("Copying dependencies into mod: ${it.files}")

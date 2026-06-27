@@ -290,8 +290,9 @@ public class FontRenderer extends myau.util.font.Font {
         if (character == '§') {
           i++;
           if (i < characters.length) {
-            int index = COLOR_CODE_CHARACTERS.indexOf(characters[i]);
-            if (index != -1 && index < COLOR_CODES.length) {
+            char formatChar = characters[i];
+            int index = COLOR_CODE_CHARACTERS.indexOf(formatChar);
+            if (index != -1 && index < 16) {
               int formatColor = COLOR_CODES[index];
               if (isShadowPass) {
                 formatColor = (formatColor & 0xFCFCFC) >> 2;
@@ -299,7 +300,15 @@ public class FontRenderer extends myau.util.font.Font {
               int originalAlpha = (color >> 24) & 0xFF;
               if (originalAlpha == 0) originalAlpha = 255;
               ColorUtil.glColor((originalAlpha << 24) | (formatColor & 0x00FFFFFF));
+            } else if (formatChar == 'r') {
+              // Reset to original color, applying shadow if needed
+              int resetColor = color;
+              if (isShadowPass) {
+                resetColor = (color & 0xFCFCFC) >> 2 | color & 0xFF000000;
+              }
+              ColorUtil.glColor(resetColor);
             }
+            // Other formatting codes (k, l, m, n, o) are not implemented — skip
           }
           continue;
         }

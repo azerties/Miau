@@ -7,7 +7,7 @@ import myau.util.animation.AnimationTimer;
 import myau.util.font.Font;
 import myau.util.font.Fonts;
 import myau.util.render.RenderUtil;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.client.renderer.GlStateManager;
 
 public class ColorComponent extends Component {
   public ColorProperty property;
@@ -120,12 +120,9 @@ public class ColorComponent extends Component {
         boxX, boxY, boxX + PREVIEW_BOX_SIZE, boxY + PREVIEW_BOX_SIZE, getColorRGB());
 
     Font renderer = Fonts.MINECRAFT.get(18);
-    GL11.glPushMatrix();
-    GL11.glScaled(0.5, 0.5, 0.5);
+    GlStateManager.color(1f, 1f, 1f, 1f);
     float textOffset = renderer.getStringWidth("[+]  ");
-    renderer.draw(
-        property.getName(), (cx + 4) * 2 + xOffset + textOffset, (cy + o + 4) * 2, -1, true);
-    GL11.glPopMatrix();
+    renderer.draw(property.getName(), cx + 4 + xOffset / 2 + textOffset, cy + o + 4, -1, true);
 
     float progress = getAnimationProgress();
     if (progress <= 0f) return;

@@ -78,6 +78,7 @@ public class WelcomeScreen extends GuiScreen {
   public void drawScreen(int mx, int my, float pt) {
     loadFonts();
     if (startTime < 0) startTime = System.currentTimeMillis();
+    GlStateManager.color(1f, 1f, 1f, 1f);
 
     long el = System.currentTimeMillis() - startTime;
 

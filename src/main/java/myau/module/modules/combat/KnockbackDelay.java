@@ -18,10 +18,13 @@ import net.minecraft.network.play.INetHandlerPlayClient;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 import net.minecraft.util.MovingObjectPosition;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.lwjgl.input.Mouse;
 
 public class KnockbackDelay extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
+  private static final Logger LOGGER = LogManager.getLogger("KnockbackDelay");
 
   public final FloatProperty distanceToTarget =
       new FloatProperty("distance-to-target", 6.0F, 3.0F, 12.0F);
@@ -108,13 +111,26 @@ public class KnockbackDelay extends Module {
     return (Packet<INetHandlerPlayClient>) packet;
   }
 
+  private void safeHandlePacket(Packet<INetHandlerPlayClient> packet) {
+    if (mc.getNetHandler() == null || mc.thePlayer == null || mc.theWorld == null) {
+      LOGGER.warn(
+          "Dropped delayed {} packet due to null environment", packet.getClass().getSimpleName());
+      return;
+    }
+    try {
+      PacketUtil.handlePacket(packet);
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to re-inject delayed {} packet", packet.getClass().getSimpleName(), e);
+    }
+  }
+
   private void releaseExpiredPackets() {
     long now = System.currentTimeMillis();
     Iterator<DelayedPacket> iterator = this.delayedPackets.iterator();
     while (iterator.hasNext()) {
       DelayedPacket data = iterator.next();
       if (now - data.time >= this.maximumDelay.getValue()) {
-        PacketUtil.handlePacket(data.packet);
+        safeHandlePacket(data.packet);
         iterator.remove();
       }
     }
@@ -123,7 +139,7 @@ public class KnockbackDelay extends Module {
 
   private void flushPackets() {
     for (DelayedPacket data : this.delayedPackets) {
-      PacketUtil.handlePacket(data.packet);
+      safeHandlePacket(data.packet);
     }
     this.delayedPackets.clear();
     this.delaying = false;

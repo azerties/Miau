@@ -7,9 +7,11 @@ import myau.module.modules.misc.NickHider;
 import myau.module.modules.render.HUD;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import org.lwjgl.opengl.GL11;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -63,6 +65,9 @@ public abstract class MixinFontRenderer {
     if (isCustomRendering || text == null || text.isEmpty() || Myau.moduleManager == null) {
       return;
     }
+
+    GL11.glColor4f(1f, 1f, 1f, 1f);
+    GlStateManager.color(1f, 1f, 1f, 1f);
 
     AntiObfuscate antiObfuscate =
         (AntiObfuscate) Myau.moduleManager.modules.get(AntiObfuscate.class);

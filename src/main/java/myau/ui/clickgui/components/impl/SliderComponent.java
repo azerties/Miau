@@ -11,7 +11,7 @@ import myau.property.properties.PercentProperty;
 import myau.ui.clickgui.components.Component;
 import myau.util.font.Fonts;
 import myau.util.render.RenderUtil;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.client.renderer.GlStateManager;
 
 public class SliderComponent extends Component {
   public Property<?> property;
@@ -189,14 +189,12 @@ public class SliderComponent extends Component {
     }
 
     float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
-    GL11.glPushMatrix();
-    GL11.glScaled(0.5, 0.5, 0.5);
-    float labelX = (float) ((cx + 6 + xOffset / 2) * 2);
-    float labelY = (float) ((cy + 4 * fontScale) * 2);
+    GlStateManager.color(1f, 1f, 1f, 1f);
+    float labelX = cx + 6 + xOffset / 2;
+    float labelY = cy + 4 * fontScale;
     Fonts.MINECRAFT
         .get(18)
-        .draw(this.property.getName() + ": " + valueText + suffix, labelX, labelY, -1, false);
-    GL11.glPopMatrix();
+        .draw(this.property.getName() + ": " + valueText + suffix, labelX, labelY, -1, true);
 
     float trackLeft = cx + 6 + (xOffset / 2);
     float trackRight = cx + cw - 6 + (xOffset / 2);
