@@ -32,11 +32,9 @@ public class OMIntaveNoSlow extends NoSlowMode {
         && event.getPacket() instanceof C08PacketPlayerBlockPlacement) {
       if (this.getParent().isSwordActive()
           && !BadPacketsComponent.bad(false, true, true, false, false)) {
-        if (!this.getParent().antiSwitch.getValue()) {
-          int currentSlot = mc.thePlayer.inventory.currentItem;
-          PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
-          PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
-        }
+        int currentSlot = mc.thePlayer.inventory.currentItem;
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
       }
     }
   }

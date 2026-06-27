@@ -50,10 +50,21 @@ public enum Fonts {
     return get(0, Weight.NONE);
   }
 
+  public void clearCache() {
+    this.sizes.clear();
+  }
+
   public Font get(int size, Weight weight) {
     if (get != null) {
+      if (this == MINECRAFT && !ClientFontManager.isMinecraftSelected()) {
+        return MAIN.get(size, weight);
+      }
       if (font == null) font = get.get();
       return font;
+    }
+
+    if (this == MAIN && ClientFontManager.isMinecraftSelected()) {
+      return MINECRAFT.get();
     }
 
     int key = Integer.parseInt(size + "" + weight.getNum());
@@ -63,7 +74,22 @@ public enum Fonts {
       String location = "unknown";
 
       try {
-        if (this == CUSTOM) {
+        if (this == MAIN) {
+          String fontFile = ClientFontManager.getSelectedFontFileName();
+          try {
+            java.io.InputStream is =
+                Fonts.class
+                    .getClassLoader()
+                    .getResourceAsStream("assets/keystrokesmod/fonts/" + fontFile);
+            if (is != null) {
+              awtFont =
+                  java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is)
+                      .deriveFont((float) size);
+            }
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        } else if (this == CUSTOM) {
           location = this.name;
           awtFont = new java.awt.Font(this.name, java.awt.Font.PLAIN, size);
         } else if (name.contains(":")) {

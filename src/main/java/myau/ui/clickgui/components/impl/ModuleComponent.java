@@ -431,16 +431,24 @@ public class ModuleComponent extends Component {
     return isVisibleBase(component);
   }
 
+  public static float getFontScale() {
+    return myau.util.font.Fonts.MAIN.get(18).height() / 9.0f;
+  }
+
   private float getBaseComponentHeightF(Component component) {
+    float fontScale = getFontScale();
     if (component instanceof SliderComponent) {
-      return 16f;
+      return 16f * fontScale;
     }
     if (component instanceof ColorComponent) {
       ColorComponent cc = (ColorComponent) component;
       float progress = cc.getAnimationProgress();
-      return 12f + (cc.getExpandedHeight() - 12f) * progress;
+      return 12f * fontScale + (cc.getExpandedHeight() - 12f * fontScale) * progress;
     }
-    return 12f;
+    if (component instanceof BindComponent) {
+      return 16f * fontScale;
+    }
+    return 12f * fontScale;
   }
 
   private float getAnimatedComponentHeightF(Component component) {
@@ -495,7 +503,7 @@ public class ModuleComponent extends Component {
   }
 
   private float getCollapsedHeight() {
-    return hasModuleHeader() ? 18f : 0f;
+    return hasModuleHeader() ? 18f * getFontScale() : 0f;
   }
 
   private float getSettingStartOffset() {

@@ -11,7 +11,6 @@ import myau.util.player.*;
 import myau.util.time.*;
 import myau.util.vector.Vector2d;
 import myau.util.world.*;
-import org.lwjgl.opengl.GL11;
 
 public final class ColorUtil {
   public static final Color RED = new Color(255, 0, 0);
@@ -64,19 +63,22 @@ public final class ColorUtil {
   }
 
   public static void glColor(final int hex) {
-    final float a = (hex >> 24 & 0xFF) / 255.0F;
+    float a = (hex >> 24 & 0xFF) / 255.0F;
     final float r = (hex >> 16 & 0xFF) / 255.0F;
     final float g = (hex >> 8 & 0xFF) / 255.0F;
     final float b = (hex & 0xFF) / 255.0F;
-    GL11.glColor4f(r, g, b, a);
+    if (a == 0.0F) a = 1.0F;
+    org.lwjgl.opengl.GL11.glColor4f(r, g, b, a);
+    net.minecraft.client.renderer.GlStateManager.color(r, g, b, a);
   }
 
   public static void glColor(final Color color) {
-    GL11.glColor4f(
-        color.getRed() / 255.0F,
-        color.getGreen() / 255.0F,
-        color.getBlue() / 255.0F,
-        color.getAlpha() / 255.0F);
+    float r = color.getRed() / 255.0F;
+    float g = color.getGreen() / 255.0F;
+    float b = color.getBlue() / 255.0F;
+    float a = color.getAlpha() / 255.0F;
+    org.lwjgl.opengl.GL11.glColor4f(r, g, b, a);
+    net.minecraft.client.renderer.GlStateManager.color(r, g, b, a);
   }
 
   public static Color darker(Color color, float factor) {

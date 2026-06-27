@@ -7,7 +7,7 @@ import myau.util.animation.AnimationTimer;
 import myau.util.font.Font;
 import myau.util.font.Fonts;
 import myau.util.render.RenderUtil;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.client.renderer.GlStateManager;
 
 public class ColorComponent extends Component {
   public ColorProperty property;
@@ -80,7 +80,8 @@ public class ColorComponent extends Component {
   }
 
   public float getExpandedHeight() {
-    return LABEL_HEIGHT + SQUARE_TOP_PAD + SQUARE_SIZE + BOTTOM_PAD;
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
+    return LABEL_HEIGHT * fontScale + SQUARE_TOP_PAD + SQUARE_SIZE + BOTTOM_PAD;
   }
 
   public float getAnimationProgress() {
@@ -119,27 +120,26 @@ public class ColorComponent extends Component {
         boxX, boxY, boxX + PREVIEW_BOX_SIZE, boxY + PREVIEW_BOX_SIZE, getColorRGB());
 
     Font renderer = Fonts.MINECRAFT.get(18);
-    GL11.glPushMatrix();
-    GL11.glScaled(0.5, 0.5, 0.5);
+    GlStateManager.color(1f, 1f, 1f, 1f);
     float textOffset = renderer.getStringWidth("[+]  ");
-    renderer.draw(
-        property.getName(), (cx + 4) * 2 + xOffset + textOffset, (cy + o + 4) * 2, -1, true);
-    GL11.glPopMatrix();
+    renderer.draw(property.getName(), cx + 4 + xOffset / 2 + textOffset, cy + o + 4, -1, true);
 
     float progress = getAnimationProgress();
     if (progress <= 0f) return;
 
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     float scrollOffset = moduleComponent.categoryComponent.moduleY - cy;
-    float contentTopScreen = cy + o + LABEL_HEIGHT + scrollOffset;
-    float revealH = (getExpandedHeight() - LABEL_HEIGHT) * progress;
+    float contentTopScreen = cy + o + LABEL_HEIGHT * fontScale + scrollOffset;
+    float revealH = (getExpandedHeight() - LABEL_HEIGHT * fontScale) * progress;
     RenderUtil.scissorPushGui(cx, contentTopScreen, cw, revealH);
     renderPickerContent(cx, cy);
     RenderUtil.scissorPop();
   }
 
   private void renderPickerContent(float cx, float cy) {
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     float areaLeft = cx + 4 + (xOffset / 2);
-    float sqTop = cy + o + LABEL_HEIGHT + SQUARE_TOP_PAD;
+    float sqTop = cy + o + LABEL_HEIGHT * fontScale + SQUARE_TOP_PAD;
     float sqRight = areaLeft + SQUARE_SIZE;
     float sqBottom = sqTop + SQUARE_SIZE;
 
@@ -197,7 +197,8 @@ public class ColorComponent extends Component {
     if (dragMode == 0 || getAnimationProgress() < 1f) return;
 
     float areaLeft = this.x + 4 + (xOffset / 2);
-    float sqTop = this.y + LABEL_HEIGHT + SQUARE_TOP_PAD;
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
+    float sqTop = this.y + LABEL_HEIGHT * fontScale + SQUARE_TOP_PAD;
     float sqRight = areaLeft + SQUARE_SIZE;
     float sqBottom = sqTop + SQUARE_SIZE;
 
@@ -219,10 +220,11 @@ public class ColorComponent extends Component {
 
     float cw = moduleComponent.categoryComponent.getWidth();
 
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     if (mouseX > this.x
         && mouseX < this.x + cw
         && mouseY > this.y
-        && mouseY < this.y + LABEL_HEIGHT) {
+        && mouseY < this.y + LABEL_HEIGHT * fontScale) {
       if (button == 0 || button == 1) {
         float currentProgress = getAnimationProgress();
         this.animationStartProgress = currentProgress;
@@ -238,7 +240,7 @@ public class ColorComponent extends Component {
     if (getAnimationProgress() < 1f) return false;
 
     float areaLeft = this.x + 4 + (xOffset / 2);
-    float sqTop = this.y + LABEL_HEIGHT + SQUARE_TOP_PAD;
+    float sqTop = this.y + LABEL_HEIGHT * fontScale + SQUARE_TOP_PAD;
     float sqRight = areaLeft + SQUARE_SIZE;
     float sqBottom = sqTop + SQUARE_SIZE;
     float hueLeft = sqRight + HUE_GAP;

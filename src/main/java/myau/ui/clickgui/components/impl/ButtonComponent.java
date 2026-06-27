@@ -6,7 +6,7 @@ import myau.property.properties.BooleanProperty;
 import myau.ui.clickgui.components.Component;
 import myau.util.font.Font;
 import myau.util.font.Fonts;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.client.renderer.GlStateManager;
 
 public class ButtonComponent extends Component {
   private static final int ENABLED_COLOR = new Color(20, 255, 0).getRGB();
@@ -36,15 +36,9 @@ public class ButtonComponent extends Component {
     float cy = this.moduleComponent.categoryComponent.getY() + this.o;
     float cw = this.moduleComponent.categoryComponent.getWidth();
 
-    GL11.glPushMatrix();
-    GL11.glScaled(0.5D, 0.5D, 0.5D);
-    renderer.draw(
-        this.property.getName(),
-        (float) ((cx + 6 + xOffset / 2) * 2),
-        (float) ((cy + 4) * 2),
-        -1,
-        false);
-    GL11.glPopMatrix();
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
+    GlStateManager.color(1f, 1f, 1f, 1f);
+    renderer.draw(this.property.getName(), cx + 6 + xOffset / 2, cy + 4 * fontScale, -1, true);
 
     boolean enabled = this.property.getValue();
     if (toggleAnim == -1) {
@@ -56,7 +50,7 @@ public class ButtonComponent extends Component {
     float switchW = 16f;
     float switchH = 8f;
     float switchX = cx + cw - switchW - 6 + (xOffset / 2);
-    float switchY = cy + 2f;
+    float switchY = cy + 2f * fontScale;
 
     Color c1 = new Color(40, 40, 40);
     Color c2 = new Color(ENABLED_COLOR);
@@ -109,9 +103,10 @@ public class ButtonComponent extends Component {
   }
 
   public boolean i(int x, int y) {
+    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     return x > this.x
         && x < this.x + this.moduleComponent.categoryComponent.getWidth()
         && y > this.y
-        && y < this.y + 11;
+        && y < this.y + 12 * fontScale;
   }
 }

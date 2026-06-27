@@ -14,11 +14,9 @@ public class OMGrimNoSlow extends NoSlowMode {
   public void onUpdate(UpdateEvent event) {
     if (this.getParent().isAnyActive()) {
       if (event.getType() == myau.event.types.EventType.PRE) {
-        if (!this.getParent().antiSwitch.getValue()) {
-          int currentSlot = mc.thePlayer.inventory.currentItem;
-          PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
-          PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
-        }
+        int currentSlot = mc.thePlayer.inventory.currentItem;
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot % 8 + 1));
+        PacketUtil.sendPacket(new C09PacketHeldItemChange(currentSlot));
       }
 
       float multiplier = this.getParent().getMotionMultiplier();

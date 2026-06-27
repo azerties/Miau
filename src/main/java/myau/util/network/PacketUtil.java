@@ -32,6 +32,12 @@ public class PacketUtil {
 
   public static void handlePacket(Packet<INetHandlerPlayClient> packet) {
     if (packet == null) return;
+    if (mc.getNetHandler() == null || mc.thePlayer == null || mc.theWorld == null) {
+      LOGGER.warn(
+          "Dropped packet {} because netHandler/thePlayer/theWorld is null",
+          packet.getClass().getSimpleName());
+      return;
+    }
 
     if (packet instanceof S00PacketKeepAlive) {
       mc.getNetHandler().handleKeepAlive((S00PacketKeepAlive) packet);

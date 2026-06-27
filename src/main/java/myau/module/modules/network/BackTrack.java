@@ -211,13 +211,14 @@ public class BackTrack extends Module {
               mc.thePlayer.getDistance(
                   targetMixin.getTrueX(), targetMixin.getTrueY(), targetMixin.getTrueZ());
           double dist = mc.thePlayer.getDistance(target.posX, target.posY, target.posZ);
+          double boxDist = RotationUtil.distanceToBox(target.getEntityBoundingBox());
 
           if (trueDist <= 6f
               && (!smart.getValue() || trueDist >= dist)
-              && (style.getValue() == 0 || !globalTimer.hasTimeElapsed(getSupposedDelay()))) {
+              && (style.getValue() == 1 || !globalTimer.hasTimeElapsed(getSupposedDelay()))) {
             shouldRender = true;
 
-            if (dist >= distance.getValue() && dist <= distance.getSecondValue()) {
+            if (boxDist >= distance.getValue() && boxDist <= distance.getSecondValue()) {
               handlePackets();
             } else {
               handlePacketsRange();
@@ -403,6 +404,8 @@ public class BackTrack extends Module {
                     event.getPartialTicks(),
                     true);
             GL11.glPopAttrib();
+            GL11.glColor4f(1f, 1f, 1f, 1f);
+            GlStateManager.color(1f, 1f, 1f, 1f);
             GlStateManager.popMatrix();
             break;
           case 3:
@@ -434,6 +437,8 @@ public class BackTrack extends Module {
                     true);
 
             GL11.glPopAttrib();
+            GL11.glColor4f(1f, 1f, 1f, 1f);
+            GlStateManager.color(1f, 1f, 1f, 1f);
             GlStateManager.popMatrix();
             break;
         }
@@ -564,7 +569,8 @@ public class BackTrack extends Module {
             event.getPartialTicks(),
             true);
     GlStateManager.popMatrix();
-    GlStateManager.resetColor();
+    GL11.glColor4f(1f, 1f, 1f, 1f);
+    GlStateManager.color(1f, 1f, 1f, 1f);
   }
 
   private void handlePackets() {
@@ -707,6 +713,7 @@ public class BackTrack extends Module {
   }
 
   private void drawBacktrackBox(AxisAlignedBB box, Color color) {
+    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
     GlStateManager.pushMatrix();
     GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     GL11.glDisable(GL11.GL_TEXTURE_2D);
@@ -730,6 +737,9 @@ public class BackTrack extends Module {
     GL11.glDisable(GL11.GL_BLEND);
     GL11.glDepthMask(true);
     GlStateManager.popMatrix();
+    GL11.glPopAttrib();
+    GL11.glColor4f(1f, 1f, 1f, 1f);
+    GlStateManager.color(1f, 1f, 1f, 1f);
   }
 
   private static int randomInt(int min, int max) {
