@@ -341,4 +341,23 @@ public class RotationUtil {
     }
     return targetRotation;
   }
+
+  public static Vec3 closestPointOnAabb(AxisAlignedBB box, Vec3 point) {
+    double x = Math.max(box.minX, Math.min(box.maxX, point.xCoord));
+    double y = Math.max(box.minY, Math.min(box.maxY, point.yCoord));
+    double z = Math.max(box.minZ, Math.min(box.maxZ, point.zCoord));
+    return new Vec3(x, y, z);
+  }
+
+  public static double distanceSqFromEyeToClosestOnAABB(Entity entity) {
+    if (entity == null || mc.thePlayer == null) return Double.MAX_VALUE;
+    Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
+    float borderSize = entity.getCollisionBorderSize();
+    AxisAlignedBB bb = entity.getEntityBoundingBox().expand(borderSize, borderSize, borderSize);
+    Vec3 closest = closestPointOnAabb(bb, eye);
+    double dx = eye.xCoord - closest.xCoord;
+    double dy = eye.yCoord - closest.yCoord;
+    double dz = eye.zCoord - closest.zCoord;
+    return dx * dx + dy * dy + dz * dz;
+  }
 }

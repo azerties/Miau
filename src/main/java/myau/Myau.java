@@ -131,7 +131,9 @@ public class Myau {
     moduleManager.modules.put(FastPlace.class, new FastPlace());
     moduleManager.modules.put(FakeLag.class, new FakeLag());
     moduleManager.modules.put(Freeze.class, new Freeze());
-    moduleManager.modules.put(Displace.class, new Displace());
+    moduleManager.modules.put(DisPlace.class, new DisPlace());
+    moduleManager.modules.put(Piercing.class, new Piercing());
+    moduleManager.modules.put(KnockbackDelay.class, new KnockbackDelay());
     moduleManager.modules.put(Fly.class, new Fly());
     moduleManager.modules.put(FullBright.class, new FullBright());
     moduleManager.modules.put(FreeLook.class, new FreeLook());
@@ -151,7 +153,6 @@ public class Myau {
     moduleManager.modules.put(Keystrokes.class, new Keystrokes());
     moduleManager.modules.put(HitBox.class, new HitBox());
     moduleManager.modules.put(KillAura.class, new KillAura());
-    moduleManager.modules.put(KnockbackDelay.class, new KnockbackDelay());
     moduleManager.modules.put(LagRange.class, new LagRange());
     moduleManager.modules.put(LightningTracker.class, new LightningTracker());
     moduleManager.modules.put(LongJump.class, new LongJump());
@@ -168,7 +169,6 @@ public class Myau {
     moduleManager.modules.put(NoRotate.class, new NoRotate());
     moduleManager.modules.put(NoSlow.class, new NoSlow());
     moduleManager.modules.put(Panic.class, new Panic());
-    moduleManager.modules.put(Piercing.class, new Piercing());
     moduleManager.modules.put(ProjectileAimBot.class, new ProjectileAimBot());
     moduleManager.modules.put(MouseRawInput.class, new MouseRawInput());
     moduleManager.modules.put(Reach.class, new Reach());
