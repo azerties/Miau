@@ -8,7 +8,6 @@ import myau.clientanticheat.ClientAntiCheatContext;
 import myau.clientanticheat.PlayerCheckData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.AxisAlignedBB;
-import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
@@ -42,19 +41,20 @@ public class HitboxRaytraceCheck {
     Vec3 eyesPos = new Vec3(player.posX, player.posY + player.getEyeHeight(), player.posZ);
     Double variance = calculateMovementVariance(player);
 
-    AxisAlignedBB targetBB = target.getEntityBoundingBox().expand(HITBOX_EXPANSION, 0.1D, HITBOX_EXPANSION);
-    targetBB = targetBB.offset(
-        (target.posX - target.lastTickPosX) * 2.0D,
-        (target.posY - target.lastTickPosY) * 2.0D,
-        (target.posZ - target.lastTickPosZ) * 2.0D
-    );
+    AxisAlignedBB targetBB =
+        target.getEntityBoundingBox().expand(HITBOX_EXPANSION, 0.1D, HITBOX_EXPANSION);
+    targetBB =
+        targetBB.offset(
+            (target.posX - target.lastTickPosX) * 2.0D,
+            (target.posY - target.lastTickPosY) * 2.0D,
+            (target.posZ - target.lastTickPosZ) * 2.0D);
 
     Vec3 lookVec = player.getLook(1.0F);
-    Vec3 maxReachVec = eyesPos.addVector(
-        lookVec.xCoord * BASE_REACH * 2.0D,
-        lookVec.yCoord * BASE_REACH * 2.0D,
-        lookVec.zCoord * BASE_REACH * 2.0D
-    );
+    Vec3 maxReachVec =
+        eyesPos.addVector(
+            lookVec.xCoord * BASE_REACH * 2.0D,
+            lookVec.yCoord * BASE_REACH * 2.0D,
+            lookVec.zCoord * BASE_REACH * 2.0D);
 
     MovingObjectPosition rayTraceResult = targetBB.calculateIntercept(eyesPos, maxReachVec);
 
@@ -68,11 +68,7 @@ public class HitboxRaytraceCheck {
         double flagWeight = Math.min(2.0D, (distance - maxReach) * 2.0D);
         if (buffer.flag(flagWeight, 6.0D)) {
           context.receiveSignal(
-              name,
-              "Reach",
-              String.format(
-                  "%.2f blocks", distance),
-              (int) (distance * 10));
+              name, "Reach", String.format("%.2f blocks", distance), (int) (distance * 10));
           buffer.reset();
         }
       } else {

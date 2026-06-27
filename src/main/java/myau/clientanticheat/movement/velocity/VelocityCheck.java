@@ -29,7 +29,10 @@ public class VelocityCheck {
       return;
     }
 
-    if (player.isInWater() || player.isInLava() || player.isOnLadder() || player.capabilities.isFlying) {
+    if (player.isInWater()
+        || player.isInLava()
+        || player.isOnLadder()
+        || player.capabilities.isFlying) {
       decayAll(name);
       return;
     }
@@ -53,7 +56,8 @@ public class VelocityCheck {
         if (verticalSamples.size() > VELOCITY_HISTORY_SIZE) verticalSamples.removeLast();
 
         if (verticalSamples.size() >= 3 && data.groundTicks < 5) {
-          double expectedVertical = verticalSamples.get(1) > 0.3D ? verticalSamples.get(1) * 0.9D : 0.35D;
+          double expectedVertical =
+              verticalSamples.get(1) > 0.3D ? verticalSamples.get(1) * 0.9D : 0.35D;
           double minExpected = expectedVertical * 0.7D;
 
           if (verticalDelta < minExpected && verticalDelta > 0.01D) {

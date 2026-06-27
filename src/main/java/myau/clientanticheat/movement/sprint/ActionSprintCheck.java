@@ -27,7 +27,8 @@ public class ActionSprintCheck {
       return;
     }
 
-    boolean usingItemWhileSprinting = data.sprinting && data.usingItem && data.horizontalDelta > 0.1D;
+    boolean usingItemWhileSprinting =
+        data.sprinting && data.usingItem && data.horizontalDelta > 0.1D;
 
     if (usingItemWhileSprinting) {
       if (buffer.flag(1.0D, 999.0D)) {

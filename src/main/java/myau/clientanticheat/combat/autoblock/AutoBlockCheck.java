@@ -67,10 +67,7 @@ public class AutoBlockCheck {
       }
 
       boolean sprintBlock =
-          data.sprinting
-              && data.blocking
-              && data.horizontalDelta > 0.22D
-              && data.blockingTicks > 5;
+          data.sprinting && data.blocking && data.horizontalDelta > 0.22D && data.blockingTicks > 5;
 
       if (sprintBlock) {
         if (!this.lastSprintBlockTime.containsKey(name)) {
