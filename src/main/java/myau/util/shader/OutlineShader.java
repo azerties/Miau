@@ -1,6 +1,7 @@
 package myau.util.shader;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL20;
 
 public class OutlineShader extends OutlineESPShader {
@@ -33,7 +34,7 @@ public class OutlineShader extends OutlineESPShader {
 
   @Override
   public void onUse() {
-    GL20.glUseProgram(programId);
+    OpenGlHelper.glUseProgram(programId);
     int u = uniform("tex");
     if (u >= 0) GL20.glUniform1i(u, 0);
     u = uniform("texelSize");

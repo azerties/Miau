@@ -160,8 +160,9 @@ public class Myau {
     moduleManager.modules.put(StaffDetector.class, new StaffDetector());
     moduleManager.modules.put(NameTags.class, new NameTags());
     moduleManager.modules.put(NickHider.class, new NickHider());
-    moduleManager.modules.put(NoFall.class, new NoFall());
     moduleManager.modules.put(NoClickDelay.class, new NoClickDelay());
+    moduleManager.modules.put(NoFall.class, new NoFall());
+    moduleManager.modules.put(Disabler.class, new Disabler());
     moduleManager.modules.put(NoHurtCam.class, new NoHurtCam());
     moduleManager.modules.put(NoJumpDelay.class, new NoJumpDelay());
     moduleManager.modules.put(NoRotate.class, new NoRotate());

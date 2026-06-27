@@ -134,8 +134,7 @@ public class Scaffold extends Module {
 
   public final ModeProperty yawOffsetProp =
       new ModeProperty("yaw-offset", 0, new String[] {"0", "45", "-45"});
-  public final IntProperty expand = new IntProperty("expand", 0, 0, 4);
-  public final FloatProperty timerProp = new FloatProperty("timer", 1.0F, 0.1F, 10.0F);
+
   public final ModeProperty rayCast =
       new ModeProperty("ray-cast", 0, new String[] {"OFF", "NORMAL", "STRICT"});
   public final BooleanProperty sneak = new BooleanProperty("sneak", false);
@@ -150,7 +149,7 @@ public class Scaffold extends Module {
   public final BooleanProperty ignoreSpeed = new BooleanProperty("ignore-speed", false);
 
   public final BooleanProperty swing = new BooleanProperty("swing", true);
-  public final BooleanProperty itemSpoof = new BooleanProperty("item-spoof", false);
+
   public final BooleanProperty blockRender = new BooleanProperty("block-render", false);
   public final ModeProperty blockRenderColorMode =
       new ModeProperty(
@@ -164,7 +163,7 @@ public class Scaffold extends Module {
           0xFF55AAFF,
           () -> this.blockRender.getValue() && this.blockRenderColorMode.getValue() == 1);
   public final BooleanProperty blockRenderRaytrace =
-      new BooleanProperty("block-render-raytrace", false, () -> this.blockRender.getValue());
+      new BooleanProperty("block-render-raytrace", true, () -> this.blockRender.getValue());
   public final IntProperty blockRenderAlpha =
       new IntProperty(
           "block-render-alpha",
@@ -745,9 +744,6 @@ public class Scaffold extends Module {
     targetPitch = this.pitch;
     float snappedYaw = 0;
 
-    if (timerProp.getValue() != 1.0F)
-      ((IAccessorMinecraft) mc).getTimer().timerSpeed = timerProp.getValue();
-
     int mode = this.rotationMode.getValue();
 
     if (mode >= 5) {
@@ -1086,31 +1082,6 @@ public class Scaffold extends Module {
 
       event.setRotation(this.yaw, this.pitch, 3);
       if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
-
-      if (this.expand.getValue() > 0) {
-        double dir =
-            MoveUtil.direction(
-                mc.thePlayer.rotationYaw,
-                mc.gameSettings.keyBindForward.isKeyDown()
-                    ? 1
-                    : mc.gameSettings.keyBindBack.isKeyDown() ? -1 : 0,
-                mc.gameSettings.keyBindRight.isKeyDown()
-                    ? -1
-                    : mc.gameSettings.keyBindLeft.isKeyDown() ? 1 : 0);
-        for (double r = 0; r <= this.expand.getValue(); r++) {
-          if (mc.theWorld
-                  .getBlockState(
-                      new BlockPos(
-                          mc.thePlayer.posX + (-Math.sin(dir) * (r + 1)),
-                          mc.thePlayer.posY - 0.5,
-                          mc.thePlayer.posZ + (Math.cos(dir) * (r + 1))))
-                  .getBlock()
-              instanceof BlockAir) {
-
-            break;
-          }
-        }
-      }
 
       BlockData bd = this.getBlockData();
 
@@ -1483,10 +1454,6 @@ public class Scaffold extends Module {
   public void onDisabled() {
     if (mc.thePlayer != null && this.lastSlot != -1) {
       mc.thePlayer.inventory.currentItem = this.lastSlot;
-    }
-
-    if (timerProp.getValue() != 1.0F) {
-      ((IAccessorMinecraft) mc).getTimer().timerSpeed = 1.0F;
     }
 
     ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak)

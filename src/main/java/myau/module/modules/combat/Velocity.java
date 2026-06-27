@@ -41,6 +41,7 @@ public class Velocity extends Module {
           "Mode",
           0,
           new String[] {
+            register(new ThreeFPracVelocity("3FPrac", this)),
             register(new StandardVelocity("Standard", this)),
             register(new LegitVelocity("Legit", this)),
             register(new IntaveReduceVelocity("IntaveReduce", this)),

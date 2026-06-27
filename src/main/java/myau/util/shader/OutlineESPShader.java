@@ -2,6 +2,7 @@ package myau.util.shader;
 
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL20;
 
 public abstract class OutlineESPShader {
@@ -54,7 +55,7 @@ public abstract class OutlineESPShader {
   }
 
   public void stop() {
-    GL20.glUseProgram(0);
+    OpenGlHelper.glUseProgram(0);
   }
 
   public boolean isValid() {

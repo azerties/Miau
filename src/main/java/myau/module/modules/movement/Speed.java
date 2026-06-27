@@ -4,10 +4,12 @@ import java.util.concurrent.ThreadLocalRandom;
 import myau.Myau;
 import myau.event.EventTarget;
 import myau.event.impl.LivingUpdateEvent;
+import myau.event.impl.PacketEvent;
 import myau.event.impl.StrafeEvent;
 import myau.event.types.Priority;
 import myau.mixin.IAccessorEntity;
 import myau.module.Module;
+import myau.module.modules.movement.speeds.VulcanSpeed;
 import myau.module.modules.player.Scaffold;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
@@ -19,7 +21,7 @@ import net.minecraft.client.Minecraft;
 public class Speed extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final ModeProperty mode =
-      new ModeProperty("mode", 0, new String[] {"DEFAULT", "LEGIT", "LowHop"});
+      new ModeProperty("mode", 0, new String[] {"DEFAULT", "LEGIT", "LowHop", "VULCAN"});
   public final FloatProperty multiplier =
       new FloatProperty("multiplier", 1.0F, 0.0F, 10.0F, () -> this.mode.getValue() == 0);
   public final FloatProperty friction =
@@ -36,6 +38,8 @@ public class Speed extends Module {
       new BooleanProperty("only-jump-when-moving", true, () -> this.mode.getValue() == 2);
 
   private boolean hopping;
+
+  public final VulcanSpeed vulcan = new VulcanSpeed("VULCAN", this);
 
   public boolean canBoost() {
     Scaffold scaffold = (Scaffold) Myau.moduleManager.modules.get(Scaffold.class);
@@ -129,6 +133,11 @@ public class Speed extends Module {
       return;
     }
 
+    if (this.mode.getValue() == 3) {
+      this.vulcan.onLivingUpdate(event);
+      return;
+    }
+
     if (this.canBoost()) {
       if (this.mode.getValue() == 1) {
         if (mc.thePlayer.onGround && MoveUtil.isForwardPressed()) {
@@ -138,6 +147,14 @@ public class Speed extends Module {
         return;
       }
       mc.thePlayer.movementInput.jump = false;
+    }
+  }
+
+  @EventTarget(Priority.LOW)
+  public void onPacket(PacketEvent event) {
+    if (!this.isEnabled()) return;
+    if (this.mode.getValue() == 3) {
+      this.vulcan.onPacket(event);
     }
   }
 

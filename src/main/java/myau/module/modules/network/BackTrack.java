@@ -316,20 +316,21 @@ public class BackTrack extends Module {
         if (packet instanceof S14PacketEntity && target != null) {
           Entity entity = ((S14PacketEntity) packet).getEntity(mc.theWorld);
           if (entity != null && entity.getEntityId() == target.getEntityId()) {
-            ITruePosition tp = (ITruePosition) target;
+            S14PacketEntity s14 = (S14PacketEntity) packet;
+            double newX = target.posX + s14.func_149062_c() / 32.0D;
+            double newY = target.posY + s14.func_149061_d() / 32.0D;
+            double newZ = target.posZ + s14.func_149064_e() / 32.0D;
             positions.add(
-                new TimedPosition(
-                    new Vec3(tp.getTrueX(), tp.getTrueY(), tp.getTrueZ()),
-                    System.currentTimeMillis()));
+                new TimedPosition(new Vec3(newX, newY, newZ), System.currentTimeMillis()));
           }
         } else if (packet instanceof S18PacketEntityTeleport
             && target != null
             && ((S18PacketEntityTeleport) packet).getEntityId() == target.getEntityId()) {
-          ITruePosition tp = (ITruePosition) target;
-          positions.add(
-              new TimedPosition(
-                  new Vec3(tp.getTrueX(), tp.getTrueY(), tp.getTrueZ()),
-                  System.currentTimeMillis()));
+          S18PacketEntityTeleport s18 = (S18PacketEntityTeleport) packet;
+          double newX = s18.getX() / 32.0D;
+          double newY = s18.getY() / 32.0D;
+          double newZ = s18.getZ() / 32.0D;
+          positions.add(new TimedPosition(new Vec3(newX, newY, newZ), System.currentTimeMillis()));
         }
 
         event.setCancelled(true);
@@ -370,78 +371,81 @@ public class BackTrack extends Module {
     if (mode.getValue() == 0) {
       if (!shouldBacktrack() || !shouldRender || target == null) return;
 
-      ITruePosition targetMixin = (ITruePosition) target;
-      double x = targetMixin.getTrueX() - mc.getRenderManager().viewerPosX;
-      double y = targetMixin.getTrueY() - mc.getRenderManager().viewerPosY;
-      double z = targetMixin.getTrueZ() - mc.getRenderManager().viewerPosZ;
+      TimedPosition renderPos = null;
+      for (TimedPosition p : positions) {
+        renderPos = p;
+      }
+      if (renderPos == null) return;
 
-      if (targetMixin.isTruePos()) {
-        Color color = new Color(espColor.getValue());
+      double x = renderPos.position.xCoord - mc.getRenderManager().viewerPosX;
+      double y = renderPos.position.yCoord - mc.getRenderManager().viewerPosY;
+      double z = renderPos.position.zCoord - mc.getRenderManager().viewerPosZ;
 
-        switch (espMode.getValue()) {
-          case 1:
-            AxisAlignedBB box =
-                target
-                    .getEntityBoundingBox()
-                    .offset(
-                        targetMixin.getTrueX() - target.posX,
-                        targetMixin.getTrueY() - target.posY,
-                        targetMixin.getTrueZ() - target.posZ);
-            drawBacktrackBox(box, color);
-            break;
-          case 2:
-            GlStateManager.pushMatrix();
-            GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-            GlStateManager.color(0.6F, 0.6F, 0.6F, 1.0F);
-            mc.getRenderManager()
-                .doRenderEntity(
-                    target,
-                    x,
-                    y,
-                    z,
-                    target.prevRotationYaw
-                        + (target.rotationYaw - target.prevRotationYaw) * event.getPartialTicks(),
-                    event.getPartialTicks(),
-                    true);
-            GL11.glPopAttrib();
-            GL11.glColor4f(1f, 1f, 1f, 1f);
-            GlStateManager.color(1f, 1f, 1f, 1f);
-            GlStateManager.popMatrix();
-            break;
-          case 3:
-            GlStateManager.pushMatrix();
-            GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-            GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_LINE);
-            GL11.glDisable(GL11.GL_TEXTURE_2D);
-            GL11.glDisable(GL11.GL_LIGHTING);
-            GL11.glDisable(GL11.GL_DEPTH_TEST);
-            GL11.glEnable(GL11.GL_LINE_SMOOTH);
-            GL11.glEnable(GL11.GL_BLEND);
-            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            GL11.glLineWidth(wireframeWidth.getValue());
+      Color color = new Color(espColor.getValue());
 
-            GL11.glColor4f(
-                color.getRed() / 255.0F,
-                color.getGreen() / 255.0F,
-                color.getBlue() / 255.0F,
-                color.getAlpha() / 255.0F);
-            mc.getRenderManager()
-                .doRenderEntity(
-                    target,
-                    x,
-                    y,
-                    z,
-                    target.prevRotationYaw
-                        + (target.rotationYaw - target.prevRotationYaw) * event.getPartialTicks(),
-                    event.getPartialTicks(),
-                    true);
+      switch (espMode.getValue()) {
+        case 1:
+          AxisAlignedBB box =
+              target
+                  .getEntityBoundingBox()
+                  .offset(
+                      renderPos.position.xCoord - target.posX,
+                      renderPos.position.yCoord - target.posY,
+                      renderPos.position.zCoord - target.posZ);
+          drawBacktrackBox(box, color);
+          break;
+        case 2:
+          GlStateManager.pushMatrix();
+          GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+          GlStateManager.color(0.6F, 0.6F, 0.6F, 1.0F);
+          mc.getRenderManager()
+              .doRenderEntity(
+                  target,
+                  x,
+                  y,
+                  z,
+                  target.prevRotationYaw
+                      + (target.rotationYaw - target.prevRotationYaw) * event.getPartialTicks(),
+                  event.getPartialTicks(),
+                  true);
+          GL11.glPopAttrib();
+          GL11.glColor4f(1f, 1f, 1f, 1f);
+          GlStateManager.color(1f, 1f, 1f, 1f);
+          GlStateManager.popMatrix();
+          break;
+        case 3:
+          GlStateManager.pushMatrix();
+          GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+          GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_LINE);
+          GL11.glDisable(GL11.GL_TEXTURE_2D);
+          GL11.glDisable(GL11.GL_LIGHTING);
+          GL11.glDisable(GL11.GL_DEPTH_TEST);
+          GL11.glEnable(GL11.GL_LINE_SMOOTH);
+          GL11.glEnable(GL11.GL_BLEND);
+          GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+          GL11.glLineWidth(wireframeWidth.getValue());
 
-            GL11.glPopAttrib();
-            GL11.glColor4f(1f, 1f, 1f, 1f);
-            GlStateManager.color(1f, 1f, 1f, 1f);
-            GlStateManager.popMatrix();
-            break;
-        }
+          GL11.glColor4f(
+              color.getRed() / 255.0F,
+              color.getGreen() / 255.0F,
+              color.getBlue() / 255.0F,
+              color.getAlpha() / 255.0F);
+          mc.getRenderManager()
+              .doRenderEntity(
+                  target,
+                  x,
+                  y,
+                  z,
+                  target.prevRotationYaw
+                      + (target.rotationYaw - target.prevRotationYaw) * event.getPartialTicks(),
+                  event.getPartialTicks(),
+                  true);
+
+          GL11.glPopAttrib();
+          GL11.glColor4f(1f, 1f, 1f, 1f);
+          GlStateManager.color(1f, 1f, 1f, 1f);
+          GlStateManager.popMatrix();
+          break;
       }
     }
   }

@@ -11,7 +11,7 @@ import myau.property.properties.FloatProperty;
 import myau.util.time.TimerUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiInventory;
-import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.init.Items;
 import net.minecraft.item.ItemSoup;
 import net.minecraft.item.ItemStack;
 
@@ -31,14 +31,23 @@ public class AutoSoup extends Module {
 
   private final TimerUtil cdTimer = new TimerUtil();
   private final TimerUtil invCdTimer = new TimerUtil();
+  private final TimerUtil eatTimer = new TimerUtil();
   private State state = State.WAITINGTOSWITCH;
   private int originalSlot;
   private boolean inInv;
   private List<Integer> sortedSlots = new ArrayList<>();
   private float ranDelay;
+  private int soupSlot;
 
   public AutoSoup() {
     super("AutoSoup", false);
+  }
+
+  @Override
+  public void onDisabled() {
+    state = State.WAITINGTOSWITCH;
+    inInv = false;
+    super.onDisabled();
   }
 
   @EventTarget
@@ -53,29 +62,45 @@ public class AutoSoup extends Module {
       switch (state) {
         case WAITINGTOSWITCH:
           ranDelay = randomRange(delay);
+          state = State.NONE;
           break;
+
         case NONE:
-          int slot = getSoupSlot();
-          if (slot == -1) return;
+          soupSlot = getSoupSlot();
+          if (soupSlot == -1) return;
           originalSlot = mc.thePlayer.inventory.currentItem;
-          mc.thePlayer.inventory.currentItem = slot;
+          mc.thePlayer.inventory.currentItem = soupSlot;
           ranDelay = randomRange(delay);
+          state = State.SWITCHED;
           break;
+
         case SWITCHED:
-          KeyBinding.onTick(mc.gameSettings.keyBindUseItem.getKeyCode());
-          ranDelay = randomRange(delay);
+          mc.thePlayer.inventory.currentItem = soupSlot;
+          mc.playerController.sendUseItem(
+              mc.thePlayer, mc.theWorld, mc.thePlayer.inventory.getStackInSlot(soupSlot));
+          eatTimer.reset();
+          state = State.EATING;
           break;
-        case SWITCHEDANDCLICKED:
-          KeyBinding.onTick(mc.gameSettings.keyBindDrop.getKeyCode());
-          ranDelay = randomRange(delay);
+
+        case EATING:
+          if (mc.thePlayer.getItemInUseDuration() < 4 || !isHeldItemSoup()) {
+            state = State.DROPPING;
+            ranDelay = randomRange(delay);
+          } else if (eatTimer.hasTimeElapsed(2000L)) {
+            state = State.DROPPING;
+            ranDelay = randomRange(delay);
+          }
           break;
-        case SWITCHEDANDDROPPED:
+
+        case DROPPING:
+          mc.playerController.sendUseItem(
+              mc.thePlayer, mc.theWorld, mc.thePlayer.inventory.getStackInSlot(soupSlot));
           mc.thePlayer.inventory.currentItem = originalSlot;
           ranDelay = randomRange(coolDown);
+          state = State.WAITINGTOSWITCH;
           break;
       }
 
-      state = state.next();
       cdTimer.reset();
     }
 
@@ -98,6 +123,11 @@ public class AutoSoup extends Module {
     }
   }
 
+  private boolean isHeldItemSoup() {
+    ItemStack stack = mc.thePlayer.inventory.getStackInSlot(soupSlot);
+    return stack != null && stack.getItem() instanceof ItemSoup;
+  }
+
   private void generateSlots() {
     List<Integer> slots = new ArrayList<>();
     int slotsNeeded = 0;
@@ -109,7 +139,9 @@ public class AutoSoup extends Module {
     for (int i = 0; i < mc.thePlayer.inventoryContainer.getInventory().size(); i++) {
       if (!slots.isEmpty() && slots.size() >= slotsNeeded) break;
       ItemStack stack = mc.thePlayer.inventoryContainer.getInventory().get(i);
-      if (stack != null && stack.getItem() instanceof ItemSoup && !(i >= 36 && i <= 44)) {
+      if (stack != null
+          && (stack.getItem() instanceof ItemSoup || stack.getItem() == Items.mushroom_stew)
+          && !(i >= 36 && i <= 44)) {
         slots.add(i);
       }
     }
@@ -119,7 +151,9 @@ public class AutoSoup extends Module {
   private int getSoupSlot() {
     for (int slot = 0; slot <= 8; slot++) {
       ItemStack itemInSlot = mc.thePlayer.inventory.getStackInSlot(slot);
-      if (itemInSlot != null && itemInSlot.getItem() instanceof ItemSoup) {
+      if (itemInSlot != null
+          && (itemInSlot.getItem() instanceof ItemSoup
+              || itemInSlot.getItem() == Items.mushroom_stew)) {
         return slot;
       }
     }
@@ -144,13 +178,7 @@ public class AutoSoup extends Module {
     WAITINGTOSWITCH,
     NONE,
     SWITCHED,
-    SWITCHEDANDCLICKED,
-    SWITCHEDANDDROPPED;
-
-    private static final State[] VALS = values();
-
-    public State next() {
-      return VALS[(this.ordinal() + 1) % VALS.length];
-    }
+    EATING,
+    DROPPING
   }
 }

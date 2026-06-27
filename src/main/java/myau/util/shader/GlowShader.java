@@ -1,5 +1,6 @@
 package myau.util.shader;
 
+import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL20;
 
 public class GlowShader extends OutlineESPShader {
@@ -24,7 +25,7 @@ public class GlowShader extends OutlineESPShader {
 
   @Override
   public void onUse() {
-    GL20.glUseProgram(programId);
+    OpenGlHelper.glUseProgram(programId);
     int u = uniform("tex");
     if (u >= 0) GL20.glUniform1i(u, 0);
   }

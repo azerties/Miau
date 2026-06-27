@@ -7,8 +7,8 @@ import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL20;
 
 public class RoundedUtils {
   public static ShaderUtils roundedShader = new ShaderUtils("roundedRect");
@@ -252,7 +252,7 @@ public class RoundedUtils {
     GL11.glPushMatrix();
     GlStateManager.pushAttrib();
     final int programId = roundedRectRiseShader.programID;
-    GL20.glUseProgram(programId);
+    OpenGlHelper.glUseProgram(programId);
     roundedRectRiseShader.setUniformf("u_size", width, height);
     roundedRectRiseShader.setUniformf("u_radius", radius);
     roundedRectRiseShader.setUniformf(
@@ -267,7 +267,7 @@ public class RoundedUtils {
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     ShaderUtils.drawQuads(x, y, width, height);
     GlStateManager.disableBlend();
-    GL20.glUseProgram(0);
+    OpenGlHelper.glUseProgram(0);
     GlStateManager.popAttrib();
     GL11.glPopMatrix();
   }

@@ -2,6 +2,7 @@ package myau.util.render;
 
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 
@@ -62,11 +63,11 @@ public class ShaderUtil {
   }
 
   public void init() {
-    if (programID != 0) GL20.glUseProgram(programID);
+    if (programID != 0) OpenGlHelper.glUseProgram(programID);
   }
 
   public void unload() {
-    if (programID != 0) GL20.glUseProgram(0);
+    if (programID != 0) OpenGlHelper.glUseProgram(0);
   }
 
   public void setUniformf(String name, float... args) {

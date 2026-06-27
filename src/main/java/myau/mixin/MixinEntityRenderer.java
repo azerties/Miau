@@ -145,6 +145,7 @@ public abstract class MixinEntityRenderer implements MotionBlurShaderHook {
       GlStateManager.loadIdentity();
       this.myau$motionBlurShader.loadShaderGroup(partialTicks);
       GlStateManager.popMatrix();
+      GlStateManager.matrixMode(5888);
     }
   }
 

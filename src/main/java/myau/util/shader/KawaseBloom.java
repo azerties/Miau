@@ -37,10 +37,11 @@ public class KawaseBloom {
               false);
       currentBuffer.setFramebufferFilter(GL_LINEAR);
 
-      GlStateManager.bindTexture(currentBuffer.framebufferTexture);
+      org.lwjgl.opengl.GL11.glBindTexture(
+          org.lwjgl.opengl.GL11.GL_TEXTURE_2D, currentBuffer.framebufferTexture);
       GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL14.GL_MIRRORED_REPEAT);
       GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL14.GL_MIRRORED_REPEAT);
-      GlStateManager.bindTexture(0);
+      org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0);
 
       framebufferList.add(currentBuffer);
     }
@@ -93,20 +94,22 @@ public class KawaseBloom {
         "halfpixel", 1.0f / lastBuffer.framebufferWidth, 1.0f / lastBuffer.framebufferHeight);
     kawaseUp.setUniformf("iResolution", lastBuffer.framebufferWidth, lastBuffer.framebufferHeight);
     GlStateManager.setActiveTexture(GL13.GL_TEXTURE16);
-    RenderUtil.bindTexture(framebufferTexture);
+    org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, framebufferTexture);
     GlStateManager.setActiveTexture(GL13.GL_TEXTURE0);
-    RenderUtil.bindTexture(framebufferList.get(1).framebufferTexture);
+    org.lwjgl.opengl.GL11.glBindTexture(
+        org.lwjgl.opengl.GL11.GL_TEXTURE_2D, framebufferList.get(1).framebufferTexture);
     ShaderUtils.drawQuads();
     kawaseUp.unload();
 
     GlStateManager.clearColor(0, 0, 0, 0);
     mc.getFramebuffer().bindFramebuffer(false);
-    RenderUtil.bindTexture(framebufferList.get(0).framebufferTexture);
+    org.lwjgl.opengl.GL11.glBindTexture(
+        org.lwjgl.opengl.GL11.GL_TEXTURE_2D, framebufferList.get(0).framebufferTexture);
     RenderUtil.setAlphaLimit(0);
     GlStateManager.enableBlend();
     GlStateManager.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     ShaderUtils.drawQuads();
-    GlStateManager.bindTexture(0);
+    org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0);
 
     GlStateManager.alphaFunc(GL_GREATER, 0.1F);
     GlStateManager.disableBlend();
@@ -117,7 +120,7 @@ public class KawaseBloom {
     fb.framebufferClear();
     fb.bindFramebuffer(false);
     shader.init();
-    RenderUtil.bindTexture(framebufferTexture);
+    org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, framebufferTexture);
     shader.setUniformf("offset", offset, offset);
     shader.setUniformi("inTexture", 0);
     shader.setUniformi("check", 0);

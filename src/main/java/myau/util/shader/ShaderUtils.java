@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL20;
 
@@ -467,11 +468,11 @@ public class ShaderUtils {
   }
 
   public void init() {
-    glUseProgram(programID);
+    OpenGlHelper.glUseProgram(programID);
   }
 
   public void unload() {
-    glUseProgram(0);
+    OpenGlHelper.glUseProgram(0);
   }
 
   public void setUniformf(String name, float... args) {

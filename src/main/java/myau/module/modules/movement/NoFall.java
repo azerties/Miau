@@ -44,7 +44,8 @@ public class NoFall extends Module {
   private int lastMlgSlot = -1;
   private boolean mlgPlaced = false;
   public final ModeProperty mode =
-      new ModeProperty("mode", 0, new String[] {"PACKET", "BLINK", "NO_GROUND", "SPOOF", "LEGIT"});
+      new ModeProperty(
+          "mode", 0, new String[] {"PACKET", "BLINK", "NO_GROUND", "SPOOF", "LEGIT", "VULCAN"});
   public final FloatProperty distance = new FloatProperty("distance", 3.0F, 0.0F, 20.0F);
   public final IntProperty delay = new IntProperty("delay", 0, 0, 10000);
 
@@ -127,6 +128,14 @@ public class NoFall extends Module {
                 mc.thePlayer.fallDistance = 0.0F;
               }
             }
+          case 5:
+            if (!packet.isOnGround() && mc.thePlayer.fallDistance > 7.0f && this.canTrigger()) {
+              this.packetDelayTimer.reset();
+              ((IAccessorC03PacketPlayer) packet).setOnGround(true);
+              mc.thePlayer.fallDistance = 0.0F;
+              mc.thePlayer.motionY = 0.0;
+            }
+            break;
         }
       }
     }

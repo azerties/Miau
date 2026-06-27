@@ -145,9 +145,11 @@ public class MotionBlur extends Module {
     int width = mc.getFramebuffer().framebufferWidth;
     int height = mc.getFramebuffer().framebufferHeight;
     GlStateManager.matrixMode(GL11.GL_PROJECTION);
+    GlStateManager.pushMatrix();
     GlStateManager.loadIdentity();
     GlStateManager.ortho(0.0D, width, height, 0.0D, 1000.0D, 3000.0D);
     GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+    GlStateManager.pushMatrix();
     GlStateManager.loadIdentity();
     GlStateManager.translate(0.0F, 0.0F, -2000.0F);
 
@@ -180,6 +182,11 @@ public class MotionBlur extends Module {
     Framebuffer swap = this.blurBufferMain;
     this.blurBufferMain = this.blurBufferInto;
     this.blurBufferInto = swap;
+
+    GlStateManager.matrixMode(GL11.GL_PROJECTION);
+    GlStateManager.popMatrix();
+    GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+    GlStateManager.popMatrix();
   }
 
   private float getMoulberryAlpha() {
