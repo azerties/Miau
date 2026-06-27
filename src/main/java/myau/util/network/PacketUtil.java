@@ -182,12 +182,13 @@ public class PacketUtil {
     } else if (packet instanceof S49PacketUpdateEntityNBT) {
       mc.getNetHandler().handleEntityNBT((S49PacketUpdateEntityNBT) packet);
     } else {
-      throw new IllegalArgumentException(
-          "Unable to match packet type to handle: " + packet.getClass());
+      LOGGER.warn(
+          "Unable to match packet type, processing via processPacket: {}",
+          packet.getClass().getSimpleName());
+      packet.processPacket(mc.getNetHandler());
     }
   }
 
-  /** Validates S21PacketChunkData for ViaVersion compatibility issues */
   private static boolean validateChunkData(S21PacketChunkData packet) {
     try {
       if (packet == null) return false;
@@ -217,7 +218,6 @@ public class PacketUtil {
     }
   }
 
-  /** Validates S26PacketMapChunkBulk for ViaVersion compatibility issues */
   private static boolean validateMapChunkBulk(S26PacketMapChunkBulk packet) {
     try {
       if (packet == null) return false;
@@ -235,7 +235,6 @@ public class PacketUtil {
     }
   }
 
-  /** Logs chunk packet errors with rate limiting */
   private static void logChunkError(String packetType, Exception e, Object... details) {
     long currentTime = System.currentTimeMillis();
 
@@ -260,7 +259,6 @@ public class PacketUtil {
     }
   }
 
-  /** Safely handles S21PacketChunkData with ViaVersion compatibility */
   private static void handleChunkDataSafe(S21PacketChunkData packet) {
     try {
       if (!validateChunkData(packet)) {
@@ -277,7 +275,6 @@ public class PacketUtil {
     }
   }
 
-  /** Safely handles S26PacketMapChunkBulk with ViaVersion compatibility */
   private static void handleMapChunkBulkSafe(S26PacketMapChunkBulk packet) {
     try {
       if (!validateMapChunkBulk(packet)) {
