@@ -401,6 +401,7 @@ public class CategoryComponent {
         REGULAR_OUTLINE,
         REGULAR_OUTLINE2);
 
+    // Lift everything via glTranslatef
     GL11.glPushMatrix();
     GL11.glTranslatef(0f, -liftY, 0f);
 
@@ -557,8 +558,8 @@ public class CategoryComponent {
     if (textTimer != null) {
       return lastNamePos;
     }
-    Font titleFont = FontRepository.getFont("productsans-bold", 20f);
-    float middlePos = this.x + this.width / 2 - titleFont.width(this.category) / 2.0f;
+    float middlePos =
+        this.x + this.width / 2 - FontRepository.getMinecraftFont().width(this.category) / 2.0f;
     return this.opened ? middlePos : (this.x + 12);
   }
 

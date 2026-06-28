@@ -198,9 +198,12 @@ public class ModuleComponent extends Component {
       if (hoverAlpha == 0) {
         hoverTimer = null;
       }
+      // Removed module hover background as requested
     }
 
-    if (hasModuleHeader() && enableAlpha > 0.01f) {}
+    if (hasModuleHeader() && enableAlpha > 0.01f) {
+      // Removed module active background as requested
+    }
 
     int r = (int) (192 + (255 - 192) * enableAlpha);
     int g = (int) (192 + (255 - 192) * enableAlpha);
@@ -229,19 +232,21 @@ public class ModuleComponent extends Component {
       }
       float rotation = progress * 180f;
 
-      Font iconFont = FontRepository.getFont("materialicons-regular", 18f);
+      Font iconFont = FontRepository.getFont("materialicons-regular", 18);
       String arrowIcon = "\ue5cf";
       float iconW = iconFont.width(arrowIcon);
-      float iconH = 18;
+      float iconH = iconFont.height();
 
       float arrowX =
           this.categoryComponent.getX() + this.categoryComponent.getWidth() - 14 - (iconW / 2.0f);
       float arrowY = this.categoryComponent.getY() + this.yPos + 6;
 
       GL11.glPushMatrix();
-      GL11.glTranslatef(arrowX + iconW / 2.0f, arrowY + iconH / 2.0f, 0);
+      float centerX = arrowX + iconW / 2.0f;
+      float centerY = arrowY + iconH / 2.0f;
+      GL11.glTranslatef(centerX, centerY, 0);
       GL11.glRotatef(rotation, 0, 0, 1);
-      GL11.glTranslatef(-(arrowX + iconW / 2.0f), -(arrowY + iconH / 2.0f), 0);
+      GL11.glTranslatef(-centerX, -centerY, 0);
       iconFont.draw(arrowIcon, arrowX, arrowY, button_rgb, false);
       GL11.glPopMatrix();
     }
@@ -431,24 +436,16 @@ public class ModuleComponent extends Component {
     return isVisibleBase(component);
   }
 
-  public static float getFontScale() {
-    return FontRepository.getHudFont(18).height() / 9.0f;
-  }
-
   private float getBaseComponentHeightF(Component component) {
-    float fontScale = getFontScale();
     if (component instanceof SliderComponent) {
-      return 16f * fontScale;
+      return 16f;
     }
     if (component instanceof ColorComponent) {
       ColorComponent cc = (ColorComponent) component;
       float progress = cc.getAnimationProgress();
-      return 12f * fontScale + (cc.getExpandedHeight() - 12f * fontScale) * progress;
+      return 12f + (cc.getExpandedHeight() - 12f) * progress;
     }
-    if (component instanceof BindComponent) {
-      return 16f * fontScale;
-    }
-    return 12f * fontScale;
+    return 12f;
   }
 
   private float getAnimatedComponentHeightF(Component component) {
@@ -503,7 +500,7 @@ public class ModuleComponent extends Component {
   }
 
   private float getCollapsedHeight() {
-    return hasModuleHeader() ? 18f * getFontScale() : 0f;
+    return hasModuleHeader() ? 18f : 0f;
   }
 
   private float getSettingStartOffset() {

@@ -103,7 +103,7 @@ public class Myau {
     moduleManager.modules.put(AntiBot.class, new AntiBot());
     moduleManager.modules.put(AntiCheatDetector.class, new AntiCheatDetector());
     moduleManager.modules.put(AntiVoid.class, new AntiVoid());
-    moduleManager.modules.put(HackerDetector.class, new HackerDetector());
+    moduleManager.modules.put(Anticheat.class, new Anticheat());
 
     moduleManager.modules.put(AutoClicker.class, new AutoClicker());
     moduleManager.modules.put(AutoAnduril.class, new AutoAnduril());
@@ -212,6 +212,7 @@ public class Myau {
     commandManager.commands.add(new TargetCommand());
     commandManager.commands.add(new ToggleCommand());
     commandManager.commands.add(new VclipCommand());
+    commandManager.commands.add(new ReportCommand());
     for (Module module : moduleManager.modules.values()) {
       ArrayList<Property<?>> properties = new ArrayList<>();
       for (final Field field : module.getClass().getDeclaredFields()) {

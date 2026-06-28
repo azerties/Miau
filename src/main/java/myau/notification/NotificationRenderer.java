@@ -76,12 +76,14 @@ public final class NotificationRenderer {
       }
 
       final float width =
-          Math.max(
-              100,
-              iconOffset
-                  + Math.max(
-                      TITLE_FONT.getStringWidth(notification.getTitle()) + (padding * 4),
-                      DESCRIPTION_FONT.getStringWidth(notification.getDescription())));
+          Math.min(
+              scaledWidth - padding * 2,
+              Math.max(
+                  100,
+                  iconOffset
+                      + Math.max(
+                          TITLE_FONT.getStringWidth(notification.getTitle()) + (padding * 4),
+                          DESCRIPTION_FONT.getStringWidth(notification.getDescription()))));
 
       final float endX = scaledWidth - width - padding;
 

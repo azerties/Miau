@@ -71,7 +71,7 @@ public class FontCharacter {
     if (this.texture == -1) {
       upload();
     }
-    net.minecraft.client.renderer.GlStateManager.bindTexture(this.texture);
+    GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.texture);
     GL11.glBegin(GL11.GL_QUADS);
     GL11.glTexCoord2f(0.0F, 0.0F);
     GL11.glVertex2f(x, y);

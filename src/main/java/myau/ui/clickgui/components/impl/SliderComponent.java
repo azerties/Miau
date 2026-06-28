@@ -11,7 +11,7 @@ import myau.property.properties.PercentProperty;
 import myau.ui.clickgui.components.Component;
 import myau.util.font.FontRepository;
 import myau.util.render.RenderUtil;
-import net.minecraft.client.renderer.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 public class SliderComponent extends Component {
   public Property<?> property;
@@ -26,6 +26,7 @@ public class SliderComponent extends Component {
   private double targetValue;
   private double displayedValue;
 
+  // For double slider
   public boolean draggingMin = false;
   public boolean draggingMax = false;
   private double targetSecondValue;
@@ -188,16 +189,17 @@ public class SliderComponent extends Component {
       }
     }
 
-    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
-    GlStateManager.color(1f, 1f, 1f, 1f);
-    float labelX = cx + 6 + xOffset / 2;
-    float labelY = cy + 4 * fontScale;
+    GL11.glPushMatrix();
+    GL11.glScaled(0.5, 0.5, 0.5);
+    float labelX = (float) ((cx + 6 + xOffset / 2) * 2);
+    float labelY = (float) ((cy + 4) * 2);
     FontRepository.getMinecraftFont()
         .draw(this.property.getName() + ": " + valueText + suffix, labelX, labelY, -1, true);
+    GL11.glPopMatrix();
 
     float trackLeft = cx + 6 + (xOffset / 2);
     float trackRight = cx + cw - 6 + (xOffset / 2);
-    float trackY = cy + 13 * fontScale;
+    float trackY = cy + 13;
     float trackHeight = 2.5f;
 
     RenderUtil.drawRoundedRectangle(
@@ -368,19 +370,17 @@ public class SliderComponent extends Component {
   }
 
   public boolean u(int mouseX, int mouseY) {
-    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     return mouseX > this.x
         && mouseX < this.x + this.moduleComponent.categoryComponent.getWidth() / 2 + 1
         && mouseY > this.y
-        && mouseY < this.y + 16 * fontScale;
+        && mouseY < this.y + 16;
   }
 
   public boolean i(int mouseX, int mouseY) {
-    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     return mouseX > this.x + this.moduleComponent.categoryComponent.getWidth() / 2
         && mouseX < this.x + this.moduleComponent.categoryComponent.getWidth()
         && mouseY > this.y
-        && mouseY < this.y + 16 * fontScale;
+        && mouseY < this.y + 16;
   }
 
   @Override

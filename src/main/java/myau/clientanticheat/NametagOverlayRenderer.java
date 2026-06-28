@@ -37,7 +37,7 @@ public class NametagOverlayRenderer {
     if (event.type != RenderGameOverlayEvent.ElementType.PLAYER_LIST) {
       return;
     }
-    if (!AntiCheatAlertStyle.hasMarkedCheaters()) {
+    if (!AlertManager.hasMarkedPlayers()) {
       return;
     }
 
@@ -52,7 +52,7 @@ public class NametagOverlayRenderer {
     NetHandlerPlayClient netHandler = mc.getNetHandler();
     Set<NetworkPlayerInfo> markedInfos =
         Collections.newSetFromMap(new IdentityHashMap<NetworkPlayerInfo, Boolean>());
-    for (String name : AntiCheatAlertStyle.getMarkedCheaterNames()) {
+    for (String name : AlertManager.getMarkedNames()) {
       NetworkPlayerInfo info = netHandler.getPlayerInfo(name);
       if (info != null) {
         markedInfos.add(info);
@@ -107,7 +107,7 @@ public class NametagOverlayRenderer {
             / columns;
     int startX = screenWidth / 2 - (rowWidth * columns + (columns - 1) * 5) / 2;
     int baseY = this.playerListTop(font, tabOverlay, screenWidth);
-    int iconColor = AntiCheatAlertStyle.getNametagColor();
+    int iconColor = AlertManager.getNametagColor();
 
     for (int i = 0; i < playerCount; ++i) {
       NetworkPlayerInfo info = players.get(i);
