@@ -7,10 +7,9 @@ import java.util.List;
 import myau.Myau;
 import myau.module.modules.render.HUD;
 import myau.module.modules.render.Scoreboard;
-import net.minecraft.client.gui.Gui;
+import myau.util.shader.RoundedUtils;
 import net.minecraft.client.gui.GuiIngame;
 import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.scoreboard.Score;
 import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
@@ -28,70 +27,58 @@ public abstract class MixinGuiIngameScoreboard {
   protected abstract void renderScoreboard(ScoreObjective objective, ScaledResolution scaledRes);
 
   private static boolean isRenderingBloom = false;
-  private static boolean openMyauCustomScoreboardRendered = false;
 
   @Inject(method = "renderScoreboard", at = @At("HEAD"), cancellable = true)
   private void onRenderScoreboardPre(
       ScoreObjective objective, ScaledResolution scaledRes, CallbackInfo ci) {
-    openMyauCustomScoreboardRendered = false;
+    if (Myau.moduleManager == null) return;
 
-    if (!isRenderingBloom) {
-      HUD hud = (HUD) Myau.moduleManager.getModule(HUD.class);
-      if (hud != null && hud.isEnabled() && hud.shaders.getValue()) {
-        isRenderingBloom = true;
-
-        myau.util.shader.BlurUtils.prepareBloom();
-        this.renderScoreboard(objective, scaledRes);
-        myau.util.shader.BlurUtils.bloomEnd(5, 24.0f);
-
-        this.renderScoreboard(objective, scaledRes);
-
-        isRenderingBloom = false;
-        ci.cancel();
-        return;
-      }
-    }
-
-    if (Myau.moduleManager != null) {
-      Scoreboard scoreboardMod = (Scoreboard) Myau.moduleManager.getModule(Scoreboard.class);
-      if (scoreboardMod != null && scoreboardMod.isEnabled()) {
-        scoreboardMod.updateBounds(scaledRes);
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(
-            (float) scoreboardMod.drag.position.x - scoreboardMod.defaultX,
-            (float) scoreboardMod.drag.position.y - scoreboardMod.defaultY,
-            0.0f);
-
-        ci.cancel();
-        renderTenacityScoreboard(objective, scaledRes, scoreboardMod);
-        openMyauCustomScoreboardRendered = true;
-
-        GlStateManager.popMatrix();
-      }
-    }
-  }
-
-  @Inject(method = "renderScoreboard", at = @At("RETURN"))
-  private void onRenderScoreboardPost(
-      ScoreObjective objective, ScaledResolution scaledRes, CallbackInfo ci) {
-    if (openMyauCustomScoreboardRendered) {
-      openMyauCustomScoreboardRendered = false;
+    Scoreboard scoreboardMod = (Scoreboard) Myau.moduleManager.getModule(Scoreboard.class);
+    if (scoreboardMod == null || !scoreboardMod.isEnabled()) {
       return;
     }
-    if (Myau.moduleManager != null) {
-      Scoreboard scoreboardMod = (Scoreboard) Myau.moduleManager.getModule(Scoreboard.class);
-      if (scoreboardMod != null && scoreboardMod.isEnabled()) {
-        GlStateManager.popMatrix();
-      }
+
+    // Recalculate bounds every frame (this updates defaultX/defaultY)
+    scoreboardMod.updateBounds(scaledRes);
+
+    HUD hud = (HUD) Myau.moduleManager.getModule(HUD.class);
+    boolean useShaders = hud != null && hud.isEnabled() && hud.shaders.getValue();
+
+    if (!isRenderingBloom && useShaders) {
+      // Bloom pass
+      isRenderingBloom = true;
+      myau.util.shader.BlurUtils.prepareBloom();
+      renderOpalScoreboard(objective, scaledRes, scoreboardMod, true);
+      myau.util.shader.BlurUtils.bloomEnd(
+          hud.bloomCompression.getValue().intValue(), hud.bloomRadius.getValue());
+
+      // Blur pass
+      myau.util.shader.BlurUtils.prepareBlur();
+      renderOpalScoreboard(objective, scaledRes, scoreboardMod, false);
+      myau.util.shader.BlurUtils.blurEnd(
+          hud.blurCompression.getValue().intValue(), hud.blurRadius.getValue());
+
+      // Final pass
+      renderOpalScoreboard(objective, scaledRes, scoreboardMod, false);
+      isRenderingBloom = false;
+      ci.cancel();
+      return;
     }
+
+    renderOpalScoreboard(objective, scaledRes, scoreboardMod, false);
+    ci.cancel();
   }
 
   /**
-   * Tenacity-style scoreboard rendering with semi-transparent background, optional red numbers, and
-   * text shadow support.
+   * Opal-style scoreboard rendering with rounded-rect frosted-glass card.
+   *
+   * <p>Position is read from {@code scoreboardMod.defaultX/defaultY} — computed fresh each frame.
    */
-  private void renderTenacityScoreboard(
-      ScoreObjective objective, ScaledResolution scaledRes, Scoreboard scoreboardMod) {
+  private void renderOpalScoreboard(
+      ScoreObjective objective,
+      ScaledResolution scaledRes,
+      Scoreboard scoreboardMod,
+      boolean bloomPass) {
     net.minecraft.scoreboard.Scoreboard scoreboard = objective.getScoreboard();
     Collection<Score> collection = scoreboard.getSortedScores(objective);
     List<Score> list = new ArrayList<>();
@@ -100,38 +87,45 @@ public abstract class MixinGuiIngameScoreboard {
         list.add(score);
       }
     }
-
     if (list.size() > 15) {
       list = list.subList(list.size() - 15, list.size());
     }
 
-    int imageY = scaledRes.getScaledHeight() / 2 + list.size() * getFontHeight() / 3;
-    int lineCount = 0;
+    float cardX = scoreboardMod.defaultX;
+    float cardY = scoreboardMod.defaultY;
+    float cardWidth = (float) scoreboardMod.drag.scale.x;
+    float cardHeight = (float) scoreboardMod.drag.scale.y;
+    float radius = 2.0f;
 
-    int maxWidth = getStringWidth(objective.getDisplayName());
-    for (Score score : list) {
-      ScorePlayerTeam team = scoreboard.getPlayersTeam(score.getPlayerName());
-      String name =
-          ScorePlayerTeam.formatPlayerName(team, score.getPlayerName())
-              + ": "
-              + score.getScorePoints();
-      maxWidth = Math.max(maxWidth, getStringWidth(name));
+    boolean shadow = scoreboardMod.textShadow.getValue();
+
+    // --- Draw card background ---
+    if (bloomPass) {
+      RoundedUtils.drawRound(
+          cardX, cardY, cardWidth, cardHeight, radius, new Color(0xFF090909, true));
+    } else {
+      RoundedUtils.drawRound(
+          cardX, cardY, cardWidth, cardHeight, radius, new Color(0x80, 0x09, 0x09, 0x09));
     }
 
-    float xOffset = scaledRes.getScaledWidth() - maxWidth - 3;
-    Color bgColor = new Color(0, 0, 0, 75);
+    // --- Title ---
+    String title = objective.getDisplayName();
+    float titleX = cardX + cardWidth / 2.0F - getStringWidth(title) / 2.0F;
+    float titleY = cardY + 2.0F;
+    drawString(title, titleX, titleY, -1, shadow);
 
+    // --- Entries ---
+    int lineCount = 0;
     for (Score score : list) {
       lineCount++;
       ScorePlayerTeam team = scoreboard.getPlayersTeam(score.getPlayerName());
       String playerName = ScorePlayerTeam.formatPlayerName(team, score.getPlayerName());
-      int y = imageY - lineCount * getFontHeight();
-      int rightEdge = scaledRes.getScaledWidth() - 3 + 2;
 
-      Gui.drawRect((int) (xOffset - 2), y, rightEdge, y + getFontHeight(), bgColor.getRGB());
+      float entryY =
+          cardY + mc.fontRendererObj.FONT_HEIGHT + 2 + lineCount * mc.fontRendererObj.FONT_HEIGHT;
+      float leftPad = cardX + 4.0F;
 
-      boolean shadow = scoreboardMod.textShadow.getValue();
-      drawString(playerName, xOffset, y, -1, shadow);
+      drawString(playerName, leftPad, entryY, -1, shadow);
 
       String scoreText;
       if (scoreboardMod.redNumbers.getValue()) {
@@ -139,38 +133,23 @@ public abstract class MixinGuiIngameScoreboard {
       } else {
         scoreText = " " + score.getScorePoints();
       }
-      drawString(scoreText, rightEdge - getStringWidth(scoreText), y, -1, shadow);
-
-      if (lineCount == list.size()) {
-        String title = objective.getDisplayName();
-        int titleY = y - getFontHeight() - 1;
-        Gui.drawRect((int) (xOffset - 2), titleY, rightEdge, y - 1, bgColor.getRGB());
-        GlStateManager.enableBlend();
-        Gui.drawRect((int) (xOffset - 2), y - 1, rightEdge, y, bgColor.getRGB());
-
-        float titleX = xOffset + maxWidth / 2.0F - getStringWidth(title) / 2.0F;
-        drawString(title, titleX, titleY, -1, shadow);
-      }
+      float rightEdge = cardX + cardWidth - 4.0F;
+      drawString(scoreText, rightEdge - getStringWidth(scoreText), entryY, -1, shadow);
     }
   }
 
-  private int getFontHeight() {
-    return net.minecraft.client.Minecraft.getMinecraft().fontRendererObj.FONT_HEIGHT;
-  }
+  private static final net.minecraft.client.Minecraft mc =
+      net.minecraft.client.Minecraft.getMinecraft();
 
   private int getStringWidth(String text) {
-    return net.minecraft.client.Minecraft.getMinecraft().fontRendererObj.getStringWidth(text);
+    return mc.fontRendererObj.getStringWidth(text);
   }
 
   private void drawString(String text, double x, double y, int color, boolean shadow) {
     if (shadow) {
-      net.minecraft.client.Minecraft.getMinecraft()
-          .fontRendererObj
-          .drawStringWithShadow(text, (float) x, (float) y, color);
+      mc.fontRendererObj.drawStringWithShadow(text, (float) x, (float) y, color);
     } else {
-      net.minecraft.client.Minecraft.getMinecraft()
-          .fontRendererObj
-          .drawString(text, (int) x, (int) y, color);
+      mc.fontRendererObj.drawString(text, (int) x, (int) y, color);
     }
   }
 }

@@ -15,7 +15,7 @@ import myau.config.online.OnlineConfigClient;
 import myau.config.online.OnlineConfigEntry;
 import myau.util.client.ChatUtil;
 import myau.util.font.Font;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import myau.util.math.MathUtil;
 import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
@@ -136,9 +136,9 @@ public class ConfigWindow {
         new Color(0, 0, 0, 150).getRGB(),
         new Color(81, 99, 149).getRGB(),
         new Color(97, 67, 133).getRGB());
-    Font titleFont = Fonts.MINECRAFT.get(22);
-    Font regularFont = Fonts.MINECRAFT.get(18);
-    Font smallFont = Fonts.MINECRAFT.get(16);
+    Font titleFont = FontRepository.getMinecraftFont();
+    Font regularFont = FontRepository.getMinecraftFont();
+    Font smallFont = FontRepository.getMinecraftFont();
     RenderUtil.drawRect(x, y + 20, x + width, y + 21, new Color(255, 255, 255, 50).getRGB());
     titleFont.draw(
         "Config Manager",

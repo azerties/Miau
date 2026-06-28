@@ -17,7 +17,7 @@ import myau.mixin.IAccessorGuiChat;
 import myau.module.Module;
 import myau.module.modules.render.hud.InterfaceComponent;
 import myau.property.properties.*;
-import myau.util.font.ClientFontManager;
+import myau.util.font.FontRepository;
 import myau.util.render.ColorUtil;
 import myau.util.render.MenuBackground;
 import myau.util.render.RenderUtil;
@@ -60,6 +60,7 @@ public class HUD extends Module {
       new ModeProperty("color-animation", 1, new String[] {"STATIC", "FADE", "RAINBOW"});
   public final ModeProperty modulesToShow =
       new ModeProperty("modules-to-show", 1, new String[] {"ALL", "EXCLUDE RENDER", "ONLY BOUND"});
+  public final ModeProperty fontFace = new ModeProperty("Font", 1, FontRepository.FONT_NAMES);
   public final ModeProperty posX =
       new ModeProperty("position-x", 0, new String[] {"LEFT", "RIGHT"});
   public final ModeProperty posY =
@@ -92,7 +93,24 @@ public class HUD extends Module {
       new FloatProperty("Rounding Radius", 1.0F, 0.0F, 10.0F);
   public final ModeProperty menuBackground =
       new ModeProperty("Menu Background", 0, MenuBackground.NAMES);
-  public final ModeProperty fontFace = new ModeProperty("Font", 1, ClientFontManager.FACES);
+
+  /**
+   * Returns the total height of the visible module array for autofit calculations. Only meaningful
+   * when posX == 1 (right side).
+   */
+  public float getModuleListHeight() {
+    float itemHeight = hudMode.getValue() == 1 ? 12.0f : 10.0f;
+    int count = 0;
+    for (Module module : Myau.moduleManager.modules.values()) {
+      if (!module.isEnabled()) continue;
+      if (modulesToShow.getValue() == 1 && module.isHidden()) continue;
+      if (modulesToShow.getValue() == 2 && module.getKey() == 0) continue;
+      String name = module.getName().toLowerCase();
+      if (name.equals("hud") || name.equals("gui") || name.equals("clickgui")) continue;
+      count++;
+    }
+    return count * itemHeight * scale.getValue();
+  }
 
   private InterfaceComponent getComponent(Module module) {
     return components.computeIfAbsent(module, InterfaceComponent::new);
@@ -131,19 +149,19 @@ public class HUD extends Module {
   }
 
   public myau.util.font.Font getFont() {
-    return myau.util.font.Fonts.MAIN.get(18);
+    return FontRepository.getHudFont(18);
   }
 
   public HUD() {
     super("HUD", true, true);
-    ClientFontManager.setFace(this.fontFace.getValue());
+    FontRepository.setHudFace(this.fontFace.getValue());
   }
 
   @Override
   public void verifyValue(String name) {
     if (name.equalsIgnoreCase("Font")) {
-      ClientFontManager.setFace(this.fontFace.getValue());
-      myau.util.font.Fonts.MAIN.clearCache();
+      FontRepository.setHudFace(this.fontFace.getValue());
+      FontRepository.clearCache();
     }
   }
 
@@ -250,7 +268,7 @@ public class HUD extends Module {
                     .reversed())
             .collect(Collectors.toList());
 
-    boolean isMcFont = myau.util.font.ClientFontManager.isMinecraftSelected();
+    boolean isMcFont = FontRepository.isMinecraftSelected();
     float heightExhibition = 9.0f + 3.0f;
     float heightNormal = 9.0f + 1.0f;
     float currentYExhibition = (float) this.offsetY.getValue() + 1.0F * this.scale.getValue();
@@ -346,7 +364,7 @@ public class HUD extends Module {
       float delta,
       java.util.List<InterfaceComponent> animatingComponents,
       ScaledResolution sr) {
-    boolean isMcFont = myau.util.font.ClientFontManager.isMinecraftSelected();
+    boolean isMcFont = FontRepository.isMinecraftSelected();
     float heightExhibition = 9.0f + 3.0f;
     float heightNormal = 9.0f + 1.0f;
     if (this.showWatermark.getValue()) {

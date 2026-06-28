@@ -17,7 +17,7 @@ import myau.ui.clickgui.ClickGui;
 import myau.ui.clickgui.components.Component;
 import myau.util.animation.AnimationTimer;
 import myau.util.font.Font;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import org.lwjgl.BufferUtils;
@@ -198,16 +198,19 @@ public class ModuleComponent extends Component {
       if (hoverAlpha == 0) {
         hoverTimer = null;
       }
+      // Removed module hover background as requested
     }
 
-    if (hasModuleHeader() && enableAlpha > 0.01f) {}
+    if (hasModuleHeader() && enableAlpha > 0.01f) {
+      // Removed module active background as requested
+    }
 
     int r = (int) (192 + (255 - 192) * enableAlpha);
     int g = (int) (192 + (255 - 192) * enableAlpha);
     int b = (int) (192 + (255 - 192) * enableAlpha);
     int button_rgb = new Color(r, g, b).getRGB();
 
-    Font titleRenderer = Fonts.MINECRAFT.get(24);
+    Font titleRenderer = FontRepository.getMinecraftFont();
 
     if (hasModuleHeader()) {
       float textX = this.categoryComponent.getX() + 6;
@@ -229,19 +232,21 @@ public class ModuleComponent extends Component {
       }
       float rotation = progress * 180f;
 
-      Font iconFont = Fonts.ICONS.get(18);
+      Font iconFont = FontRepository.getFont("materialicons-regular", 18);
       String arrowIcon = "\ue5cf";
       float iconW = iconFont.width(arrowIcon);
-      float iconH = 18;
+      float iconH = iconFont.height();
 
       float arrowX =
           this.categoryComponent.getX() + this.categoryComponent.getWidth() - 14 - (iconW / 2.0f);
       float arrowY = this.categoryComponent.getY() + this.yPos + 6;
 
       GL11.glPushMatrix();
-      GL11.glTranslatef(arrowX + iconW / 2.0f, arrowY + iconH / 2.0f, 0);
+      float centerX = arrowX + iconW / 2.0f;
+      float centerY = arrowY + iconH / 2.0f;
+      GL11.glTranslatef(centerX, centerY, 0);
       GL11.glRotatef(rotation, 0, 0, 1);
-      GL11.glTranslatef(-(arrowX + iconW / 2.0f), -(arrowY + iconH / 2.0f), 0);
+      GL11.glTranslatef(-centerX, -centerY, 0);
       iconFont.draw(arrowIcon, arrowX, arrowY, button_rgb, false);
       GL11.glPopMatrix();
     }
@@ -431,24 +436,16 @@ public class ModuleComponent extends Component {
     return isVisibleBase(component);
   }
 
-  public static float getFontScale() {
-    return myau.util.font.Fonts.MAIN.get(18).height() / 9.0f;
-  }
-
   private float getBaseComponentHeightF(Component component) {
-    float fontScale = getFontScale();
     if (component instanceof SliderComponent) {
-      return 16f * fontScale;
+      return 16f;
     }
     if (component instanceof ColorComponent) {
       ColorComponent cc = (ColorComponent) component;
       float progress = cc.getAnimationProgress();
-      return 12f * fontScale + (cc.getExpandedHeight() - 12f * fontScale) * progress;
+      return 12f + (cc.getExpandedHeight() - 12f) * progress;
     }
-    if (component instanceof BindComponent) {
-      return 16f * fontScale;
-    }
-    return 12f * fontScale;
+    return 12f;
   }
 
   private float getAnimatedComponentHeightF(Component component) {
@@ -503,7 +500,7 @@ public class ModuleComponent extends Component {
   }
 
   private float getCollapsedHeight() {
-    return hasModuleHeader() ? 18f * getFontScale() : 0f;
+    return hasModuleHeader() ? 18f : 0f;
   }
 
   private float getSettingStartOffset() {

@@ -6,177 +6,118 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import myau.util.client.ChatUtil;
+import net.minecraft.client.Minecraft;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.scoreboard.ScorePlayerTeam;
+import net.minecraft.scoreboard.Scoreboard;
 
 /**
- * Enhanced AntiCheat alert styling with Fake VL system. Features: - Realistic fake VL values (looks
- * like server-side anticheat) - Severity/risk percentage with emoji indicators - Movement fix
- * desync detection alerts - Nametag-overlay integration (tracks marked cheaters for tab list
- * rendering) - Consistent style across all check types
+ * Simplified anticheat alert. Format:
+ *
+ * <p>{@code [Miau] &lt;teamColor&gt;playerName &7detected for &bKillAura &8[silent(snap)] &7[&aVL:
+ * &f69&7] - 5m}
+ *
+ * <p>The client prefix + username color is handled automatically by ChatUtil. Username color is
+ * pulled from the player's Scoreboard team prefix (works on any server with team-colored names).
+ * Distance is computed from the local player to the suspect.
  */
 public class AntiCheatAlertStyle {
 
-  // ── Marked cheaters for NametagOverlayRenderer ─────────────────────────
+  // ── Marked cheaters (for nametag overlay) ───────────────────────────────
+
   private static final Map<String, MarkedCheater> markedCheaters = new HashMap<>();
+  private static final long MARK_DURATION_MS = 120_000L; // 2 minutes
 
   private static final class MarkedCheater {
     final String playerName;
     final String checkName;
     final int vl;
     final long markedAt;
-    final long duration;
 
-    MarkedCheater(String playerName, String checkName, int vl, long duration) {
+    MarkedCheater(String playerName, String checkName, int vl) {
       this.playerName = playerName;
       this.checkName = checkName;
       this.vl = vl;
       this.markedAt = System.currentTimeMillis();
-      this.duration = duration;
     }
 
     boolean isExpired() {
-      return System.currentTimeMillis() - markedAt > duration;
+      return System.currentTimeMillis() - markedAt > MARK_DURATION_MS;
     }
   }
 
-  private static final long MARK_DURATION_MS = 120_000L; // 2 minutes
+  // ── Main alert method ──────────────────────────────────────────────────
 
   /**
-   * Display a styled flag alert with fake VL, risk %, severity, and trace ID. Uses ChatUtil.display
-   * for formatting.
+   * Display a simple anticheat alert.
+   *
+   * @param playerName suspect name
+   * @param cheatName type of cheat (KillAura, Scaffold, etc.)
+   * @param detail sub-type / component detail
+   * @param vl violation level
    */
-  public static void displayFlag(
-      String playerName, String cheatName, String detail, int vl, int flagCount, int maxFlagCount) {
-    if (playerName == null || playerName.isEmpty() || cheatName == null || cheatName.isEmpty()) {
-      return;
-    }
-
-    String normalizedCheat = normalizeCheatName(cheatName);
-    String normalizedDetail = normalizeDetail(cheatName, detail);
-    int visualVl = visualVl(playerName, normalizedCheat, vl, flagCount, maxFlagCount);
-    int risk = riskPercent(visualVl, flagCount, maxFlagCount);
-    String severity = severity(risk);
-    String severityColor = severityColor(risk);
-    String traceId = traceId(playerName, normalizedCheat);
-    String emoji = severityEmoji(risk);
-
-    // Mark as a cheater for nametag overlay
-    markCheater(playerName, normalizedCheat, visualVl);
-
-    // Build the alert message in a realistic anticheat style
-    StringBuilder sb = new StringBuilder();
-    sb.append(severityColor).append(severity).append(" &8| &f").append(playerName);
-    sb.append(" &7failed &b").append(normalizedCheat);
-    sb.append(" &8(&7").append(normalizedDetail).append("&8)");
-    sb.append(" &8| &dVL &f").append(visualVl / 10).append(".").append(visualVl % 10);
-    sb.append(" &8| &cRisk &f").append(risk).append("%");
-    sb.append(" &8| &7flags &f").append(flagCount).append("&8/&f").append(maxFlagCount);
-    sb.append(" &8| &7Trace#&f").append(traceId);
-    sb.append(" &8").append(emoji);
-
-    ChatUtil.display(sb.toString());
-  }
-
-  /** Display a movement fix desync alert (new style for body/head desync). */
-  public static void displayDesyncAlert(String playerName, String component, String detail) {
-    if (playerName == null || component == null) return;
-
-    markCheater(playerName, component, 50);
-
-    StringBuilder sb = new StringBuilder();
-    sb.append("&4DESYNC &8| &f").append(playerName);
-    sb.append(" &7").append(component);
-    sb.append(" &8(&7").append(detail).append("&8)");
-    sb.append(" &8| &cVL &f5.0 &8| &cRisk &f75%");
-    sb.append(" &8| &7Trace#&f").append(traceId(playerName, component));
-    sb.append(" &8\u26A0");
-
-    ChatUtil.display(sb.toString());
-  }
-
-  /** Display a generic catch-all alert with the same style. */
-  public static void displayGeneric(String playerName, String checkName, String detail, int vl) {
+  public static void displayFlag(String playerName, String cheatName, String detail, int vl) {
     if (playerName == null || playerName.isEmpty()) return;
 
-    markCheater(playerName, checkName, vl);
+    String teamColor = getPlayerTeamColor(playerName);
+    String normalized = normalizeCheatName(cheatName);
+    // VL: scale vl to a friendly number (aimVl/10)
+    int visualVl = Math.max(1, vl);
+
+    // Mark for nametag overlay
+    markCheater(playerName, normalized, visualVl);
 
     StringBuilder sb = new StringBuilder();
-    sb.append("&eALERT &8| &f").append(playerName);
-    sb.append(" &7flagged &b").append(checkName);
-    if (detail != null && !detail.isEmpty()) {
-      sb.append(" &8(&7").append(detail).append("&8)");
+    // Username in team color
+    sb.append(teamColor).append(playerName);
+    // " detected for "
+    sb.append(" &7detected for &b").append(normalized);
+    // [detail]
+    if (detail != null
+        && !detail.isEmpty()
+        && !"behavior anomaly".equalsIgnoreCase(detail)
+        && !"vl".equalsIgnoreCase(detail)) {
+      sb.append(" &8[").append(detail).append("&8]");
     }
-    sb.append(" &8| &dVL &f").append(vl);
-    sb.append(" &8| &7Trace#&f").append(traceId(playerName, checkName));
+    // [VL: number]
+    sb.append(" &7[&aVL: &f").append(visualVl).append("&7]");
+    // - Xm
+    int distance = getPlayerDistance(playerName);
+    if (distance >= 0) {
+      sb.append(" &7- &f").append(distance).append("m");
+    }
 
     ChatUtil.display(sb.toString());
   }
 
-  // ── Normalization helpers ─────────────────────────────────────────────
+  // ── Cheat name normaliser ──────────────────────────────────────────────
 
+  /** Normalise cheat names so "KillAura (Constant Aim)" becomes just "KillAura". */
   public static String normalizeCheatName(String cheatName) {
-    int detailStart = cheatName.indexOf(" (");
-    return detailStart > 0 ? cheatName.substring(0, detailStart) : cheatName;
+    if (cheatName == null) return "Unknown";
+    // Strip parenthesised detail like "KillAura (Constant Aim)"
+    int paren = cheatName.indexOf(" (");
+    String name = paren > 0 ? cheatName.substring(0, paren) : cheatName;
+    // Normalise common variations
+    String lower = name.toLowerCase(Locale.ROOT);
+    if (lower.startsWith("killaura") || lower.startsWith("killaura")) return "KillAura";
+    if (lower.startsWith("scaffold")) return "Scaffold";
+    if (lower.startsWith("autoblock")) return "AutoBlock";
+    if (lower.startsWith("reach")) return "Reach";
+    if (lower.startsWith("velocity")) return "Velocity";
+    if (lower.startsWith("noslow")) return "NoSlow";
+    if (lower.startsWith("blink")) return "Blink";
+    if (lower.startsWith("fakelag")) return "FakeLag";
+    if (lower.startsWith("sprint")) return "Sprint";
+    if (lower.startsWith("autoclicker")) return "AutoClicker";
+    return name;
   }
 
-  public static String normalizeDetail(String cheatName, String detail) {
-    if (detail != null
-        && !detail.trim().isEmpty()
-        && !"behavior anomaly".equalsIgnoreCase(detail)) {
-      return detail.trim();
-    }
-    int detailStart = cheatName.indexOf(" (");
-    if (detailStart > 0 && cheatName.endsWith(")")) {
-      return cheatName.substring(detailStart + 2, cheatName.length() - 1);
-    }
-    return "heuristic anomaly";
-  }
-
-  // ── Fake VL system ────────────────────────────────────────────────────
-
-  /** Generates a realistic fake VL value (looks like server-side anticheat). */
-  private static int visualVl(
-      String playerName, String cheatName, int vl, int flagCount, int maxFlagCount) {
-    int seed = Math.abs((playerName + ":" + cheatName).hashCode());
-    int base = Math.max(vl * 10, flagCount * 18 + maxFlagCount * 7);
-    return Math.min(120, Math.max(10, base + seed % 17));
-  }
-
-  private static int riskPercent(int visualVl, int flagCount, int maxFlagCount) {
-    int flagRisk = maxFlagCount <= 0 ? 35 : (flagCount * 100 / maxFlagCount);
-    return Math.min(99, Math.max(25, (visualVl * 5 + flagRisk * 6) / 11));
-  }
-
-  private static String severity(int risk) {
-    if (risk >= 90) return "RAGE";
-    if (risk >= 75) return "HIGH";
-    if (risk >= 55) return "MED";
-    return "LOW";
-  }
-
-  private static String severityColor(int risk) {
-    if (risk >= 90) return "&4";
-    if (risk >= 75) return "&c";
-    if (risk >= 55) return "&e";
-    return "&a";
-  }
-
-  private static String severityEmoji(int risk) {
-    if (risk >= 90) return "\u2622"; // ☢ radioactive
-    if (risk >= 75) return "\u26A0"; // ⚠ warning
-    if (risk >= 55) return "\u26A1"; // ⚡ high voltage
-    return "\u2139"; // ℹ info
-  }
-
-  private static String traceId(String playerName, String cheatName) {
-    String hex = Integer.toHexString(Math.abs((playerName + cheatName).hashCode())).toUpperCase();
-    return hex.length() <= 4 ? hex : hex.substring(0, 4);
-  }
-
-  // ── Nametag integration ───────────────────────────────────────────────
+  // ── Nametag overlay helpers ────────────────────────────────────────────
 
   public static void markCheater(String playerName, String checkName, int vl) {
     String key = playerName.toLowerCase(Locale.ROOT);
-    markedCheaters.put(key, new MarkedCheater(playerName, checkName, vl, MARK_DURATION_MS));
+    markedCheaters.put(key, new MarkedCheater(playerName, checkName, vl));
     pruneExpired();
   }
 
@@ -195,16 +136,48 @@ public class AntiCheatAlertStyle {
   }
 
   public static int getNametagColor() {
-    // Red icon with the configured opacity
     return 0xCCFF3B30;
+  }
+
+  public static void clearMarkedCheaters() {
+    markedCheaters.clear();
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────
+
+  /** Get the player's team colour from the Scoreboard (e.g., "&c" for red). */
+  private static String getPlayerTeamColor(String playerName) {
+    Minecraft mc = Minecraft.getMinecraft();
+    if (mc.theWorld == null) return "&f";
+    Scoreboard board = mc.theWorld.getScoreboard();
+    if (board == null) return "&f";
+    ScorePlayerTeam team = board.getPlayersTeam(playerName);
+    if (team != null) {
+      String prefix = team.getColorPrefix();
+      if (prefix != null) {
+        // Extract the last §-style colour from the prefix
+        int idx = prefix.lastIndexOf('\u00A7');
+        if (idx >= 0 && idx + 1 < prefix.length()) {
+          return "&" + prefix.charAt(idx + 1);
+        }
+      }
+    }
+    return "&f"; // default white
+  }
+
+  /** Distance in integer blocks from the local player to the suspect. */
+  private static int getPlayerDistance(String playerName) {
+    Minecraft mc = Minecraft.getMinecraft();
+    if (mc.thePlayer == null || mc.theWorld == null) return -1;
+    for (EntityPlayer p : mc.theWorld.playerEntities) {
+      if (p.getName().equals(playerName)) {
+        return (int) Math.round(mc.thePlayer.getDistanceToEntity(p));
+      }
+    }
+    return -1;
   }
 
   private static void pruneExpired() {
     markedCheaters.values().removeIf(MarkedCheater::isExpired);
-  }
-
-  /** Clear all marked cheaters (on world unload). */
-  public static void clearMarkedCheaters() {
-    markedCheaters.clear();
   }
 }

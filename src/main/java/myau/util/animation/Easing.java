@@ -53,7 +53,14 @@ public enum Easing {
                   ? 1
                   : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * ((2 * Math.PI) / 3)) * 0.5
                       + 1),
-  EASE_IN_BACK(x -> (1.70158 + 1) * x * x * x - 1.70158 * x * x);
+  EASE_IN_BACK(x -> (1.70158 + 1) * x * x * x - 1.70158 * x * x),
+
+  /** Opal's DECELERATE: 1 - ((x-1) * (x-1)). */
+  DECELERATE(x -> 1 - ((x - 1) * (x - 1))),
+  /** Opal's SMOOTH_STEP: -2 * x^3 + 3 * x^2. */
+  SMOOTH_STEP(x -> -2 * Math.pow(x, 3) + 3 * Math.pow(x, 2)),
+  /** Opal's DYNAMIC_ISLAND: 1 - cos(x * PI * (0.2 + 2.5 * x^3)) * exp(-x * 5). */
+  DYNAMIC_ISLAND(x -> 1 - Math.cos(x * Math.PI * (0.2 + 2.5 * Math.pow(x, 3))) * Math.exp(-x * 5));
 
   private final Function<Double, Double> function;
 

@@ -54,16 +54,19 @@ public class DragManager {
       if (module.isEnabled()) {
         for (Property<?> value : module.getValues()) {
           if (value instanceof DragProperty) {
-            draggables.add((DragProperty) value);
-            draggableNames.add(module.getName());
+            DragProperty dp = (DragProperty) value;
+            // Skip structure-only drags (e.g. scoreboard which uses autofit, not manual drag)
+            if (!dp.structure) {
+              draggables.add(dp);
+              draggableNames.add(module.getName());
+            }
           }
         }
       }
     }
 
-    if (Myau.notificationManager != null && Myau.notificationManager.drag != null) {
-      draggables.add(Myau.notificationManager.drag);
-      draggableNames.add("Notifications");
+    if (Myau.notificationManager != null) {
+      // NotificationManager is now Opal-style (no drag property)
     }
 
     int mouseX = Mouse.getX() * width / mc.displayWidth;
@@ -84,6 +87,7 @@ public class DragManager {
         Vector2d scale = positionValue.scale;
 
         if (!positionValue.structure
+            && positionValue.render
             && mouseX >= position.x
             && mouseX <= position.x + scale.x
             && mouseY >= position.y
@@ -206,6 +210,8 @@ public class DragManager {
       DragProperty positionValue = draggables.get(i);
       String name = draggableNames.get(i);
       float padding = 2;
+
+      if (!positionValue.render) continue;
 
       positionValue.position.x = Math.max(padding, positionValue.position.x);
       positionValue.position.x =

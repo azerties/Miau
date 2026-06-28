@@ -28,6 +28,7 @@ import myau.module.modules.network.*;
 import myau.module.modules.player.*;
 import myau.module.modules.render.*;
 import myau.notification.NotificationManager;
+import myau.notification.NotificationRenderer;
 import myau.property.Property;
 import myau.property.PropertyManager;
 import net.minecraftforge.common.MinecraftForge;
@@ -83,7 +84,7 @@ public class Myau {
     EventManager.register(moduleManager);
     EventManager.register(commandManager);
     EventManager.register(discordRichPresence);
-    EventManager.register(notificationManager);
+    EventManager.register(NotificationRenderer.getInstance());
     EventManager.register(dragManager);
 
     badPacketsComponent = new myau.component.BadPacketsComponent();

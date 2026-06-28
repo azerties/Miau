@@ -1,15 +1,47 @@
 package myau.notification;
 
-/**
- * Convenience type alias.
- *
- * <p>The notification value object has been moved into {@link NotificationManager.Notification} as
- * a static inner class. This subclass re-exports it under the top-level name so that any existing
- * {@code import myau.notification.Notification} continues to compile without modification.
- */
-public class Notification extends NotificationManager.Notification {
+import myau.util.time.TimerUtil;
 
-  public Notification(NotificationType type, String title, String description, int duration) {
-    super(type, title, description, duration);
+public final class Notification {
+
+  private final TimerUtil timer = new TimerUtil();
+  private final NotificationType type;
+  private final String title, description;
+  private final int duration;
+
+  Notification(
+      final NotificationType type,
+      final String title,
+      final String description,
+      final int duration) {
+    this.type = type;
+    this.title = title;
+    this.description = description;
+    this.duration = duration;
+    this.timer.reset();
+  }
+
+  public NotificationType getType() {
+    return type;
+  }
+
+  public String getTitle() {
+    return title;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public int getDuration() {
+    return duration;
+  }
+
+  public boolean hasExpired() {
+    return timer.hasTimeElapsed(duration, false);
+  }
+
+  public long getTime() {
+    return timer.getTime();
   }
 }

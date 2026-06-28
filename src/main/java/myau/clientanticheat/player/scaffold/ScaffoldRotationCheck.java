@@ -1,10 +1,12 @@
 package myau.clientanticheat.player.scaffold;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import myau.clientanticheat.CheckBuffer;
 import myau.clientanticheat.ClientAntiCheatContext;
 import myau.clientanticheat.PlayerCheckData;
+import myau.clientanticheat.StatisticalUtils;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
@@ -16,15 +18,43 @@ public class ScaffoldRotationCheck {
   private final Map<String, CheckBuffer> stabilityBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> speedBuffers = new HashMap<>();
   private final Map<String, CheckBuffer> sharpRotationBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> backSnapBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> constantYawBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> entropyBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> gcdBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> perfectSnapBuffers = new HashMap<>();
+  private final Map<String, CheckBuffer> cardinalBiasBuffers = new HashMap<>();
+
   private final Map<String, float[]> yawHistory = new HashMap<>();
   private final Map<String, float[]> pitchHistory = new HashMap<>();
   private final Map<String, Integer> sharpRotationCounts = new HashMap<>();
   private final Map<String, Long> sharpRotationResets = new HashMap<>();
   private final Map<String, Long> lastBlockPlacement = new HashMap<>();
-  private final Map<String, CheckBuffer> backSnapBuffers = new HashMap<>();
-  private final Map<String, CheckBuffer> constantYawBuffers = new HashMap<>();
+
+  // GCD tracking
+  private final Map<String, LinkedList<Float>> yawGcdHistory = new HashMap<>();
+  private final Map<String, LinkedList<Float>> pitchGcdHistory = new HashMap<>();
+
+  // Perfect snap tracking
+  private final Map<String, Integer> consecutivePerfectSnaps = new HashMap<>();
+  private final Map<String, Float> lastPerfectYaw = new HashMap<>();
+  private final Map<String, Float> lastPerfectPitch = new HashMap<>();
+
+  // Cardinal bias tracking
+  private final Map<String, LinkedList<Float>> yawHistogram = new HashMap<>();
+  private final Map<String, LinkedList<Float>> pitchHistogram = new HashMap<>();
+
+  // Entropy tracking
+  private final Map<String, LinkedList<Float>> yawEntropySamples = new HashMap<>();
+  private final Map<String, LinkedList<Float>> pitchEntropySamples = new HashMap<>();
+
+  private final Map<String, Long> lastFlag = new HashMap<>();
 
   private static final int HISTORY_LENGTH = 6;
+  private static final int GCD_HISTORY_SIZE = 20;
+  private static final int PERFECT_SNAP_COOLDOWN = 5;
+  private static final int CARDINAL_HISTORY_SIZE = 30;
+  private static final int ENTROPY_WINDOW = 15;
 
   public void check(
       EntityPlayer player, World world, PlayerCheckData data, ClientAntiCheatContext context) {
@@ -40,6 +70,12 @@ public class ScaffoldRotationCheck {
         this.backSnapBuffers.computeIfAbsent(name, key -> new CheckBuffer());
     CheckBuffer constantYawBuffer =
         this.constantYawBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer entropyBuffer = this.entropyBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer gcdBuffer = this.gcdBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer perfectSnapBuffer =
+        this.perfectSnapBuffers.computeIfAbsent(name, key -> new CheckBuffer());
+    CheckBuffer cardinalBiasBuffer =
+        this.cardinalBiasBuffers.computeIfAbsent(name, key -> new CheckBuffer());
 
     ItemStack held = player.getHeldItem();
     boolean holdingBlock = held != null && held.getItem() instanceof ItemBlock;
@@ -49,6 +85,10 @@ public class ScaffoldRotationCheck {
       sharpRotationBuffer.decay(0.2D);
       backSnapBuffer.decay(0.2D);
       constantYawBuffer.decay(0.3D);
+      entropyBuffer.decay(0.2D);
+      gcdBuffer.decay(0.15D);
+      perfectSnapBuffer.decay(0.2D);
+      cardinalBiasBuffer.decay(0.15D);
       return;
     }
 
@@ -66,6 +106,7 @@ public class ScaffoldRotationCheck {
     float deltaYaw = data.yawDelta;
     float deltaPitch = data.pitchDelta;
 
+    // ── Stability check ──
     if (bridgeContext) {
       if (deltaPitch > 0.0F && deltaPitch < 0.005F && deltaYaw > 20.0F * sensitivityMult) {
         stabilityBuffer.flag(1.0D, 4.0D);
@@ -83,6 +124,7 @@ public class ScaffoldRotationCheck {
       speedBuffer.decay(0.4D);
     }
 
+    // ── Rotation history ──
     float[] yawHist = this.yawHistory.computeIfAbsent(name, k -> new float[HISTORY_LENGTH]);
     float[] pitchHist = this.pitchHistory.computeIfAbsent(name, k -> new float[HISTORY_LENGTH]);
     for (int i = 0; i < HISTORY_LENGTH - 1; i++) {
@@ -92,6 +134,7 @@ public class ScaffoldRotationCheck {
     yawHist[HISTORY_LENGTH - 1] = player.rotationYaw;
     pitchHist[HISTORY_LENGTH - 1] = player.rotationPitch;
 
+    // ── Sharp rotation check ──
     boolean recentPlacement =
         System.currentTimeMillis() - this.lastBlockPlacement.getOrDefault(name, 0L) < 2000;
     float rotationMovement = Math.abs(yawMotion(1, yawHist));
@@ -111,6 +154,7 @@ public class ScaffoldRotationCheck {
       }
     }
 
+    // ── Back-snap detection (existing) ──
     boolean alphaCondition = pitchAt(1, pitchHist) > 70;
     int pitchLimit = alphaCondition ? 20 : 40;
 
@@ -143,6 +187,7 @@ public class ScaffoldRotationCheck {
       backSnapBuffer.flag(2.5D, 999.0D);
     }
 
+    // ── Constant yaw check (existing) ──
     if (bridgeContext && recentPlacement) {
       float yawToCardinal = Math.abs(player.rotationYaw % 90.0F);
       boolean perfectCardinal = yawToCardinal < 0.5F || yawToCardinal > 89.5F;
@@ -157,6 +202,129 @@ public class ScaffoldRotationCheck {
       constantYawBuffer.decay(0.2D);
     }
 
+    // ── GCD Analysis (NEW) ──
+    // Clean GCD = low-entropy rotation like aimbot
+    if (bridgeContext && (deltaYaw > 0.05F || deltaPitch > 0.05F)) {
+      LinkedList<Float> yawGcds = this.yawGcdHistory.computeIfAbsent(name, k -> new LinkedList<>());
+      LinkedList<Float> pitchGcds =
+          this.pitchGcdHistory.computeIfAbsent(name, k -> new LinkedList<>());
+
+      if (deltaYaw > 0.05F && deltaPitch > 0.05F) {
+        float gcd = (float) StatisticalUtils.gcd(deltaYaw, deltaPitch);
+        yawGcds.addFirst(gcd);
+        if (yawGcds.size() > GCD_HISTORY_SIZE) yawGcds.removeLast();
+      }
+
+      if (yawGcds.size() >= 10) {
+        double mad = StatisticalUtils.medianAbsoluteDeviation(yawGcds);
+        // Very low MAD = suspiciously consistent GCD = aimbot-like rotation
+        if (mad < 0.01 && bridgeContext) {
+          gcdBuffer.flag(1.0D, 999.0D);
+        } else {
+          gcdBuffer.decay(0.15D);
+        }
+      }
+    } else {
+      gcdBuffer.decay(0.1D);
+    }
+
+    // ── Entropy Analysis (NEW) ──
+    // Human rotation has high entropy; cheat rotation has low entropy
+    if (bridgeContext && (deltaYaw > 0.01F || deltaPitch > 0.01F)) {
+      LinkedList<Float> yawSamples =
+          this.yawEntropySamples.computeIfAbsent(name, k -> new LinkedList<>());
+      LinkedList<Float> pitchSamples =
+          this.pitchEntropySamples.computeIfAbsent(name, k -> new LinkedList<>());
+
+      yawSamples.addFirst(deltaYaw);
+      pitchSamples.addFirst(deltaPitch);
+      if (yawSamples.size() > ENTROPY_WINDOW) yawSamples.removeLast();
+      if (pitchSamples.size() > ENTROPY_WINDOW) pitchSamples.removeLast();
+
+      if (yawSamples.size() >= ENTROPY_WINDOW && recentPlacement) {
+        double yawEntropy =
+            StatisticalUtils.entropy(
+                new LinkedList<Long>() {
+                  {
+                    for (Float f : yawSamples) add(f.longValue());
+                  }
+                });
+        double pitchEntropy =
+            StatisticalUtils.entropy(
+                new LinkedList<Long>() {
+                  {
+                    for (Float f : pitchSamples) add(f.longValue());
+                  }
+                });
+
+        // Very low entropy on both axes = rotation pattern too uniform
+        if (yawEntropy < 0.5 && pitchEntropy < 0.3 && bridgeContext) {
+          entropyBuffer.flag(1.5D, 999.0D);
+        } else {
+          entropyBuffer.decay(0.15D);
+        }
+      }
+    } else {
+      entropyBuffer.decay(0.1D);
+    }
+
+    // ── Perfect Snap Detection (NEW) ──
+    // Consecutive perfect 180° snaps = scaffold module behavior
+    if (bridgeContext && recentPlacement) {
+      float yawMotion1 = yawMotion(1, yawHist);
+      float pitchMotion1 = pitchMotion(1, pitchHist);
+
+      boolean isPerfectSnap =
+          Math.abs(yawMotion1 - 180.0F) < 0.5F || Math.abs(yawMotion1 - 90.0F) < 0.5F;
+
+      if (isPerfectSnap) {
+        int count = this.consecutivePerfectSnaps.getOrDefault(name, 0) + 1;
+        this.consecutivePerfectSnaps.put(name, count);
+
+        if (count >= 3) {
+          perfectSnapBuffer.flag(1.5D, 999.0D);
+        }
+      } else {
+        this.consecutivePerfectSnaps.put(name, 0);
+      }
+    } else {
+      int current = this.consecutivePerfectSnaps.getOrDefault(name, 0);
+      if (current > 0) {
+        this.consecutivePerfectSnaps.put(name, Math.max(0, current - 1));
+      }
+    }
+
+    // ── Cardinal Direction Bias (NEW) ──
+    // Cheat clients often snap to cardinal angles (0, 90, 180, 270)
+    if (bridgeContext && deltaYaw > 0.5F) {
+      float normalizedYaw = player.rotationYaw % 360;
+      if (normalizedYaw < 0) normalizedYaw += 360;
+
+      LinkedList<Float> yawSamples =
+          this.yawHistogram.computeIfAbsent(name, k -> new LinkedList<>());
+      yawSamples.addFirst(normalizedYaw);
+      if (yawSamples.size() > CARDINAL_HISTORY_SIZE) yawSamples.removeLast();
+
+      if (yawSamples.size() >= 10) {
+        int cardinalHits = 0;
+        for (float y : yawSamples) {
+          float distToCardinal = Math.abs(y % 90);
+          if (distToCardinal < 3 || distToCardinal > 87) {
+            cardinalHits++;
+          }
+        }
+        double ratio = (double) cardinalHits / yawSamples.size();
+        if (ratio > 0.7 && bridgeContext) {
+          cardinalBiasBuffer.flag(1.0D, 999.0D);
+        } else {
+          cardinalBiasBuffer.decay(0.15D);
+        }
+      }
+    } else {
+      cardinalBiasBuffer.decay(0.12D);
+    }
+
+    // ── Individual flagging (backward compatible) ──
     if (stabilityBuffer.get() > 3.0D) {
       context.receiveSignal(name, "Scaffold (Rotation Stability)");
       stabilityBuffer.reset();
@@ -176,6 +344,24 @@ public class ScaffoldRotationCheck {
     if (constantYawBuffer.get() > 7.0D) {
       context.receiveSignal(name, "Scaffold (Constant Yaw)");
       constantYawBuffer.reset();
+    }
+
+    // ── New combined flags ──
+    if (entropyBuffer.get() > 5.0D) {
+      context.receiveSignal(name, "Scaffold (Low Entropy)");
+      entropyBuffer.reset();
+    }
+    if (gcdBuffer.get() > 5.0D) {
+      context.receiveSignal(name, "Scaffold (Clean GCD)");
+      gcdBuffer.reset();
+    }
+    if (perfectSnapBuffer.get() > 4.0D) {
+      context.receiveSignal(name, "Scaffold (Perfect Snap)");
+      perfectSnapBuffer.reset();
+    }
+    if (cardinalBiasBuffer.get() > 7.0D) {
+      context.receiveSignal(name, "Scaffold (Cardinal Bias)");
+      cardinalBiasBuffer.reset();
     }
   }
 
@@ -254,5 +440,19 @@ public class ScaffoldRotationCheck {
     this.lastBlockPlacement.clear();
     this.backSnapBuffers.clear();
     this.constantYawBuffers.clear();
+    this.entropyBuffers.clear();
+    this.gcdBuffers.clear();
+    this.perfectSnapBuffers.clear();
+    this.cardinalBiasBuffers.clear();
+    this.yawGcdHistory.clear();
+    this.pitchGcdHistory.clear();
+    this.consecutivePerfectSnaps.clear();
+    this.lastPerfectYaw.clear();
+    this.lastPerfectPitch.clear();
+    this.yawHistogram.clear();
+    this.pitchHistogram.clear();
+    this.yawEntropySamples.clear();
+    this.pitchEntropySamples.clear();
+    this.lastFlag.clear();
   }
 }

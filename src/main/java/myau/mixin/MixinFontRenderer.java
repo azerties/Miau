@@ -5,6 +5,7 @@ import myau.enums.ChatColors;
 import myau.module.modules.misc.AntiObfuscate;
 import myau.module.modules.misc.NickHider;
 import myau.module.modules.render.HUD;
+import myau.util.font.FontRepository;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
@@ -32,7 +33,7 @@ public abstract class MixinFontRenderer {
 
   private void updateHeight() {
     if (Myau.moduleManager == null) return;
-    this.FONT_HEIGHT = myau.util.font.ClientFontManager.isMinecraftSelected() ? 9 : 9;
+    this.FONT_HEIGHT = FontRepository.isMinecraftSelected() ? 9 : 9;
   }
 
   @ModifyVariable(method = "getStringWidth", at = @At("HEAD"), ordinal = 0, argsOnly = true)
@@ -93,13 +94,13 @@ public abstract class MixinFontRenderer {
       }
     }
 
-    if (!myau.util.font.ClientFontManager.isMinecraftSelected()) {
+    if (!FontRepository.isMinecraftSelected()) {
       isCustomRendering = true;
       try {
         if (!targetName.isEmpty() && text.contains(targetName)) {
           cir.setReturnValue(drawTrueRGBCustomName(text, x, y, color, dropShadow, targetName, hud));
         } else {
-          myau.util.font.Font font = myau.util.font.Fonts.MAIN.get(18);
+          myau.util.font.Font font = FontRepository.getHudFont(18);
           font.draw(text, x, y, color, dropShadow);
           cir.setReturnValue((int) (x + font.width(text)));
         }
@@ -121,7 +122,7 @@ public abstract class MixinFontRenderer {
   public void onGetStringWidth(String text, CallbackInfoReturnable<Integer> cir) {
     updateHeight();
     if (isCustomRendering) return;
-    if (!myau.util.font.ClientFontManager.isMinecraftSelected() && Myau.moduleManager != null) {
+    if (!FontRepository.isMinecraftSelected() && Myau.moduleManager != null) {
       if (text == null) {
         cir.setReturnValue(0);
         return;
@@ -140,7 +141,7 @@ public abstract class MixinFontRenderer {
           text = nickHider.replaceNick(text);
         }
 
-        myau.util.font.Font font = myau.util.font.Fonts.MAIN.get(18);
+        myau.util.font.Font font = FontRepository.getHudFont(18);
         cir.setReturnValue(font.width(text));
       } finally {
         isCustomRendering = false;
@@ -152,10 +153,10 @@ public abstract class MixinFontRenderer {
   public void onGetCharWidth(char character, CallbackInfoReturnable<Integer> cir) {
     updateHeight();
     if (isCustomRendering) return;
-    if (!myau.util.font.ClientFontManager.isMinecraftSelected()) {
+    if (!FontRepository.isMinecraftSelected()) {
       isCustomRendering = true;
       try {
-        myau.util.font.Font font = myau.util.font.Fonts.MAIN.get(18);
+        myau.util.font.Font font = FontRepository.getHudFont(18);
         cir.setReturnValue(font.width(String.valueOf(character)));
       } finally {
         isCustomRendering = false;
@@ -171,7 +172,7 @@ public abstract class MixinFontRenderer {
       boolean dropShadow,
       String targetName,
       HUD hud) {
-    myau.util.font.Font font = myau.util.font.Fonts.MAIN.get(18);
+    myau.util.font.Font font = FontRepository.getHudFont(18);
     float currentX = x;
     String remaining = text;
     int index = remaining.indexOf(targetName);

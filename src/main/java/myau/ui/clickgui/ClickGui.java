@@ -51,14 +51,32 @@ public class ClickGui extends GuiScreen {
           "Minigames"
         };
 
+    net.minecraft.client.gui.ScaledResolution sr =
+        new net.minecraft.client.gui.ScaledResolution(
+            net.minecraft.client.Minecraft.getMinecraft());
+    int screenWidth = sr.getScaledWidth();
+
     float startX = 15;
+    float startY = 15;
     float marginX = 105;
+    float marginY = 60;
+
+    float currentX = startX;
+    float currentY = startY;
 
     for (int i = 0; i < values.length; ++i) {
       CategoryComponent cc = new CategoryComponent(values[i]);
-      cc.setX(startX + (i / 2) * marginX, false);
-      cc.setY(15 + (i % 2) * 60, false);
+
+      if (currentX + marginX > screenWidth && currentX > startX) {
+        currentX = startX;
+        currentY += marginY;
+      }
+
+      cc.setX(currentX, false);
+      cc.setY(currentY, false);
       categories.add(cc);
+
+      currentX += marginX;
     }
   }
 
@@ -105,12 +123,18 @@ public class ClickGui extends GuiScreen {
     this.actualScreenWidth = this.sr.getScaledWidth();
     this.actualScreenHeight = this.sr.getScaledHeight();
 
+    int delay = 0;
     for (CategoryComponent categoryComponent : categories) {
       categoryComponent.setScreenSize(this.width, this.height);
       categoryComponent.limitPositions();
       categoryComponent.reloadModules();
+
+      categoryComponent.guiOpenTimer = new AnimationTimer(250 + delay * 80);
+      categoryComponent.guiOpenTimer.start();
+      delay++;
     }
 
+    // Khởi tạo ConfigWindow nếu chưa có (Để góc dưới cùng bên phải)
     if (configWindow == null) {
       configWindow = new ConfigWindow(actualScreenWidth - 350, actualScreenHeight - 250);
     } else {
@@ -144,14 +168,12 @@ public class ClickGui extends GuiScreen {
     float centerX = this.width / 2.0f;
     float centerY = this.height / 2.0f;
 
-    float progress = this.scaleAnimation.getValueFloat(0.0f, 1.0f, 1);
-    float ease = (float) myau.util.animation.Easing.EASE_OUT_EXPO.apply(progress);
-    float scaleFactor = 0.8f + (0.2f * ease);
+    float scaleFactor = 1.0f;
 
     ClickGui.openingScale = scaleFactor;
 
-    int scaledX = (int) (centerX + (x - centerX) / scaleFactor);
-    int scaledY = (int) (centerY + (y - centerY) / scaleFactor);
+    int scaledX = x;
+    int scaledY = y;
 
     updateAutoLayout(delta);
 
@@ -212,6 +234,7 @@ public class ClickGui extends GuiScreen {
     }
     GL11.glColor3f(1.0f, 1.0f, 1.0f);
 
+    // Vẽ Config Window
     if (configWindow != null) {
       configWindow.drawWindow(scaledX, scaledY, delta);
     }
@@ -325,14 +348,16 @@ public class ClickGui extends GuiScreen {
 
   @Override
   public void keyTyped(char t, int k) {
-
+    // 1. Chặn phím tắt nếu đang gõ chữ trong ConfigWindow
     if (configWindow != null && configWindow.keyTyped(t, k)) return;
 
+    // Kiểm tra xem người dùng có đang cài Keybind cho module nào không
     boolean isBinding = binding();
 
     SearchBarComponent searchBar = null;
     CategoryComponent searchCategory = null;
 
+    // Tìm Category Search và Component SearchBar
     for (CategoryComponent category : categories) {
       if (category.category.equalsIgnoreCase("Search")) {
         searchCategory = category;
@@ -344,9 +369,10 @@ public class ClickGui extends GuiScreen {
       }
     }
 
+    // 2. Logic Xử lý phím cho Search
     if (searchBar != null && searchCategory != null) {
       if (searchBar.focused) {
-
+        // Nếu đang gõ Search mà bấm ESC -> Thoát khỏi chế độ gõ (không đóng GUI)
         if (k == Keyboard.KEY_ESCAPE) {
           searchBar.focused = false;
           return;
@@ -355,18 +381,21 @@ public class ClickGui extends GuiScreen {
           && k != Keyboard.KEY_ESCAPE
           && k != Keyboard.KEY_RETURN
           && k != Keyboard.KEY_BACK) {
-
+        // TỰ ĐỘNG BẮT PHÍM (Giống Rise Client)
+        // Nếu gõ chữ cái, số, hoặc khoảng trắng -> Tự động chuyển qua Search
         if (String.valueOf(t).matches("[a-zA-Z0-9 ]")) {
-
+          // Mở xổ Panel Search ra nếu nó đang bị thu gọn
           if (!searchCategory.isOpened()) {
             searchCategory.mouseClicked(true);
           }
-
+          // Bật focus để nó nhận chữ ngay lập tức
           searchBar.focused = true;
+          // (Phím vừa gõ sẽ được truyền tiếp xuống vòng lặp bên dưới để add vào ô Search)
         }
       }
     }
 
+    // 3. Xử lý đóng ClickGUI bằng ESC
     if (k == Keyboard.KEY_ESCAPE) {
       if (!isBinding) {
         this.mc.displayGuiScreen(null);
@@ -374,6 +403,7 @@ public class ClickGui extends GuiScreen {
       }
     }
 
+    // 4. Truyền phím xuống cho toàn bộ các module/setting/searchbar
     for (CategoryComponent category : categories) {
       if (category.isOpened() && !category.getModules().isEmpty()) {
         for (Component module : category.getModules()) {

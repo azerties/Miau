@@ -6,6 +6,7 @@ package myau.util.animation;
  */
 public class Animation {
   private Easing easing;
+  private long millis;
   protected long duration;
   private long startTime;
 
@@ -44,11 +45,13 @@ public class Animation {
    * @param destinationValue the value that the animation is going to reach
    */
   public void run(float destinationValue) {
+    this.millis = System.currentTimeMillis();
     if (this.destinationValue != destinationValue) {
       this.destinationValue = destinationValue;
       this.reset();
     } else {
-      this.finished = System.currentTimeMillis() - this.duration > this.startTime;
+      this.finished =
+          this.millis - this.duration > this.startTime || this.value == destinationValue;
       if (this.finished) {
         this.value = destinationValue;
         return;
@@ -168,5 +171,22 @@ public class Animation {
 
   public boolean isFinished() {
     return finished;
+  }
+
+  public void setStartValue(float startValue) {
+    this.startValue = startValue;
+    this.value = startValue;
+  }
+
+  public float getStartValue() {
+    return startValue;
+  }
+
+  public long getMillis() {
+    return millis;
+  }
+
+  public void setMillis(long millis) {
+    this.millis = millis;
   }
 }

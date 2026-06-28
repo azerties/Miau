@@ -16,7 +16,7 @@ import myau.module.Module;
 import myau.module.modules.movement.LongJump;
 import myau.module.modules.render.HUD;
 import myau.property.properties.*;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import myau.util.math.RandomUtil;
 import myau.util.network.PacketUtil;
 import myau.util.player.*;
@@ -489,7 +489,7 @@ public class Scaffold extends Module {
     String amount = String.valueOf(count);
     String info = "Blocks: " + amount;
 
-    float textWidth = Fonts.MAIN.get(18).width(info);
+    float textWidth = FontRepository.getHudFont(18).width(info);
     float width = 16f + 8f + textWidth + 8f;
     float height = 22f;
     float x = (sr.getScaledWidth() - width) / 2f;
@@ -538,11 +538,10 @@ public class Scaffold extends Module {
 
     GlStateManager.enableBlend();
     int textAlpha = (int) (255 * animationProgress);
-    float fontY = y + (height / 2f) - (Fonts.MAIN.get(18).height() / 2f);
+    float fontY = y + (height / 2f) - (FontRepository.getHudFont(18).height() / 2f);
     float textX = x + 24f;
 
-    Fonts.MAIN
-        .get(18)
+    FontRepository.getHudFont(18)
         .drawWithShadow(info, textX, fontY, new Color(255, 255, 255, textAlpha).getRGB());
 
     GlStateManager.popMatrix();

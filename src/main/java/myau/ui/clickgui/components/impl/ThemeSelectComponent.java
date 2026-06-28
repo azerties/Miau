@@ -56,7 +56,7 @@ public class ThemeSelectComponent extends Component {
     float cy = this.categoryComponent.getY() + this.o + 2;
     float w = this.categoryComponent.getWidth() - 8;
     float h = 42;
-    float gradientH = 22 + (hoverAnim * 20);
+    float gradientH = 22 + (hoverAnim * 20); // Gradient expands slightly on hover
 
     int bgAlpha = (int) (150 + hoverAnim * 50);
     int bgColor = new Color(18, 21, 30, bgAlpha).getRGB();
@@ -69,6 +69,7 @@ public class ThemeSelectComponent extends Component {
         ColorUtil.interpolate(
             hoverAnim, this.theme.getSecondColor(), this.theme.getSecondColor().brighter());
 
+    // Offset for running color animation
     long offsetMS = (currentMS / 15L) % 360L;
     if (hoverAnim > 0.01f) {
       float hue = (offsetMS % 360L) / 360f;
@@ -80,7 +81,7 @@ public class ThemeSelectComponent extends Component {
 
     myau.util.shader.RoundedUtils.drawGradientHorizontal(cx, cy, w, gradientH, 6, c1, c2);
 
-    Font font = myau.util.font.Fonts.MAIN.get(18);
+    Font font = myau.util.font.FontRepository.getHudFont(18);
     Color textColor = ColorUtil.interpolate(selectAnim, Color.WHITE, this.theme.getFirstColor());
     font.drawCentered(
         this.theme.getThemeName(),

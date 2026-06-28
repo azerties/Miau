@@ -10,7 +10,7 @@ import myau.ui.clickgui.animation.ScrollOffsetAnimation;
 import myau.ui.clickgui.components.Component;
 import myau.util.animation.AnimationTimer;
 import myau.util.font.Font;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -40,6 +40,7 @@ public class CategoryComponent {
   public boolean hovering = false;
   public boolean hoveringOverCategory = false;
   public AnimationTimer smoothTimer;
+  public AnimationTimer guiOpenTimer;
   private AnimationTimer textTimer;
   public float big;
 
@@ -296,7 +297,7 @@ public class CategoryComponent {
 
   public void render(FontRenderer renderer) {
     this.width = this.category.equalsIgnoreCase("Config") ? 135 : 92;
-    Font titleRenderer = Fonts.MINECRAFT.get(24);
+    Font titleRenderer = FontRepository.getMinecraftFont();
 
     long currentMS = System.currentTimeMillis();
     float delta = currentMS - lastRenderMS;
@@ -376,6 +377,21 @@ public class CategoryComponent {
     cachedHoverAnim = 0f;
     cachedRenderModuleY = renderModuleY;
 
+    float openAnimationValue = 1.0f;
+    if (guiOpenTimer != null) {
+      openAnimationValue = guiOpenTimer.getValueFloat(0f, 1f, 1);
+      if (openAnimationValue >= 1.0f) {
+        guiOpenTimer = null;
+      }
+    }
+
+    if (openAnimationValue < 1.0f) {
+      GL11.glEnable(GL11.GL_SCISSOR_TEST);
+      float scissorHeight = (extra - this.renderY) * openAnimationValue;
+      RenderUtil.scissor(this.renderX - 3, this.renderY - 3, this.width + 6, scissorHeight + 6);
+    }
+
+    // Draw translucent background with gradient outline (raven-bS style)
     drawRoundedGradientOutlinedRectangle(
         this.renderX - 2,
         this.renderY,
@@ -386,6 +402,7 @@ public class CategoryComponent {
         REGULAR_OUTLINE,
         REGULAR_OUTLINE2);
 
+    // Lift everything via glTranslatef
     GL11.glPushMatrix();
     GL11.glTranslatef(0f, -liftY, 0f);
 
@@ -412,6 +429,9 @@ public class CategoryComponent {
       GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
+    if (openAnimationValue < 1.0f) {
+      GL11.glDisable(GL11.GL_SCISSOR_TEST);
+    }
     GL11.glPopMatrix();
   }
 
@@ -539,7 +559,8 @@ public class CategoryComponent {
     if (textTimer != null) {
       return lastNamePos;
     }
-    float middlePos = this.x + this.width / 2 - Fonts.MINECRAFT.get(24).width(this.category) / 2.0f;
+    float middlePos =
+        this.x + this.width / 2 - FontRepository.getMinecraftFont().width(this.category) / 2.0f;
     return this.opened ? middlePos : (this.x + 12);
   }
 
@@ -747,7 +768,7 @@ public class CategoryComponent {
     GL11.glEnable(GL11.GL_BLEND);
     GL11.glDisable(GL11.GL_TEXTURE_2D);
     GL11.glEnable(GL11.GL_LINE_SMOOTH);
-
+    // Filled background
     GL11.glBegin(GL11.GL_TRIANGLE_FAN);
     glColor(n6);
     for (int i = 0; i <= 90; i += 3) {
@@ -775,7 +796,7 @@ public class CategoryComponent {
           (double) (y + radius) + Math.cos(n12) * radius);
     }
     GL11.glEnd();
-
+    // Gradient outline
     GL11.glPushMatrix();
     GL11.glShadeModel(GL11.GL_SMOOTH);
     GL11.glLineWidth(2.0f);

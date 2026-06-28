@@ -11,7 +11,7 @@ import myau.ClientInfo;
 import myau.management.MyauAPI;
 import myau.ui.GuiUpdateClient;
 import myau.util.font.Font;
-import myau.util.font.impl.rise.FontRenderer;
+import myau.util.font.FontRepository;
 import myau.util.render.Themes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.*;
@@ -51,17 +51,17 @@ public class MiauMainMenu extends GuiScreen {
       if (is == null) return null;
       java.awt.Font awt =
           java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is).deriveFont(size);
-      return new FontRenderer(awt, true, true, false);
+      return new myau.util.font.impl.rise.FontRenderer(awt, true, true, false);
     } catch (Exception e) {
       return null;
     }
   }
 
   private void loadFonts() {
-    fontLogo = myau.util.font.Fonts.MAIN.get(56);
-    fontSubtitle = myau.util.font.Fonts.MAIN.get(18);
-    fontBtn = myau.util.font.Fonts.MAIN.get(18);
-    fontMeta = myau.util.font.Fonts.MAIN.get(14);
+    fontLogo = FontRepository.getHudFont(56);
+    fontSubtitle = FontRepository.getHudFont(18);
+    fontBtn = FontRepository.getHudFont(18);
+    fontMeta = FontRepository.getHudFont(14);
   }
 
   @Override

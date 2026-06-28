@@ -13,12 +13,7 @@ import myau.clientanticheat.PlayerCheckData;
 import myau.clientanticheat.PlayerEligibility;
 import myau.clientanticheat.combat.autoblock.AutoBlockCheck;
 import myau.clientanticheat.combat.autoclicker.ClickSpeedCheck;
-import myau.clientanticheat.combat.killaura.KillAuraHeuristicsCheck;
-import myau.clientanticheat.combat.killaura.KillAuraLatencyCheck;
-import myau.clientanticheat.combat.killaura.KillAuraNoSwingCheck;
-import myau.clientanticheat.combat.killaura.KillAuraRotationSpeed;
-import myau.clientanticheat.combat.killaura.KillAuraToolSwitchCheck;
-import myau.clientanticheat.combat.killaura.KillAuraUnifiedCheck;
+import myau.clientanticheat.combat.killaura.KillAuraMegaCheck;
 import myau.clientanticheat.combat.reach.HitboxRaytraceCheck;
 import myau.clientanticheat.movement.blink.BlinkCheck;
 import myau.clientanticheat.movement.blink.FakeLagCheck;
@@ -57,13 +52,8 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
 
   // ── Check instances ──────────────────────────────────────────────────
 
-  // KillAura (6 checkers — unified + heuristics + 4 extras)
-  private final KillAuraUnifiedCheck killauraUnified = new KillAuraUnifiedCheck();
-  private final KillAuraHeuristicsCheck killauraHeuristics = new KillAuraHeuristicsCheck();
-  private final KillAuraNoSwingCheck killauraNoSwing = new KillAuraNoSwingCheck();
-  private final KillAuraLatencyCheck killauraLatency = new KillAuraLatencyCheck();
-  private final KillAuraToolSwitchCheck killauraToolSwitch = new KillAuraToolSwitchCheck();
-  private final KillAuraRotationSpeed killauraRotation = new KillAuraRotationSpeed();
+  // KillAura (single mega checker — replaces all 6 previous checkers)
+  private final KillAuraMegaCheck killauraCheck = new KillAuraMegaCheck();
 
   // Combat
   private final AutoBlockCheck autoBlockCheck = new AutoBlockCheck();
@@ -131,14 +121,9 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
 
       data.updateRainData(player);
 
-      // ── KillAura (Unified + Heuristics + 4 Extras) ──────────────────
+      // ── KillAura (Mega Check — all detection in one pass) ──────────
       if (this.enableKillaura.getValue()) {
-        this.killauraUnified.check(player, data, currentTick, this);
-        this.killauraHeuristics.check(player, data, this);
-        this.killauraNoSwing.check(player, data, this);
-        this.killauraLatency.check(player, data, this);
-        this.killauraToolSwitch.check(player, data, currentTick, this);
-        this.killauraRotation.check(player, data, currentTick, this);
+        this.killauraCheck.check(player, data, currentTick, this);
       }
 
       // ── AutoBlock ──────────────────────────────────────────────────
@@ -205,9 +190,7 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
     this.checkCooldowns.put(cooldownKey, now);
 
     ++this.flagCount;
-    AntiCheatAlertStyle.displayFlag(playerName, cheatName, detail, vl, this.flagCount,
-        MAX_FLAG_COUNT);
-    AntiCheatAlertStyle.markCheater(playerName, cheatName, vl);
+    AntiCheatAlertStyle.displayFlag(playerName, cheatName, detail, vl);
 
     if (this.sound.getValue() && now - this.lastAlertSoundTime >= 1500L) {
       mc.thePlayer.playSound("random.orb", 0.3F, 1.0F);
@@ -235,12 +218,7 @@ public class HackerDetector extends Module implements ClientAntiCheatContext {
     this.lastAlertSoundTime = 0;
     this.checkCooldowns.clear();
 
-    this.killauraUnified.reset();
-    this.killauraHeuristics.reset();
-    this.killauraNoSwing.reset();
-    this.killauraLatency.reset();
-    this.killauraToolSwitch.reset();
-    this.killauraRotation.reset();
+    this.killauraCheck.reset();
     this.autoBlockCheck.reset();
     this.reachCheck.reset();
     this.velocityCheck.reset();

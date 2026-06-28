@@ -3,8 +3,8 @@ package myau.clientanticheat;
 import java.util.LinkedList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
-import net.minecraft.potion.Potion;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
 
 public class PlayerCheckData {
@@ -85,6 +85,40 @@ public class PlayerCheckData {
   public final LinkedList<Float> yawGcdSamples = new LinkedList<>();
   public EntityPlayer nearestTarget;
   public double nearestTargetDistance;
+
+  // ── Scaffold tracking fields ──
+  /** Timestamps of recent block placements (millis) */
+  public final LinkedList<Long> placementTimestamps = new LinkedList<>();
+
+  /** Recent yaw deltas during scaffold (bridge context) */
+  public final LinkedList<Float> scaffoldYawDeltas = new LinkedList<>();
+
+  /** Recent pitch deltas during scaffold (bridge context) */
+  public final LinkedList<Float> scaffoldPitchDeltas = new LinkedList<>();
+
+  /** Block positions placed in scaffold mode */
+  public final LinkedList<BlockPos> blockPositionHistory = new LinkedList<>();
+
+  /** Timestamps when sneak toggled */
+  public final LinkedList<Long> sneakToggleTimestamps = new LinkedList<>();
+
+  /** Tick when last scaffold swing occurred */
+  public int lastScaffoldSwingTick;
+
+  /** Ticks spent in scaffold (bridge) mode */
+  public int scaffoldTicks;
+
+  /** Whether player is currently in scaffold bridge context */
+  public boolean scaffoldBridge;
+
+  /** Last n placement intervals in ms (for speed analysis) */
+  public final LinkedList<Long> placementIntervals = new LinkedList<>();
+
+  /** Current streak of placement bursts (rapid consecutive) */
+  public int placementBurst;
+
+  /** Last known held block count */
+  public int lastBlockCount;
 
   public PlayerCheckData(EntityPlayer player) {
     this.name = player.getName();

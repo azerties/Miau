@@ -1,21 +1,10 @@
 package myau.util.font.impl.rise;
 
 import java.awt.*;
-import java.awt.font.FontRenderContext;
-import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
-import myau.util.animation.*;
-import myau.util.client.*;
-import myau.util.math.*;
-import myau.util.misc.*;
-import myau.util.network.*;
-import myau.util.player.*;
-import myau.util.render.*;
 import myau.util.render.ColorUtil;
-import myau.util.time.*;
-import myau.util.world.*;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.BufferUtils;
@@ -23,65 +12,63 @@ import org.lwjgl.opengl.GL11;
 
 public class FontRenderer extends myau.util.font.Font {
 
-  private static final String ALPHABET = "ABCDEFGHOKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   private static final String COLOR_CODE_CHARACTERS = "0123456789abcdefklmnor";
   private static final Color TRANSPARENT_COLOR = new Color(255, 255, 255, 0);
   private static final float SCALE = 0.5f;
   private static final float SCALE_INVERSE = 1 / SCALE;
   private static final char COLOR_INVOKER = '\247';
   private static final int[] COLOR_CODES = new int[32];
-  private static final int LATIN_MAX_AMOUNT = 256;
   private static final int MARGIN_WIDTH = 4;
   private static final int MASK = 0xFF;
+  private static final int PRE_RENDER_MAX = 256;
 
-  private final Font font;
+  private final java.awt.Font font;
   private final boolean fractionalMetrics;
   private final float fontHeight;
+  private final boolean smooth;
 
   private final java.util.Map<Character, FontCharacter> regularCharacters =
       new java.util.HashMap<>();
   private final java.util.Map<Character, FontCharacter> boldCharacters = new java.util.HashMap<>();
-  private boolean antialiasing = true, international = false;
+  private boolean antialiasing = true;
 
-  private Font plainFont;
-  private Font boldFont;
+  private java.awt.Font plainFont;
+  private java.awt.Font boldFont;
   private FontMetrics plainFontMetrics;
   private FontMetrics boldFontMetrics;
   private Graphics2D plainFontGraphics;
   private Graphics2D boldFontGraphics;
 
   public FontRenderer(
-      Font font, boolean fractionalMetrics, boolean antialiasing, boolean international) {
+      final java.awt.Font font,
+      final boolean fractionalMetrics,
+      final boolean antialiasing,
+      final boolean smooth) {
     calculateColorCodes();
     this.antialiasing = antialiasing;
     this.font = font;
     this.fractionalMetrics = fractionalMetrics;
-    this.fontHeight =
-        (float)
-            (font.getStringBounds(
-                        ALPHABET,
-                        new FontRenderContext(
-                            new AffineTransform(), antialiasing, fractionalMetrics))
-                    .getHeight()
-                / 2);
+    this.smooth = smooth;
     setupFonts();
-    this.fillCharacters(this.regularCharacters, Font.PLAIN);
-    this.fillCharacters(this.boldCharacters, Font.BOLD);
-    this.international = international;
+    // Height from font metrics — works for both regular and icon fonts
+    this.fontHeight =
+        (float) ((plainFontMetrics.getAscent() + plainFontMetrics.getDescent()) / 2.0);
+    fillCharacters(this.regularCharacters, java.awt.Font.PLAIN);
+    fillCharacters(this.boldCharacters, java.awt.Font.BOLD);
   }
 
   public FontRenderer(
-      final Font font, final boolean fractionalMetrics, final boolean antialiasing) {
+      final java.awt.Font font, final boolean fractionalMetrics, final boolean antialiasing) {
     this(font, fractionalMetrics, antialiasing, false);
   }
 
-  public FontRenderer(final Font font, final boolean fractionalMetrics) {
+  public FontRenderer(final java.awt.Font font, final boolean fractionalMetrics) {
     this(font, fractionalMetrics, true, false);
   }
 
   private void setupFonts() {
-    this.plainFont = font.deriveFont(Font.PLAIN);
-    this.boldFont = font.deriveFont(Font.BOLD);
+    this.plainFont = font.deriveFont(java.awt.Font.PLAIN);
+    this.boldFont = font.deriveFont(java.awt.Font.BOLD);
 
     final BufferedImage plainFontImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
     this.plainFontGraphics = (Graphics2D) plainFontImage.getGraphics();
@@ -112,18 +99,18 @@ public class FontRenderer extends myau.util.font.Font {
 
   public void fillCharacters(
       final java.util.Map<Character, FontCharacter> characters, final int style) {
-    for (int i = 0; i < LATIN_MAX_AMOUNT; ++i) {
+    for (int i = 0; i < PRE_RENDER_MAX; ++i) {
       final char character = (char) i;
       characters.put(character, createCharacter(character, style));
     }
   }
 
   private FontCharacter createCharacter(final char character, final int style) {
-    final Font font = (style == Font.BOLD) ? this.boldFont : this.plainFont;
+    final java.awt.Font font = (style == java.awt.Font.BOLD) ? this.boldFont : this.plainFont;
     final Graphics2D fontGraphics =
-        (style == Font.BOLD) ? this.boldFontGraphics : this.plainFontGraphics;
+        (style == java.awt.Font.BOLD) ? this.boldFontGraphics : this.plainFontGraphics;
     final FontMetrics fontMetrics =
-        (style == Font.BOLD) ? this.boldFontMetrics : this.plainFontMetrics;
+        (style == java.awt.Font.BOLD) ? this.boldFontMetrics : this.plainFontMetrics;
 
     final Rectangle2D charRectangle = fontMetrics.getStringBounds(character + "", fontGraphics);
 
@@ -139,7 +126,7 @@ public class FontRenderer extends myau.util.font.Font {
     charGraphics.setColor(TRANSPARENT_COLOR);
     charGraphics.fillRect(0, 0, width, height);
     setRenderHints(charGraphics);
-    charGraphics.drawString(character + "", MARGIN_WIDTH, font.getSize());
+    charGraphics.drawString(character + "", MARGIN_WIDTH, fontMetrics.getAscent());
 
     if (net.minecraft.client.Minecraft.getMinecraft().isCallingFromMinecraftThread()) {
       final int charTexture = GL11.glGenTextures();
@@ -152,7 +139,7 @@ public class FontRenderer extends myau.util.font.Font {
 
   private synchronized FontCharacter getCharacter(final char character, final int style) {
     final java.util.Map<Character, FontCharacter> characters =
-        (style == Font.BOLD) ? this.boldCharacters : this.regularCharacters;
+        (style == java.awt.Font.BOLD) ? this.boldCharacters : this.regularCharacters;
     FontCharacter fontCharacter = characters.get(character);
     if (fontCharacter == null) {
       fontCharacter = createCharacter(character, style);
@@ -183,7 +170,7 @@ public class FontRenderer extends myau.util.font.Font {
   public void uploadTexture(
       final int texture, final BufferedImage image, final int width, final int height) {
     final int[] pixels = image.getRGB(0, 0, width, height, new int[width * height], 0, width);
-    final ByteBuffer byteBuffer = BufferUtils.createByteBuffer(width * height * MARGIN_WIDTH);
+    final ByteBuffer byteBuffer = BufferUtils.createByteBuffer(width * height * 4);
     for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
         final int pixel = pixels[x + y * width];
@@ -196,8 +183,14 @@ public class FontRenderer extends myau.util.font.Font {
     ((java.nio.Buffer) byteBuffer).flip();
     int currentTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
     GlStateManager.bindTexture(texture);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+    // Smooth (bilinear) for icons and antialiased text, nearest for non-antialiased crisp text
+    if (smooth || antialiasing) {
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+    } else {
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+    }
     GL11.glTexImage2D(
         GL11.GL_TEXTURE_2D,
         0,
@@ -287,7 +280,7 @@ public class FontRenderer extends myau.util.font.Font {
           y += lineHeightTimes2;
           continue;
         }
-        if (character == '§') {
+        if (character == '\u00A7') {
           i++;
           if (i < characters.length) {
             char formatChar = characters[i];
@@ -301,19 +294,17 @@ public class FontRenderer extends myau.util.font.Font {
               if (originalAlpha == 0) originalAlpha = 255;
               ColorUtil.glColor((originalAlpha << 24) | (formatColor & 0x00FFFFFF));
             } else if (formatChar == 'r') {
-              // Reset to original color, applying shadow if needed
               int resetColor = color;
               if (isShadowPass) {
                 resetColor = (color & 0xFCFCFC) >> 2 | color & 0xFF000000;
               }
               ColorUtil.glColor(resetColor);
             }
-            // Other formatting codes (k, l, m, n, o) are not implemented — skip
           }
           continue;
         }
 
-        final FontCharacter fontCharacter = getCharacter(character, Font.PLAIN);
+        final FontCharacter fontCharacter = getCharacter(character, java.awt.Font.PLAIN);
         if (fontCharacter == null) continue;
 
         float characterWidth = fontCharacter.getWidth();
@@ -333,7 +324,7 @@ public class FontRenderer extends myau.util.font.Font {
 
   @Override
   public void drawCharacter(final char character, final int x, final int y, final Color color) {
-    final FontCharacter fontCharacter = getCharacter(character, Font.PLAIN);
+    final FontCharacter fontCharacter = getCharacter(character, java.awt.Font.PLAIN);
     if (fontCharacter == null) return;
     GlStateManager.color(
         color.getRed() / 255f,
@@ -354,7 +345,7 @@ public class FontRenderer extends myau.util.font.Font {
         i++;
         continue;
       }
-      final FontCharacter fontCharacter = getCharacter(character, Font.PLAIN);
+      final FontCharacter fontCharacter = getCharacter(character, java.awt.Font.PLAIN);
       if (fontCharacter == null) continue;
       width += fontCharacter.getWidth() - MARGIN_WIDTH * 2;
     }
@@ -364,15 +355,5 @@ public class FontRenderer extends myau.util.font.Font {
 
   public float height() {
     return fontHeight;
-  }
-
-  private boolean requiresInternationalFont(String text) {
-    int highest = 0;
-
-    for (int i = 0; i < text.length(); i++) {
-      if (text.charAt(i) > highest) highest = text.charAt(i);
-    }
-
-    return highest >= 256;
   }
 }

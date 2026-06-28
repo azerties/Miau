@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.io.IOException;
 import java.io.InputStream;
 import myau.util.font.Font;
-import myau.util.font.impl.rise.FontRenderer;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
 import org.lwjgl.opengl.GL11;
@@ -41,7 +40,7 @@ public class WelcomeScreen extends GuiScreen {
       if (is == null) return null;
       java.awt.Font awt =
           java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is).deriveFont(size);
-      return new FontRenderer(awt, true, true, false);
+      return new myau.util.font.impl.rise.FontRenderer(awt, true, true, false);
     } catch (Exception e) {
       return null;
     }

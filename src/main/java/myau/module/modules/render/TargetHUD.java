@@ -65,6 +65,11 @@ public class TargetHUD extends Module {
   public final FloatProperty scale = new FloatProperty("Scale", 1.0F, 0.5F, 1.5F);
   public final BooleanProperty shadow = new BooleanProperty("Shadow", true);
   public final DragProperty drag = new DragProperty("Position", new Vector2d(70, 30));
+
+  {
+    this.drag.render = true;
+  }
+
   public final BooleanProperty showStatus = new BooleanProperty("Show win or loss", true);
   public final BooleanProperty healthColor = new BooleanProperty("Traditional health color", false);
   public final BooleanProperty renderEsp = new BooleanProperty("Render ESP", true);

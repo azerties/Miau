@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import myau.Myau;
 import myau.module.modules.render.HUD;
-import myau.notification.NotificationManager;
 import myau.notification.NotificationType;
 import myau.property.Property;
 import myau.util.client.KeyBindUtil;
@@ -56,10 +55,24 @@ public abstract class Module {
       boolean showNotif = hud == null || hud.notifications.getValue();
       if (enabled) {
         this.onEnabled();
-        NotificationManager.notify(this.getName(), "Module enabled.", NotificationType.ENABLED);
+        if (showNotif) {
+          Myau.notificationManager
+              .builder(NotificationType.INFO)
+              .duration(1000)
+              .title(this.getName())
+              .description("Module enabled.")
+              .buildAndPublish();
+        }
       } else {
         this.onDisabled();
-        NotificationManager.notify(this.getName(), "Module disabled.", NotificationType.DISABLED);
+        if (showNotif) {
+          Myau.notificationManager
+              .builder(NotificationType.INFO)
+              .duration(1000)
+              .title(this.getName())
+              .description("Module disabled.")
+              .buildAndPublish();
+        }
       }
     }
   }

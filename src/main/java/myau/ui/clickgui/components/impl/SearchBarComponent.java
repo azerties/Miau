@@ -3,7 +3,7 @@ package myau.ui.clickgui.components.impl;
 import java.awt.Color;
 import myau.ui.clickgui.components.Component;
 import myau.util.font.Font;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import net.minecraft.client.gui.Gui;
 import org.lwjgl.input.Keyboard;
 
@@ -20,7 +20,7 @@ public class SearchBarComponent extends Component {
 
   @Override
   public void render() {
-    Font font = Fonts.MINECRAFT.get(18);
+    Font font = FontRepository.getMinecraftFont();
     String display =
         currentText.length() == 0 && !focused
             ? "Search module..."

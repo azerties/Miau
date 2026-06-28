@@ -3,6 +3,7 @@ package myau.clientanticheat;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 public final class StatisticalUtils {
@@ -124,6 +125,169 @@ public final class StatisticalUtils {
   public static double sensitivityFromGcd(double gcd) {
     double f = Math.cbrt(gcd / 8.0);
     return (f - 0.2) / 0.6;
+  }
+
+  /**
+   * Exponential Moving Average (EMA) alpha = smoothing factor (0-1), higher = more weight to recent
+   * values
+   */
+  public static double exponentialMovingAverage(Collection<? extends Number> values, double alpha) {
+    if (values.isEmpty()) return 0.0;
+    double ema = 0.0;
+    boolean first = true;
+    for (Number v : values) {
+      if (first) {
+        ema = v.doubleValue();
+        first = false;
+      } else {
+        ema = alpha * v.doubleValue() + (1.0 - alpha) * ema;
+      }
+    }
+    return ema;
+  }
+
+  /** Weighted mean where newer values have higher weight */
+  public static double weightedMean(List<? extends Number> values) {
+    int size = values.size();
+    if (size == 0) return 0.0;
+    double sum = 0.0;
+    double weightSum = 0.0;
+    for (int i = 0; i < size; i++) {
+      double w = (double) (i + 1) / size; // newer = higher weight
+      sum += values.get(i).doubleValue() * w;
+      weightSum += w;
+    }
+    return sum / weightSum;
+  }
+
+  /** Variance on a sliding window – detects sudden changes in dispersion */
+  public static double slidingWindowVariance(List<? extends Number> values, int windowSize) {
+    int size = values.size();
+    if (size < windowSize || windowSize < 2) return 0.0;
+    double sum = 0.0;
+    double sumSq = 0.0;
+    int start = size - windowSize;
+    for (int i = start; i < size; i++) {
+      double v = values.get(i).doubleValue();
+      sum += v;
+      sumSq += v * v;
+    }
+    double mean = sum / windowSize;
+    return (sumSq / windowSize) - (mean * mean);
+  }
+
+  /** Auto-correlation at lag k – detects periodic patterns */
+  public static double autoCorrelation(List<? extends Number> values, int lag) {
+    int n = values.size();
+    if (n <= lag || lag <= 0) return 0.0;
+    double m = mean(values);
+    double numerator = 0.0;
+    double denominator = 0.0;
+    for (int i = 0; i < n - lag; i++) {
+      double v = values.get(i).doubleValue();
+      double vLag = values.get(i + lag).doubleValue();
+      numerator += (v - m) * (vLag - m);
+      denominator += (v - m) * (v - m);
+    }
+    if (denominator == 0.0) return 0.0;
+    return numerator / denominator;
+  }
+
+  /**
+   * Histogram similarity (chi-squared distance) between two value lists. Lower = more similar.
+   * Useful for comparing rotation distributions.
+   */
+  public static double histogramSimilarity(
+      List<? extends Number> a, List<? extends Number> b, int bins) {
+    if (a.isEmpty() || b.isEmpty()) return 1.0;
+    double min = Double.MAX_VALUE, max = -Double.MAX_VALUE;
+    for (Number v : a) {
+      double d = v.doubleValue();
+      if (d < min) min = d;
+      if (d > max) max = d;
+    }
+    for (Number v : b) {
+      double d = v.doubleValue();
+      if (d < min) min = d;
+      if (d > max) max = d;
+    }
+    double range = max - min;
+    if (range < 1e-10) return a.size() == b.size() ? 0.0 : 1.0;
+    int[] histA = new int[bins];
+    int[] histB = new int[bins];
+    for (Number v : a) {
+      int idx = (int) ((v.doubleValue() - min) / range * (bins - 1));
+      idx = Math.max(0, Math.min(bins - 1, idx));
+      histA[idx]++;
+    }
+    for (Number v : b) {
+      int idx = (int) ((v.doubleValue() - min) / range * (bins - 1));
+      idx = Math.max(0, Math.min(bins - 1, idx));
+      histB[idx]++;
+    }
+    double chiSq = 0.0;
+    for (int i = 0; i < bins; i++) {
+      double sum = histA[i] + histB[i];
+      if (sum > 0) {
+        chiSq += (histA[i] - histB[i]) * (histA[i] - histB[i]) / sum;
+      }
+    }
+    return chiSq / (bins * 2);
+  }
+
+  /**
+   * Median Absolute Deviation – robust measure of dispersion. Low MAD = values are suspiciously
+   * consistent.
+   */
+  public static double medianAbsoluteDeviation(List<? extends Number> values) {
+    int n = values.size();
+    if (n < 3) return 0.0;
+    double med = median(values);
+    double[] devs = new double[n];
+    for (int i = 0; i < n; i++) {
+      devs[i] = Math.abs(values.get(i).doubleValue() - med);
+    }
+    return medianArray(devs);
+  }
+
+  private static double median(List<? extends Number> values) {
+    int n = values.size();
+    double[] sorted = new double[n];
+    int i = 0;
+    for (Number v : values) sorted[i++] = v.doubleValue();
+    java.util.Arrays.sort(sorted);
+    if (n % 2 == 1) return sorted[n / 2];
+    return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+  }
+
+  private static double medianArray(double[] sorted) {
+    int n = sorted.length;
+    java.util.Arrays.sort(sorted);
+    if (n % 2 == 1) return sorted[n / 2];
+    return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+  }
+
+  /** Normalize a value to [0, 1] range using min-max scaling */
+  public static double normalize(double value, double min, double max) {
+    if (max - min == 0) return 0.5;
+    return Math.max(0.0, Math.min(1.0, (value - min) / (max - min)));
+  }
+
+  /** Sigmoid function for smoothing threshold transitions */
+  public static double sigmoid(double x) {
+    return 1.0 / (1.0 + Math.exp(-x));
+  }
+
+  /** Weighted sum combining multiple scores */
+  public static double weightedScore(double[] scores, double[] weights) {
+    if (scores.length != weights.length) return 0.0;
+    double sum = 0.0;
+    double weightSum = 0.0;
+    for (int i = 0; i < scores.length; i++) {
+      sum += scores[i] * weights[i];
+      weightSum += weights[i];
+    }
+    return weightSum > 0 ? sum / weightSum : 0.0;
   }
 
   private static double log2(double x) {

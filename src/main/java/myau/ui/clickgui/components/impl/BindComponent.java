@@ -3,12 +3,12 @@ package myau.ui.clickgui.components.impl;
 import java.awt.Color;
 import myau.ui.clickgui.components.Component;
 import myau.util.font.Font;
-import myau.util.font.Fonts;
+import myau.util.font.FontRepository;
 import myau.util.render.RenderUtil;
 import myau.util.render.Themes;
 import myau.util.vector.Vector2d;
-import net.minecraft.client.renderer.GlStateManager;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 public class BindComponent extends Component {
   private static final String EYE_ICON_PATH = "/assets/keystrokesmod/textures/gui/eye.png";
@@ -45,11 +45,13 @@ public class BindComponent extends Component {
   }
 
   public void render() {
-    Font renderer = Fonts.MINECRAFT.get(18);
-    String text =
-        this.isBinding ? "Press a key..." : "Current bind: '\u00a7e" + getKeyAsStr() + "\u00a7r'";
-    GlStateManager.color(1f, 1f, 1f, 1f);
-    this.drawString(renderer, text);
+    Font renderer = FontRepository.getMinecraftFont();
+    GL11.glPushMatrix();
+    GL11.glScaled(0.5D, 0.5D, 0.5D);
+    this.drawString(
+        renderer,
+        this.isBinding ? "Press a key..." : "Current bind: '\u00a7e" + getKeyAsStr() + "\u00a7r'");
+    GL11.glPopMatrix();
 
     int iconSize = getEyeIconSize();
     float iconX = getEyeIconX(iconSize);
@@ -114,7 +116,7 @@ public class BindComponent extends Component {
 
   private boolean overBindText(int mouseX, int mouseY) {
     String text = getBindDisplayString();
-    Font renderer = Fonts.MINECRAFT.get(18);
+    Font renderer = FontRepository.getMinecraftFont();
 
     float left = getBindTextX();
     float top = getBindTextY();
@@ -125,7 +127,7 @@ public class BindComponent extends Component {
   }
 
   private int getEyeIconSize() {
-    int fontH = Math.round(Fonts.MINECRAFT.get(18).getFontHeight() * 0.5f);
+    int fontH = Math.round(FontRepository.getMinecraftFont().getFontHeight() * 0.5f);
     return Math.max(6, fontH - 1);
   }
 
@@ -138,7 +140,7 @@ public class BindComponent extends Component {
 
   private float getEyeIconY(int iconSize) {
     float textY = getBindTextY();
-    float textHeight = Fonts.MINECRAFT.get(18).getFontHeight() * 0.5f;
+    float textHeight = FontRepository.getMinecraftFont().getFontHeight() * 0.5f;
     return textY + (textHeight - iconSize) / 2f;
   }
 
@@ -159,14 +161,10 @@ public class BindComponent extends Component {
   }
 
   public boolean overSetting(int mouseX, int mouseY) {
-    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     float rowX = moduleComponent.categoryComponent.getX();
     float rowY = moduleComponent.categoryComponent.getModuleY() + o;
     float rowW = moduleComponent.categoryComponent.getWidth();
-    return mouseX > rowX
-        && mouseX < rowX + rowW
-        && mouseY > rowY - 1
-        && mouseY < rowY + 12 * fontScale;
+    return mouseX > rowX && mouseX < rowX + rowW && mouseY > rowY - 1 && mouseY < rowY + 12;
   }
 
   public String getKeyAsStr() {
@@ -193,12 +191,11 @@ public class BindComponent extends Component {
   }
 
   private void drawString(Font renderer, String s) {
-    float fontScale = myau.ui.clickgui.components.impl.ModuleComponent.getFontScale();
     int color = Themes.getCurrentTheme().getAccentColor(new Vector2d(this.x, this.y)).getRGB();
     renderer.draw(
         s,
-        (float) (this.moduleComponent.categoryComponent.getX() + 4) + xOffset,
-        (float) (this.moduleComponent.categoryComponent.getY() + this.o + 3 * fontScale),
+        (float) ((this.moduleComponent.categoryComponent.getX() + 4) * 2) + xOffset,
+        (float) ((this.moduleComponent.categoryComponent.getY() + this.o + 3) * 2),
         color,
         true);
   }

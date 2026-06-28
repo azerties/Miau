@@ -109,6 +109,10 @@ public class RoundedUtils {
     ShaderUtils.drawQuads(x - 1, y - 1, width + 2, height + 2);
     roundedGradientShader.unload();
     GlStateManager.disableBlend();
+    int err = GL11.glGetError();
+    if (err != 0) {
+      System.out.println("GL ERROR in RoundedUtils.drawGradientRound: " + err);
+    }
   }
 
   public static void drawGradientRound(
@@ -270,6 +274,10 @@ public class RoundedUtils {
     GL20.glUseProgram(0);
     GlStateManager.popAttrib();
     GL11.glPopMatrix();
+    int err = GL11.glGetError();
+    if (err != 0) {
+      System.out.println("GL ERROR in RoundedUtils.drawRoundedRectRise: " + err);
+    }
   }
 
   public static void drawRoundedRectRise(
