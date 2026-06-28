@@ -114,6 +114,7 @@ public class ClickGui extends GuiScreen {
   @Override
   public void initGui() {
     super.initGui();
+    myau.ui.clickgui.faiths.FaithsCharacterRenderer.resetAnimation();
     this.scaleAnimation.start();
     ClickGui.openingScale = 0.5f;
     this.sr = new ScaledResolution(mc);
@@ -131,7 +132,6 @@ public class ClickGui extends GuiScreen {
       delay++;
     }
 
-    // Khởi tạo ConfigWindow nếu chưa có (Để góc dưới cùng bên phải)
     if (configWindow == null) {
       configWindow = new ConfigWindow(actualScreenWidth - 350, actualScreenHeight - 250);
     } else {
@@ -178,6 +178,7 @@ public class ClickGui extends GuiScreen {
         (myau.module.modules.render.HUD)
             myau.Myau.moduleManager.modules.get(myau.module.modules.render.HUD.class);
     ClickGUI guiModule = (ClickGUI) myau.Myau.moduleManager.modules.get(ClickGUI.class);
+    if (guiModule != null) guiModule.checkModeSwitch();
 
     boolean useBlur =
         (guiModule != null && guiModule.blur.getValue())
@@ -193,6 +194,7 @@ public class ClickGui extends GuiScreen {
 
     int bgColorAlpha = (int) (130 * this.scaleAnimation.getValueFloat(0.0f, 1.0f, 1));
     drawRect(0, 0, this.width, this.height, new Color(0, 0, 0, bgColorAlpha).getRGB());
+    myau.ui.clickgui.faiths.FaithsCharacterRenderer.renderCharacter(1.0f);
 
     List<CategoryComponent> renderOrder = getCategoriesInRenderOrder();
     CategoryComponent topmostUnderCursor = getTopmostUnderCursor(renderOrder, scaledX, scaledY);

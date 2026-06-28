@@ -324,8 +324,8 @@ public class GuiAccountManager extends GuiScreen {
           }
           break;
         case 1:
-          { // Add
-            mc.displayGuiScreen(new GuiMicrosoftAuth(previousScreen));
+          { // Add - Microsoft Account
+            mc.displayGuiScreen(new GuiMicrosoftFaiths(this));
           }
           break;
         case 2:

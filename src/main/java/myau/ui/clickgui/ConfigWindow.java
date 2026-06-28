@@ -33,6 +33,7 @@ public class ConfigWindow {
   public float x, y, width, height;
   private boolean dragging;
   private float dragX, dragY;
+  private boolean expanded = true;
   private float localScrollY, targetLocalScrollY;
   private float onlineScrollY, targetOnlineScrollY;
   private float userScrollY, targetUserScrollY;
@@ -118,6 +119,19 @@ public class ConfigWindow {
         });
   }
 
+  private int getClickGuiMode() {
+    try {
+      myau.module.modules.render.ClickGUI guiMod =
+          (myau.module.modules.render.ClickGUI)
+              Myau.moduleManager.getModule(myau.module.modules.render.ClickGUI.class);
+      if (guiMod != null && guiMod.mode != null) {
+        return guiMod.mode.getValue();
+      }
+    } catch (Exception ignored) {
+    }
+    return 0;
+  }
+
   public void drawWindow(int mouseX, int mouseY, float delta) {
     if (dragging) {
       x = mouseX - dragX;
@@ -127,47 +141,51 @@ public class ConfigWindow {
     onlineScrollY = MathUtil.lerp(onlineScrollY, targetOnlineScrollY, 0.015f * delta);
     userScrollY = MathUtil.lerp(userScrollY, targetUserScrollY, 0.015f * delta);
 
-    RenderUtil.drawRoundedGradientOutlinedRectangle(
-        x,
-        y,
-        x + width,
-        y + height,
-        8,
-        new Color(0, 0, 0, 150).getRGB(),
-        new Color(81, 99, 149).getRGB(),
-        new Color(97, 67, 133).getRGB());
-    Font titleFont = FontRepository.getMinecraftFont();
-    Font regularFont = FontRepository.getMinecraftFont();
-    Font smallFont = FontRepository.getMinecraftFont();
-    RenderUtil.drawRect(x, y + 20, x + width, y + 21, new Color(255, 255, 255, 50).getRGB());
-    titleFont.draw(
-        "Config Manager",
-        x + width / 2 - titleFont.width("Config Manager") / 2,
-        y + 5,
-        Color.WHITE.getRGB(),
-        true);
+    height = expanded ? 250 : 18;
 
-    float tabY = y + 25;
-    float tabWidth = (width - 20) / 3;
-    drawTab("Local", x + 5, tabY, tabWidth, selectedTab == TAB_LOCAL, mouseX, mouseY, titleFont);
+    Color themeAccent =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(x, y));
+
+    int mode = getClickGuiMode();
+    if (mode == 0) {
+      myau.util.shader.RoundedUtils.drawRound(
+          x, y, width, height, 6.0f, new Color(20, 20, 20, 235));
+      myau.util.shader.RoundedUtils.drawRoundOutline(
+          x, y, width, height, 6.0f, 1.0f, new Color(0, 0, 0, 0), themeAccent);
+    } else {
+      RenderUtil.drawOutLineRect(x, y, width, height, 1F, new Color(25, 25, 25), themeAccent);
+    }
+
+    Font titleFont = FontRepository.getHudFont(15);
+    Font regularFont = FontRepository.getHudFont(13);
+    Font smallFont = FontRepository.getHudFont(11);
+
+    titleFont.draw("config manager", x + 5, y + 3, -1);
+
+    if (!expanded) return;
+
+    float tabY = y + 18;
+    float tabWidth = (width - 16) / 3;
+    drawTab("Local", x + 4, tabY, tabWidth, selectedTab == TAB_LOCAL, mouseX, mouseY, regularFont);
     drawTab(
         "Online",
-        x + 7 + tabWidth,
+        x + 6 + tabWidth,
         tabY,
         tabWidth,
         selectedTab == TAB_ONLINE,
         mouseX,
         mouseY,
-        titleFont);
+        regularFont);
     drawTab(
         "MiauUser",
-        x + 9 + tabWidth * 2,
+        x + 8 + tabWidth * 2,
         tabY,
         tabWidth,
         selectedTab == TAB_USER,
         mouseX,
         mouseY,
-        titleFont);
+        regularFont);
 
     if (selectedTab == TAB_LOCAL) drawLocalTab(mouseX, mouseY, regularFont, smallFont);
     else if (selectedTab == TAB_ONLINE)
@@ -195,40 +213,79 @@ public class ConfigWindow {
       int mouseY,
       Font font) {
     boolean hovered = isHovered(mouseX, mouseY, tabX, tabY, tabWidth, 16);
-    int color =
-        selected
-            ? new Color(255, 255, 255, 45).getRGB()
-            : hovered ? new Color(255, 255, 255, 25).getRGB() : new Color(0, 0, 0, 80).getRGB();
-    RenderUtil.drawRoundedRectangle(tabX, tabY, tabX + tabWidth, tabY + 16, 4, color);
+    Color c1 =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(tabX, tabY));
+    Color c2 =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(tabX + tabWidth, tabY + 16));
+
+    int mode = getClickGuiMode();
+    if (selected) {
+      if (mode == 0) {
+        myau.util.shader.RoundedUtils.drawRound(tabX, tabY, tabWidth, 16, 4.0f, c1);
+      } else {
+        RenderUtil.drawHorizontalGradientRect(
+            tabX, tabY, tabX + tabWidth, tabY + 16, c1.getRGB(), c2.getRGB());
+      }
+    } else {
+      if (mode == 0) {
+        myau.util.shader.RoundedUtils.drawRound(
+            tabX, tabY, tabWidth, 16, 4.0f, new Color(35, 35, 35));
+        if (hovered) {
+          myau.util.shader.RoundedUtils.drawRound(
+              tabX, tabY, tabWidth, 16, 4.0f, new Color(255, 255, 255, 30));
+        }
+      } else {
+        RenderUtil.drawRect(tabX, tabY, tabX + tabWidth, tabY + 16, new Color(36, 36, 36).getRGB());
+        if (hovered) {
+          RenderUtil.drawRect(
+              tabX, tabY, tabX + tabWidth, tabY + 16, new Color(255, 255, 255, 30).getRGB());
+        }
+      }
+    }
+    int textColor =
+        selected ? RenderUtil.getContrastTextColor(c1) : new Color(160, 160, 160).getRGB();
     font.draw(
-        text,
-        tabX + tabWidth / 2 - font.width(text) / 2,
-        tabY + 4,
-        selected ? Color.WHITE.getRGB() : new Color(180, 180, 180).getRGB(),
-        true);
+        text.toLowerCase(),
+        tabX + tabWidth / 2 - font.width(text.toLowerCase()) / 2,
+        tabY + 3,
+        textColor);
   }
 
   private void drawLocalTab(int mouseX, int mouseY, Font regularFont, Font smallFont) {
-    float startX = x + 8;
-    float inputY = y + 48;
-    float listY = inputY + 22;
-    float listWidth = width - 16;
-    RenderUtil.drawRect(
-        startX, inputY, startX + listWidth, inputY + 15, new Color(0, 0, 0, 100).getRGB());
+    float startX = x + 6;
+    float inputY = y + 38;
+    float listY = inputY + 20;
+    float listWidth = width - 12;
+
+    Color c1 =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(startX, inputY));
+    RenderUtil.drawOutLineRect(
+        startX,
+        inputY,
+        listWidth,
+        16,
+        1F,
+        new Color(36, 36, 36),
+        isTyping ? c1 : new Color(60, 60, 60));
+
     String displayTxt =
         (typeText.length() == 0 && !isTyping)
-            ? "Create new..."
+            ? "create new..."
             : typeText.toString()
                 + (isTyping && System.currentTimeMillis() % 1000 < 500 ? "_" : "");
     regularFont.draw(
-        displayTxt,
-        startX + 4,
+        displayTxt.toLowerCase(),
+        startX + 5,
         inputY + 3,
-        isTyping ? Color.WHITE.getRGB() : new Color(150, 150, 150).getRGB(),
-        false);
+        isTyping ? -1 : new Color(140, 140, 140).getRGB());
+
     GL11.glEnable(GL11.GL_SCISSOR_TEST);
     scissor(x, listY, width, y + height - listY);
     float currentY = listY + localScrollY;
+    int mode = getClickGuiMode();
     for (File file : localConfigs) {
       String name = removeJsonExtension(file.getName());
       boolean hovered =
@@ -238,18 +295,20 @@ public class ConfigWindow {
               && mouseY <= currentY + 25
               && mouseY > listY
               && mouseY < y + height;
-      int bgColor =
-          hovered ? new Color(255, 255, 255, 30).getRGB() : new Color(0, 0, 0, 50).getRGB();
-      RenderUtil.drawRoundedRectangle(
-          startX, currentY, startX + listWidth, currentY + 25, 4, bgColor);
-      regularFont.draw(name, startX + 4, currentY + 3, Color.WHITE.getRGB(), false);
+      int bgColor = hovered ? new Color(48, 48, 48).getRGB() : new Color(36, 36, 36).getRGB();
+      if (mode == 0) {
+        myau.util.shader.RoundedUtils.drawRound(
+            startX, currentY, listWidth, 25, 4.0f, new Color(bgColor, true));
+      } else {
+        RenderUtil.drawRect(startX, currentY, startX + listWidth, currentY + 25, bgColor);
+      }
+      regularFont.draw(name.toLowerCase(), startX + 5, currentY + 3, -1);
       smallFont.draw(
-          "Last Used: " + formatLastUsed(file),
-          startX + 4,
+          "last used: " + formatLastUsed(file),
+          startX + 5,
           currentY + 14,
-          new Color(150, 150, 150).getRGB(),
-          false);
-      currentY += 28;
+          new Color(150, 150, 150).getRGB());
+      currentY += 27;
     }
     GL11.glDisable(GL11.GL_SCISSOR_TEST);
   }
@@ -263,14 +322,16 @@ public class ConfigWindow {
       String status,
       float scrollY,
       boolean userConfig) {
-    float startX = x + 8;
-    float listY = y + 48;
-    float listWidth = width - 16;
+    float startX = x + 6;
+    float listY = y + 38;
+    float listWidth = width - 12;
     GL11.glEnable(GL11.GL_SCISSOR_TEST);
     scissor(x, listY, width, y + height - listY);
     float currentY = listY + scrollY;
+    int mode = getClickGuiMode();
     if (!status.isEmpty()) {
-      regularFont.draw(status, startX + 4, currentY + 5, new Color(200, 200, 200).getRGB(), false);
+      regularFont.draw(
+          status.toLowerCase(), startX + 5, currentY + 5, new Color(200, 200, 200).getRGB());
     } else {
       for (OnlineConfigEntry entry : entries) {
         boolean hovered =
@@ -280,17 +341,21 @@ public class ConfigWindow {
                 && mouseY <= currentY + 25
                 && mouseY > listY
                 && mouseY < y + height;
-        int bgColor =
-            hovered ? new Color(255, 255, 255, 30).getRGB() : new Color(0, 0, 0, 50).getRGB();
-        RenderUtil.drawRoundedRectangle(
-            startX, currentY, startX + listWidth, currentY + 25, 4, bgColor);
-        regularFont.draw(entry.getName(), startX + 4, currentY + 3, Color.WHITE.getRGB(), false);
+        int bgColor = hovered ? new Color(48, 48, 48).getRGB() : new Color(36, 36, 36).getRGB();
+        if (mode == 0) {
+          myau.util.shader.RoundedUtils.drawRound(
+              startX, currentY, listWidth, 25, 4.0f, new Color(bgColor, true));
+        } else {
+          RenderUtil.drawRect(startX, currentY, startX + listWidth, currentY + 25, bgColor);
+        }
+        regularFont.draw(entry.getName().toLowerCase(), startX + 5, currentY + 3, -1);
         String meta =
             userConfig
                 ? "by " + entry.getAuthor() + " | " + entry.getLoadCount() + " loads"
                 : "by " + entry.getAuthor() + " | " + safe(entry.setting_type);
-        smallFont.draw(meta, startX + 4, currentY + 14, new Color(150, 150, 150).getRGB(), false);
-        currentY += 28;
+        smallFont.draw(
+            meta.toLowerCase(), startX + 5, currentY + 14, new Color(150, 150, 150).getRGB());
+        currentY += 27;
       }
     }
     GL11.glDisable(GL11.GL_SCISSOR_TEST);
@@ -298,12 +363,19 @@ public class ConfigWindow {
 
   public boolean mouseClicked(int mouseX, int mouseY, int button) {
     if (!isHovered(mouseX, mouseY, x, y, width, height)) return false;
-    if (mouseY <= y + 20) {
-      dragging = true;
-      dragX = mouseX - x;
-      dragY = mouseY - y;
-      return true;
+    if (mouseY <= y + 18) {
+      if (button == 1) {
+        expanded = !expanded;
+        return true;
+      }
+      if (button == 0) {
+        dragging = true;
+        dragX = mouseX - x;
+        dragY = mouseY - y;
+        return true;
+      }
     }
+    if (!expanded) return false;
     if (handleTabClick(mouseX, mouseY)) return true;
     if (selectedTab == TAB_LOCAL) return handleLocalClick(mouseX, mouseY, button);
     return handleRemoteClick(mouseX, mouseY, button);
@@ -388,8 +460,8 @@ public class ConfigWindow {
     dragging = false;
   }
 
-  public void onScroll(int wheel, int mouseX, int mouseY) {
-    if (!isHovered(mouseX, mouseY, x, y, width, height)) return;
+  public boolean onScroll(int wheel, int mouseX, int mouseY) {
+    if (!isHovered(mouseX, mouseY, x, y, width, height)) return false;
     float scrollSpeed = 40f;
     if (selectedTab == TAB_LOCAL) {
       targetLocalScrollY += (wheel > 0 ? scrollSpeed : -scrollSpeed);
@@ -404,6 +476,7 @@ public class ConfigWindow {
       float maxScroll = Math.max(0, (userConfigs.size() * 28) - (height - 48));
       targetUserScrollY = Math.max(-maxScroll, Math.min(0, targetUserScrollY));
     }
+    return true;
   }
 
   public boolean keyTyped(char typedChar, int keyCode) {

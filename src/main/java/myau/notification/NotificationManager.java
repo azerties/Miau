@@ -25,6 +25,34 @@ public final class NotificationManager {
     notifications.remove(notification);
   }
 
+  public void pop(final String title, final String description, final NotificationType type) {
+    if (hasDuplicate(description)) return;
+    publish(new Notification(type, title, description, 2000));
+  }
+
+  public void pop(final String description, final NotificationType type) {
+    pop(type.name(), description, type);
+  }
+
+  public void pop(
+      final String title, final String description, final int delay, final NotificationType type) {
+    if (hasDuplicate(description)) return;
+    publish(new Notification(type, title, description, delay));
+  }
+
+  public void pop(final String description, final int delay, final NotificationType type) {
+    pop(type.name(), description, delay, type);
+  }
+
+  private boolean hasDuplicate(final String description) {
+    for (final Notification notification : notifications) {
+      if (notification.getDescription().equalsIgnoreCase(description)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static class NotificationBuilder {
     private final NotificationManager dispatcher;
     private final NotificationType type;

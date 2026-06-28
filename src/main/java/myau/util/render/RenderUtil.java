@@ -193,14 +193,42 @@ public class RenderUtil {
     if (color == 0) {
       return;
     }
+    boolean texture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
+    boolean blend = GL11.glIsEnabled(GL_BLEND);
+    if (texture2D) GL11.glDisable(GL11.GL_TEXTURE_2D);
+    if (!blend) GL11.glEnable(GL11.GL_BLEND);
+    GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     RenderUtil.setColor(color);
-    GL11.glBegin(GL11.GL_POLYGON);
+    GL11.glBegin(GL11.GL_QUADS);
     GL11.glVertex2f(x1, y1);
     GL11.glVertex2f(x1, y2);
     GL11.glVertex2f(x2, y2);
     GL11.glVertex2f(x2, y1);
     GL11.glEnd();
+    if (!blend) GL11.glDisable(GL11.GL_BLEND);
+    if (texture2D) GL11.glEnable(GL11.GL_TEXTURE_2D);
     GlStateManager.resetColor();
+  }
+
+  public static void drawOutLineRect(
+      float x,
+      float y,
+      float width,
+      float height,
+      float size,
+      Color internalColor,
+      Color borderColor) {
+    drawRect(x, y, x + width, y + height, internalColor.getRGB());
+    drawRect(x, y, x + size, y + height, borderColor.getRGB());
+    drawRect(x, y - size, x + width + size, y, borderColor.getRGB());
+    drawRect(x + width, y, x + width + size, y + height, borderColor.getRGB());
+    drawRect(x, y + height - size, x + width, y + height, borderColor.getRGB());
+  }
+
+  public static int getContrastTextColor(Color bgColor) {
+    double luminance =
+        (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255.0;
+    return luminance > 0.6 ? 0xff000000 : 0xffffffff;
   }
 
   public static void drawRect3D(float x1, float y1, float x2, float y2, int color) {
