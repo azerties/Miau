@@ -1,7 +1,6 @@
 package myau.module.modules.combat;
 
-import myau.Myau;
-import myau.enums.DelayModules;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import myau.event.EventTarget;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.TickEvent;
@@ -35,7 +34,20 @@ public class KnockbackDelay extends Module {
   public final ItemListProperty whitelistedItems = new ItemListProperty("Whitelisted-items", "");
 
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private long startDelayMs = 0;
+  private final ConcurrentLinkedDeque<VelocityEntry> delayedVelocities =
+      new ConcurrentLinkedDeque<>();
+
+  private static class VelocityEntry {
+    final double motionX, motionY, motionZ;
+    final long receiveTimeMs;
+
+    VelocityEntry(double motionX, double motionY, double motionZ, long receiveTimeMs) {
+      this.motionX = motionX;
+      this.motionY = motionY;
+      this.motionZ = motionZ;
+      this.receiveTimeMs = receiveTimeMs;
+    }
+  }
 
   public KnockbackDelay() {
     super("KnockbackDelay", false);
@@ -43,12 +55,12 @@ public class KnockbackDelay extends Module {
 
   @Override
   public void onEnabled() {
-    startDelayMs = 0;
+    delayedVelocities.clear();
   }
 
   @Override
   public void onDisabled() {
-    flushInboundLagAndClear();
+    flushDelayedVelocities();
   }
 
   @EventTarget(Priority.HIGHEST)
@@ -57,7 +69,7 @@ public class KnockbackDelay extends Module {
     if (e.getType() != EventType.RECEIVE) return;
 
     if (e.getPacket() instanceof S08PacketPlayerPosLook) {
-      flushInboundLagAndClear();
+      flushDelayedVelocities();
       return;
     }
 
@@ -82,12 +94,13 @@ public class KnockbackDelay extends Module {
       return;
     }
 
-    if (isInboundSessionActive()) {
-      return;
-    }
-
-    startDelayMs = System.currentTimeMillis();
-    Myau.delayManager.setDelayState(true, DelayModules.KNOCKBACK_DELAY);
+    e.setCancelled(true);
+    delayedVelocities.addLast(
+        new VelocityEntry(
+            packet.getMotionX() / 8000.0,
+            packet.getMotionY() / 8000.0,
+            packet.getMotionZ() / 8000.0,
+            System.currentTimeMillis()));
   }
 
   @EventTarget(Priority.LOWEST)
@@ -95,32 +108,48 @@ public class KnockbackDelay extends Module {
     if (!this.isEnabled()) return;
     if (e.getType() != EventType.PRE) return;
     if (mc.thePlayer == null || mc.theWorld == null || mc.thePlayer.isDead) {
-      flushInboundLagAndClear();
+      flushDelayedVelocities();
       return;
     }
 
-    if (!isInboundSessionActive()) {
-      return;
-    }
+    if (delayedVelocities.isEmpty()) return;
 
     if (conditionsFailureReason() != null) {
-      flushInboundLagAndClear();
+      flushDelayedVelocities();
       return;
     }
 
-    if (System.currentTimeMillis() - startDelayMs >= maximumDelay.getValue()) {
-      flushInboundLagAndClear();
+    long nowMs = System.currentTimeMillis();
+    long maxDelayMs = maximumDelay.getValue().longValue();
+
+    while (!delayedVelocities.isEmpty()) {
+      VelocityEntry entry = delayedVelocities.peekFirst();
+      if (entry == null) break;
+
+      long elapsed = nowMs - entry.receiveTimeMs;
+      if (elapsed >= maxDelayMs) {
+        delayedVelocities.pollFirst();
+        applyVelocity(entry);
+      } else {
+        break;
+      }
     }
   }
 
-  private boolean isInboundSessionActive() {
-    return Myau.delayManager.getDelayModule() == DelayModules.KNOCKBACK_DELAY;
+  private void applyVelocity(VelocityEntry entry) {
+    if (mc.thePlayer == null) return;
+    mc.thePlayer.motionX = entry.motionX;
+    mc.thePlayer.motionY = entry.motionY;
+    mc.thePlayer.motionZ = entry.motionZ;
   }
 
-  private void flushInboundLagAndClear() {
-    if (Myau.delayManager.getDelayModule() == DelayModules.KNOCKBACK_DELAY) {
-      Myau.delayManager.setDelayState(false, DelayModules.KNOCKBACK_DELAY);
+  private void flushDelayedVelocities() {
+    if (mc.thePlayer != null) {
+      for (VelocityEntry entry : delayedVelocities) {
+        applyVelocity(entry);
+      }
     }
+    delayedVelocities.clear();
   }
 
   private String conditionsFailureReason() {

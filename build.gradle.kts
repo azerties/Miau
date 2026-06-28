@@ -28,7 +28,7 @@ val githubBuild: Boolean = providers.environmentVariable("GITHUB_ACTIONS").orNul
 val transformerFile = file("src/main/resources/accesstransformer.cfg")
 // Toolchains:
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(8))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
 }
 // Minecraft configuration:
 loom {
