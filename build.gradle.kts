@@ -26,10 +26,12 @@ val gitCommit: String = try {
 }
 val githubBuild: Boolean = providers.environmentVariable("GITHUB_ACTIONS").orNull.equals("true", ignoreCase = true)
 val transformerFile = file("src/main/resources/accesstransformer.cfg")
-// Toolchains:
+
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(8))
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
+
 // Minecraft configuration:
 loom {
     log4jConfigs.from(file("log4j2.xml"))
@@ -70,9 +72,9 @@ sourceSets.main {
 // Dependencies:
 repositories {
     mavenCentral()
-    maven("https://repo.spongepowered.org/maven/")
-    maven("https://repo.viaversion.com/")
-    maven("https://jitpack.io/")
+    maven("https://repo.spongepowered.org/maven")
+    maven("https://repo.viaversion.com")
+    maven("https://jitpack.io")
     // If you don't want to log in with your real minecraft account, remove this line
     maven("https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1")
 }
@@ -118,7 +120,11 @@ val generateClientInfo by tasks.registering(Copy::class) {
 tasks.withType(JavaCompile::class) {
     dependsOn(generateClientInfo)
     options.encoding = "UTF-8"
+    
+    options.release.set(8)
+    options.compilerArgs.add("-Xlint:-options")
 }
+
 tasks.withType(org.gradle.jvm.tasks.Jar::class) {
     archiveBaseName.set(jarName)
     manifest.attributes.run {
