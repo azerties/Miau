@@ -53,7 +53,7 @@ public class BedESP extends Module {
   public final FloatProperty scanSpeed = new FloatProperty("Scan speed", 8.0f, 1.0f, 32.0f);
   public final BooleanProperty firstBed = new BooleanProperty("Only render first bed", false);
   public final BooleanProperty renderFullBlock = new BooleanProperty("Render full block", false);
-  public final BooleanProperty showExposedOutline = new BooleanProperty("Exposed outline", true);
+  public final BooleanProperty showExposedOutline = new BooleanProperty("Exposed outline", false);
   public final BooleanProperty showDefenseLayers =
       new BooleanProperty("Show defense layers", false);
   public final BooleanProperty showDefenseTools = new BooleanProperty("Show break tools", false);
