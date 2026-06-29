@@ -44,7 +44,7 @@ public class Velocity extends Module {
             register(new ThreeFPracVelocity("3FPrac", this)),
             register(new StandardVelocity("Standard", this)),
             register(new LegitVelocity("Legit", this)),
-            register(new IntaveReduceVelocity("IntaveReduce", this)),
+            register(new IntaveVelocity("Intave", this)),
             register(new JumpResetVelocity("JumpReset", this)),
             register(new WatchdogPredictionVelocity("WatchdogPrediction", this)),
             register(new GrimReduceVelocity("GrimReduce", this))

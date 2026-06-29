@@ -1,5 +1,6 @@
 package myau.module.modules.movement.speeds;
 
+import myau.event.impl.JumpEvent;
 import myau.event.impl.LivingUpdateEvent;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.StrafeEvent;
@@ -29,4 +30,6 @@ public abstract class SpeedMode {
   public void onLivingUpdate(LivingUpdateEvent event) {}
 
   public void onPacket(PacketEvent event) {}
+
+  public void onJump(JumpEvent event) {}
 }
