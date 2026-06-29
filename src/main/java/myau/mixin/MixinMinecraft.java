@@ -7,7 +7,6 @@ import myau.event.types.EventType;
 import myau.init.Initializer;
 import myau.module.modules.ghost.NoClickDelay;
 import myau.ui.menu.MiauMainMenu;
-import myau.ui.menu.WelcomeScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiMainMenu;
@@ -158,16 +157,9 @@ public abstract class MixinMinecraft {
     }
   }
 
-  /** Show WelcomeScreen exactly once on first startup, MiauMainMenu on all subsequent calls. */
-  private static boolean firstLaunch = true;
-
   @ModifyVariable(method = "displayGuiScreen", at = @At("HEAD"), argsOnly = true)
   private GuiScreen modifyGuiScreen(GuiScreen guiScreenIn) {
     if (guiScreenIn instanceof GuiMainMenu || (guiScreenIn == null && this.theWorld == null)) {
-      if (firstLaunch) {
-        firstLaunch = false;
-        return new WelcomeScreen();
-      }
       return new MiauMainMenu();
     }
     return guiScreenIn;
