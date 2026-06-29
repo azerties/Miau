@@ -53,6 +53,17 @@ public class Config {
 
       JsonObject jsonObject = parsed.getAsJsonObject();
       ConfigVersionUtil.warnIfOutdated(jsonObject, file.getName());
+
+      if (jsonObject.has("theme")) {
+        String themeName = jsonObject.get("theme").getAsString();
+        for (myau.util.render.Themes theme : myau.util.render.Themes.values()) {
+          if (theme.getThemeName().equalsIgnoreCase(themeName)) {
+            myau.util.render.Themes.setCurrentTheme(theme);
+            break;
+          }
+        }
+      }
+
       for (Module module : Myau.moduleManager.modules.values()) {
         JsonElement moduleObj = jsonObject.get(module.getName());
         if (moduleObj != null && moduleObj.isJsonObject()) {
@@ -61,7 +72,9 @@ public class Config {
           ArrayList<Property<?>> list = Myau.propertyManager.properties.get(module.getClass());
           if (list != null) {
             for (Property<?> property : list) {
-              if (object.has(property.getName())) {
+              if (property.getName().equals("Position")
+                  ? (object.has("Position_x") && object.has("Position_y"))
+                  : object.has(property.getName())) {
                 try {
                   property.read(object);
                 } catch (Exception e) {
@@ -117,6 +130,8 @@ public class Config {
 
       JsonObject object = new JsonObject();
       ConfigVersionUtil.addVersion(object);
+      object.addProperty("theme", myau.util.render.Themes.getCurrentTheme().getThemeName());
+
       for (Module module : Myau.moduleManager.modules.values()) {
         JsonObject moduleObject = new JsonObject();
         moduleObject.addProperty("toggled", module.isEnabled());

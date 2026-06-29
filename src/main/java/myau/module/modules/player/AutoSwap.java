@@ -42,6 +42,7 @@ public class AutoSwap extends Module {
 
   @EventTarget(Priority.LOW)
   public void onPacket(PacketEvent event) {
+    if (!this.isEnabled()) return;
     if (event.getType() != EventType.SEND) return;
     if (mc.theWorld == null || mc.thePlayer == null) return;
     if (!(event.getPacket() instanceof C08PacketPlayerBlockPlacement)) return;
@@ -59,6 +60,7 @@ public class AutoSwap extends Module {
 
   @EventTarget(Priority.LOW)
   public void onUpdate(UpdateEvent event) {
+    if (!this.isEnabled()) return;
     if (event.getType() != EventType.PRE) return;
     if (mc.theWorld == null || mc.thePlayer == null) {
       resetState();

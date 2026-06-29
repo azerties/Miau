@@ -29,13 +29,8 @@ public class BlockUtil {
   }
 
   public static boolean isReplaceable(BlockPos blockPos) {
-    return BlockUtil.isReplaceable(BlockUtil.mc.theWorld.getBlockState(blockPos).getBlock());
-  }
-
-  public static boolean isReplaceable(Block block) {
-    if (!block.getMaterial().isReplaceable()) return false;
-    if (!(block instanceof BlockSnow)) return true;
-    return !(block.getBlockBoundsMaxY() > 0.125);
+    if (mc.thePlayer == null || mc.theWorld == null) return true;
+    return getBlock(blockPos).isReplaceable(mc.theWorld, blockPos);
   }
 
   public static boolean isInteractable(BlockPos blockPos) {

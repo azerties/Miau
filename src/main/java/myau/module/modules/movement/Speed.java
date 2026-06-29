@@ -3,6 +3,7 @@ package myau.module.modules.movement;
 import java.util.concurrent.ThreadLocalRandom;
 import myau.Myau;
 import myau.event.EventTarget;
+import myau.event.impl.JumpEvent;
 import myau.event.impl.LivingUpdateEvent;
 import myau.event.impl.PacketEvent;
 import myau.event.impl.StrafeEvent;
@@ -38,6 +39,7 @@ public class Speed extends Module {
       new BooleanProperty("only-jump-when-moving", true, () -> this.mode.getValue() == 2);
 
   private boolean hopping;
+  private int lastMode = -1;
 
   public final VulcanSpeed vulcan = new VulcanSpeed("VULCAN", this);
 
@@ -102,6 +104,11 @@ public class Speed extends Module {
       return;
     }
 
+    if (this.mode.getValue() != lastMode) {
+      mc.timer.timerSpeed = 1.0F;
+      lastMode = this.mode.getValue();
+    }
+
     if (this.mode.getValue() == 2) {
       if (!this.canSevenTick()) {
         return;
@@ -161,6 +168,12 @@ public class Speed extends Module {
   @Override
   public void onDisabled() {
     this.hopping = false;
+    mc.timer.timerSpeed = 1.0F;
+  }
+
+  @EventTarget(Priority.LOW)
+  public void onJump(JumpEvent event) {
+    if (!this.isEnabled()) return;
   }
 
   @Override

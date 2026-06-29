@@ -32,6 +32,8 @@ public class FaithsWindow {
   private float scrollY = 0F, targetScrollY = 0F;
   private float lastRenderHeight = 200F;
 
+  private String draggingPropertyName = null;
+
   private static final int PANEL_WIDTH = 100;
   private static final int TITLE_HEIGHT = 13;
   private static final int MODULE_HEIGHT = 11;
@@ -50,6 +52,10 @@ public class FaithsWindow {
   private boolean mouseHovered(
       float x, float y, float width, float height, int mouseX, int mouseY) {
     return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+  }
+
+  private boolean isInPanelBounds(float localY, float elementHeight) {
+    return localY + elementHeight > TITLE_HEIGHT && localY < lastRenderHeight;
   }
 
   private void drawRect(float x, float y, float w, float h, Color color) {
@@ -84,6 +90,10 @@ public class FaithsWindow {
   }
 
   protected void renderWindow(int mouseX, int mouseY) {
+    if (!Mouse.isButtonDown(0)) {
+      draggingPropertyName = null;
+    }
+
     if (Mouse.isButtonDown(0)) {
       if (dragging) {
         this.x += mouseX - prevMouseX;
@@ -157,7 +167,8 @@ public class FaithsWindow {
           }
         }
 
-        if (mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
+        if (isInPanelBounds(moduleY, MODULE_HEIGHT)
+            && mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
           if (!expanded && !module.isEnabled()) {
             drawRect(3, moduleY, PANEL_WIDTH - 5, MODULE_HEIGHT, new Color(255, 255, 255, 50));
           }
@@ -238,7 +249,8 @@ public class FaithsWindow {
   }
 
   private void renderBoolean(BooleanProperty prop, float moduleY, int mouseX, int mouseY) {
-    if (mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
+    if (isInPanelBounds(moduleY, MODULE_HEIGHT)
+        && mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
       if (Mouse.isButtonDown(0)) {
         if (!leftMouseClicked) {
           prop.setValue(!prop.getValue());
@@ -265,7 +277,8 @@ public class FaithsWindow {
   }
 
   private void renderMode(ModeProperty prop, float moduleY, int mouseX, int mouseY) {
-    if (mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
+    if (isInPanelBounds(moduleY, MODULE_HEIGHT)
+        && mouseHovered(x, y + moduleY, PANEL_WIDTH, MODULE_HEIGHT, mouseX, mouseY)) {
       if (Mouse.isButtonDown(0)) {
         if (!leftMouseClicked) {
           prop.nextMode();
@@ -292,18 +305,27 @@ public class FaithsWindow {
         myau.util.render.Themes.getCurrentTheme()
             .getAccentColor(
                 new myau.util.vector.Vector2d(x + valueWidth * ratio, y + moduleY + VALUE_HEIGHT));
+    boolean hovered =
+        isInPanelBounds(moduleY, MODULE_HEIGHT)
+            && mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY);
+
+    if (hovered && Mouse.isButtonDown(0) && draggingPropertyName == null) {
+      draggingPropertyName = prop.getName();
+    }
+
+    if (prop.getName().equals(draggingPropertyName) && Mouse.isButtonDown(0)) {
+      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
+      float newVal = prop.getMinimum() + newRatio * (prop.getMaximum() - prop.getMinimum());
+      prop.setValue(newVal);
+      ratio = newRatio;
+    }
+
     RenderUtil.drawHorizontalGradientRect(
         3, moduleY, 3 + valueWidth * ratio, moduleY + VALUE_HEIGHT, c1.getRGB(), c2.getRGB());
     int textColor = ratio > 0.3f ? RenderUtil.getContrastTextColor(c1) : 0xffffffff;
     font.draw(prop.getName(), 5, moduleY + 2, textColor);
     font.drawCentered(
         FLOAT_POINT_FORMAT.format(prop.getValue()), valueWidth, moduleY + 2, textColor);
-    if (mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY)
-        && Mouse.isButtonDown(0)) {
-      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
-      float newVal = prop.getMinimum() + newRatio * (prop.getMaximum() - prop.getMinimum());
-      prop.setValue(newVal);
-    }
   }
 
   private void renderInt(IntProperty prop, float moduleY, int mouseX, int mouseY) {
@@ -319,18 +341,27 @@ public class FaithsWindow {
         myau.util.render.Themes.getCurrentTheme()
             .getAccentColor(
                 new myau.util.vector.Vector2d(x + valueWidth * ratio, y + moduleY + VALUE_HEIGHT));
+    boolean hovered =
+        isInPanelBounds(moduleY, MODULE_HEIGHT)
+            && mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY);
+
+    if (hovered && Mouse.isButtonDown(0) && draggingPropertyName == null) {
+      draggingPropertyName = prop.getName();
+    }
+
+    if (prop.getName().equals(draggingPropertyName) && Mouse.isButtonDown(0)) {
+      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
+      int newVal =
+          Math.round(prop.getMinimum() + newRatio * (prop.getMaximum() - prop.getMinimum()));
+      prop.setValue(newVal);
+      ratio = newRatio;
+    }
+
     RenderUtil.drawHorizontalGradientRect(
         3, moduleY, 3 + valueWidth * ratio, moduleY + VALUE_HEIGHT, c1.getRGB(), c2.getRGB());
     int textColor = ratio > 0.3f ? RenderUtil.getContrastTextColor(c1) : 0xffffffff;
     font.draw(prop.getName(), 5, moduleY + 2, textColor);
     font.drawCentered(String.valueOf(prop.getValue()), valueWidth, moduleY + 2, textColor);
-    if (mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY)
-        && Mouse.isButtonDown(0)) {
-      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
-      int newVal =
-          Math.round(prop.getMinimum() + newRatio * (prop.getMaximum() - prop.getMinimum()));
-      prop.setValue(newVal);
-    }
   }
 
   private void renderPercent(PercentProperty prop, float moduleY, int mouseX, int mouseY) {
@@ -344,17 +375,26 @@ public class FaithsWindow {
         myau.util.render.Themes.getCurrentTheme()
             .getAccentColor(
                 new myau.util.vector.Vector2d(x + valueWidth * ratio, y + moduleY + VALUE_HEIGHT));
+    boolean hovered =
+        isInPanelBounds(moduleY, MODULE_HEIGHT)
+            && mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY);
+
+    if (hovered && Mouse.isButtonDown(0) && draggingPropertyName == null) {
+      draggingPropertyName = prop.getName();
+    }
+
+    if (prop.getName().equals(draggingPropertyName) && Mouse.isButtonDown(0)) {
+      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
+      prop.setValue(newRatio * 100.0F);
+      ratio = newRatio;
+    }
+
     RenderUtil.drawHorizontalGradientRect(
         3, moduleY, 3 + valueWidth * ratio, moduleY + VALUE_HEIGHT, c1.getRGB(), c2.getRGB());
     int textColor = ratio > 0.3f ? RenderUtil.getContrastTextColor(c1) : 0xffffffff;
     font.draw(prop.getName(), 5, moduleY + 2, textColor);
     font.drawCentered(
         String.valueOf((int) prop.getValue()) + "%", valueWidth, moduleY + 2, textColor);
-    if (mouseHovered(x, y + moduleY, valueWidth, MODULE_HEIGHT, mouseX, mouseY)
-        && Mouse.isButtonDown(0)) {
-      float newRatio = Math.max(0, Math.min(1, (mouseX - x) / valueWidth));
-      prop.setValue(newRatio * 100.0F);
-    }
   }
 
   private void renderColor(ColorProperty prop, float moduleY, int mouseX, int mouseY) {
@@ -384,6 +424,7 @@ public class FaithsWindow {
 
   public void mouseReleased(int mouseX, int mouseY, int state) {
     dragging = false;
+    draggingPropertyName = null;
   }
 
   public String getCategory() {

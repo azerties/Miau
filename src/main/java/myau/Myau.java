@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Objects;
 import me.ksyz.accountmanager.AccountManager;
-import myau.clientanticheat.NametagOverlayRenderer;
 import myau.command.CommandManager;
 import myau.command.commands.*;
 import myau.config.Config;
@@ -32,7 +31,6 @@ import myau.notification.NotificationManager;
 import myau.notification.NotificationRenderer;
 import myau.property.Property;
 import myau.property.PropertyManager;
-import net.minecraftforge.common.MinecraftForge;
 import org.lwjgl.opengl.Display;
 
 public class Myau {
@@ -92,7 +90,6 @@ public class Myau {
     EventManager.register(badPacketsComponent);
     slotComponent = new myau.component.SlotComponent();
     EventManager.register(slotComponent);
-    // Rise-style centralized rotation component (movefix + state tracking)
     EventManager.register(new myau.component.RotationComponent());
     EventManager.register(new myau.component.PingSpoofComponent());
     playerTracker = new myau.util.player.PlayerTracker();
@@ -106,8 +103,6 @@ public class Myau {
     moduleManager.modules.put(AntiBot.class, new AntiBot());
     moduleManager.modules.put(AntiCheatDetector.class, new AntiCheatDetector());
     moduleManager.modules.put(AntiVoid.class, new AntiVoid());
-    moduleManager.modules.put(Anticheat.class, new Anticheat());
-
     moduleManager.modules.put(AutoClicker.class, new AutoClicker());
     moduleManager.modules.put(AutoAnduril.class, new AutoAnduril());
     moduleManager.modules.put(AutoAuth.class, new AutoAuth());
@@ -203,6 +198,7 @@ public class Myau {
     moduleManager.modules.put(ViewClip.class, new ViewClip());
     moduleManager.modules.put(Wtap.class, new Wtap());
     moduleManager.modules.put(Statistics.class, new Statistics());
+    moduleManager.modules.put(CheatDetector.class, new CheatDetector());
     commandManager.commands.add(new BindCommand());
     commandManager.commands.add(new ConfigCommand());
     commandManager.commands.add(new OnlineConfigCommand());
@@ -274,7 +270,7 @@ public class Myau {
     }
     Display.setTitle(ClientInfo.getDisplayVersion());
 
-    MinecraftForge.EVENT_BUS.register(new NametagOverlayRenderer());
+    // removed NametagOverlayRenderer
     AccountManager.init();
     ViaMCP.create();
   }

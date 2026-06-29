@@ -67,7 +67,16 @@ public class Piercing extends Module {
     if (mc.playerController.extendedReach()) {
       reach = 6.0;
     }
-    final Vec3 look = viewEntity.getLook(partialTicks);
+    Vec3 look;
+    if (myau.util.player.RotationUtil.customRots) {
+      look =
+          ((myau.mixin.IAccessorEntity) viewEntity)
+              .callGetVectorForRotation(
+                  myau.util.player.RotationUtil.serverPitch,
+                  myau.util.player.RotationUtil.serverYaw);
+    } else {
+      look = viewEntity.getLook(partialTicks);
+    }
     final Vec3 rayEnd =
         eyes.addVector(look.xCoord * reach, look.yCoord * reach, look.zCoord * reach);
 

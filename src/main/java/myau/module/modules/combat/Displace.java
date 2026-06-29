@@ -64,7 +64,7 @@ public class Displace extends Module {
       new ModeProperty("Dynamic-angle", 0, new String[] {"Static", "Dynamic"});
   public final FloatProperty yawOffset =
       new FloatProperty("Yaw-offset", 90F, 0F, 180F, () -> dynamicAngle.getValue() == 0);
-  public final FloatProperty delay = new FloatProperty("Delay", 50F, 0F, 500F);
+  public final FloatProperty delay = new FloatProperty("Delay", 0F, 0F, 500F);
   public final ModeProperty direction =
       new ModeProperty(
           "Direction", 0, new String[] {"Left", "Right"}, () -> dynamicAngle.getValue() == 0);
@@ -84,6 +84,7 @@ public class Displace extends Module {
   private boolean displaceLeft = false;
   private boolean wasDisplacingLastTick = false;
   private boolean releaseBlinkNextGameTick = false;
+  private boolean blinkingModule = false;
   private Float dynamicVoidYaw = null;
   private Float renderDisplaceYaw = null;
   private EntityPlayer renderTarget = null;
@@ -380,7 +381,7 @@ public class Displace extends Module {
   }
 
   private float getFixedDisplaceYaw() {
-    float baseYaw = RotationUtil.serverYaw != 0 ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
+    float baseYaw = RotationUtil.customRots ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
     float offset = yawOffset.getValue();
     return displaceLeft ? baseYaw - offset : baseYaw + offset;
   }
@@ -464,7 +465,9 @@ public class Displace extends Module {
   }
 
   private void releaseBlink() {
+    if (!blinkingModule) return;
     Myau.blinkManager.setBlinkState(false, BlinkModules.DISPLACE);
+    blinkingModule = false;
   }
 
   @EventTarget(Priority.HIGHEST)
@@ -636,16 +639,28 @@ public class Displace extends Module {
     if (!(e.getPacket() instanceof C03PacketPlayer)) {
       return;
     }
-    if (Myau.blinkManager.getBlinkingModule() == BlinkModules.DISPLACE) {
-      return;
-    }
+    if (blinkingModule) return;
 
     Myau.blinkManager.setBlinkState(true, BlinkModules.DISPLACE);
+    blinkingModule = true;
     releaseBlinkNextGameTick = true;
   }
 
-  @EventTarget(Priority.LOWEST)
+  @EventTarget(Priority.HIGH)
   public void onClientRotation(UpdateEvent e) {
+    if (e.getType() != EventType.PRE) return;
+    if (this.isEnabled() && this.renderDisplaceYaw != null) {
+      e.setRotation(this.renderDisplaceYaw, mc.thePlayer.rotationPitch, 100);
+      MoveUtil.fixMovement(this.renderDisplaceYaw);
+      if (this.wasDisplacingLastTick) {
+        e.setRotation(this.renderDisplaceYaw, mc.thePlayer.rotationPitch, 100);
+        MoveUtil.fixMovement(this.renderDisplaceYaw);
+      }
+    }
+  }
+
+  @EventTarget(Priority.LOWEST)
+  public void onUpdateLowest(UpdateEvent e) {
     if (!this.isEnabled()) return;
     if (e.getType() != EventType.PRE) return;
 
@@ -682,7 +697,7 @@ public class Displace extends Module {
                   true,
                   ignoreTeammates.getValue(),
                   true,
-                  9.0,
+                  3.0,
                   CombatTargeting.SortMode.DISTANCE);
     }
 

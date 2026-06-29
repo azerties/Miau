@@ -37,8 +37,8 @@ public class SimulatedPlayer {
 
   // Player state
   private final EntityPlayerSP player;
-  private AxisAlignedBB box;
-  private MovementInput movementInput;
+  public AxisAlignedBB box;
+  public MovementInput movementInput;
   private int jumpTicks;
   public double motionZ;
   public double motionY;
@@ -842,7 +842,7 @@ public class SimulatedPlayer {
     return new double[] {d3, d5};
   }
 
-  private AxisAlignedBB getEntityBoundingBox() {
+  public AxisAlignedBB getEntityBoundingBox() {
     return box;
   }
 

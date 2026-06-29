@@ -382,19 +382,19 @@ public class ConfigWindow {
   }
 
   private boolean handleTabClick(int mouseX, int mouseY) {
-    float tabY = y + 25;
-    float tabWidth = (width - 20) / 3;
-    if (isHovered(mouseX, mouseY, x + 5, tabY, tabWidth, 16)) {
+    float tabY = y + 18;
+    float tabWidth = (width - 16) / 3;
+    if (isHovered(mouseX, mouseY, x + 4, tabY, tabWidth, 16)) {
       selectedTab = TAB_LOCAL;
       isTyping = false;
       return true;
     }
-    if (isHovered(mouseX, mouseY, x + 7 + tabWidth, tabY, tabWidth, 16)) {
+    if (isHovered(mouseX, mouseY, x + 6 + tabWidth, tabY, tabWidth, 16)) {
       selectedTab = TAB_ONLINE;
       isTyping = false;
       return true;
     }
-    if (isHovered(mouseX, mouseY, x + 9 + tabWidth * 2, tabY, tabWidth, 16)) {
+    if (isHovered(mouseX, mouseY, x + 8 + tabWidth * 2, tabY, tabWidth, 16)) {
       selectedTab = TAB_USER;
       isTyping = false;
       return true;
@@ -403,10 +403,10 @@ public class ConfigWindow {
   }
 
   private boolean handleLocalClick(int mouseX, int mouseY, int button) {
-    float startX = x + 8;
-    float inputY = y + 48;
-    float listY = inputY + 22;
-    float listWidth = width - 16;
+    float startX = x + 6;
+    float inputY = y + 38;
+    float listY = inputY + 20;
+    float listWidth = width - 12;
     if (isHovered(mouseX, mouseY, startX, inputY, listWidth, 15)) {
       isTyping = true;
       return true;
@@ -431,7 +431,7 @@ public class ConfigWindow {
           }
           return true;
         }
-        currentY += 28;
+        currentY += 27;
       }
     }
     return true;
@@ -439,9 +439,9 @@ public class ConfigWindow {
 
   private boolean handleRemoteClick(int mouseX, int mouseY, int button) {
     if (button != 0) return true;
-    float startX = x + 8;
-    float listY = y + 48;
-    float listWidth = width - 16;
+    float startX = x + 6;
+    float listY = y + 38;
+    float listWidth = width - 12;
     List<OnlineConfigEntry> entries = selectedTab == TAB_ONLINE ? onlineConfigs : userConfigs;
     float scroll = selectedTab == TAB_ONLINE ? targetOnlineScrollY : targetUserScrollY;
     boolean userConfig = selectedTab == TAB_USER;
@@ -451,7 +451,7 @@ public class ConfigWindow {
         loadOnlineConfig(entry, userConfig);
         return true;
       }
-      currentY += 28;
+      currentY += 27;
     }
     return true;
   }

@@ -10,9 +10,12 @@ import myau.module.Module;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.FloatProperty;
 import myau.property.properties.ItemListProperty;
+import myau.util.network.PacketUtil;
 import myau.util.player.CombatTargeting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.INetHandlerPlayClient;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 import org.lwjgl.input.Mouse;
@@ -34,20 +37,8 @@ public class KnockbackDelay extends Module {
   public final ItemListProperty whitelistedItems = new ItemListProperty("Whitelisted-items", "");
 
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private final ConcurrentLinkedDeque<VelocityEntry> delayedVelocities =
-      new ConcurrentLinkedDeque<>();
-
-  private static class VelocityEntry {
-    final double motionX, motionY, motionZ;
-    final long receiveTimeMs;
-
-    VelocityEntry(double motionX, double motionY, double motionZ, long receiveTimeMs) {
-      this.motionX = motionX;
-      this.motionY = motionY;
-      this.motionZ = motionZ;
-      this.receiveTimeMs = receiveTimeMs;
-    }
-  }
+  private final ConcurrentLinkedDeque<Packet<?>> delayedPackets = new ConcurrentLinkedDeque<>();
+  private long lagStartTime = -1;
 
   public KnockbackDelay() {
     super("KnockbackDelay", false);
@@ -55,12 +46,13 @@ public class KnockbackDelay extends Module {
 
   @Override
   public void onEnabled() {
-    delayedVelocities.clear();
+    delayedPackets.clear();
+    lagStartTime = -1;
   }
 
   @Override
   public void onDisabled() {
-    flushDelayedVelocities();
+    flushDelayedPackets();
   }
 
   @EventTarget(Priority.HIGHEST)
@@ -69,7 +61,13 @@ public class KnockbackDelay extends Module {
     if (e.getType() != EventType.RECEIVE) return;
 
     if (e.getPacket() instanceof S08PacketPlayerPosLook) {
-      flushDelayedVelocities();
+      flushDelayedPackets();
+      return;
+    }
+
+    if (lagStartTime != -1) {
+      e.setCancelled(true);
+      delayedPackets.addLast(e.getPacket());
       return;
     }
 
@@ -95,12 +93,8 @@ public class KnockbackDelay extends Module {
     }
 
     e.setCancelled(true);
-    delayedVelocities.addLast(
-        new VelocityEntry(
-            packet.getMotionX() / 8000.0,
-            packet.getMotionY() / 8000.0,
-            packet.getMotionZ() / 8000.0,
-            System.currentTimeMillis()));
+    delayedPackets.addLast(e.getPacket());
+    lagStartTime = System.currentTimeMillis();
   }
 
   @EventTarget(Priority.LOWEST)
@@ -108,48 +102,37 @@ public class KnockbackDelay extends Module {
     if (!this.isEnabled()) return;
     if (e.getType() != EventType.PRE) return;
     if (mc.thePlayer == null || mc.theWorld == null || mc.thePlayer.isDead) {
-      flushDelayedVelocities();
+      flushDelayedPackets();
       return;
     }
 
-    if (delayedVelocities.isEmpty()) return;
+    if (lagStartTime == -1) return;
 
     if (conditionsFailureReason() != null) {
-      flushDelayedVelocities();
+      flushDelayedPackets();
       return;
     }
 
     long nowMs = System.currentTimeMillis();
     long maxDelayMs = maximumDelay.getValue().longValue();
 
-    while (!delayedVelocities.isEmpty()) {
-      VelocityEntry entry = delayedVelocities.peekFirst();
-      if (entry == null) break;
-
-      long elapsed = nowMs - entry.receiveTimeMs;
-      if (elapsed >= maxDelayMs) {
-        delayedVelocities.pollFirst();
-        applyVelocity(entry);
-      } else {
-        break;
-      }
+    if (nowMs - lagStartTime >= maxDelayMs) {
+      flushDelayedPackets();
     }
   }
 
-  private void applyVelocity(VelocityEntry entry) {
-    if (mc.thePlayer == null) return;
-    mc.thePlayer.motionX = entry.motionX;
-    mc.thePlayer.motionY = entry.motionY;
-    mc.thePlayer.motionZ = entry.motionZ;
-  }
-
-  private void flushDelayedVelocities() {
-    if (mc.thePlayer != null) {
-      for (VelocityEntry entry : delayedVelocities) {
-        applyVelocity(entry);
+  @SuppressWarnings("unchecked")
+  private void flushDelayedPackets() {
+    lagStartTime = -1;
+    if (mc.thePlayer != null && mc.getNetHandler() != null) {
+      while (!delayedPackets.isEmpty()) {
+        Packet<?> packet = delayedPackets.pollFirst();
+        if (packet != null) {
+          PacketUtil.handlePacket((Packet<INetHandlerPlayClient>) packet);
+        }
       }
     }
-    delayedVelocities.clear();
+    delayedPackets.clear();
   }
 
   private String conditionsFailureReason() {

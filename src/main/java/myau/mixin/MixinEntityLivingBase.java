@@ -34,6 +34,9 @@ public abstract class MixinEntityLivingBase extends MixinEntity {
           new myau.event.impl.JumpEvent(
               RotationState.isActived() ? RotationState.getSmoothedYaw() : yawDegrees);
       EventManager.call(event);
+      if (event.getJumpoff() != 0.0f) {
+        this.motionY = event.getJumpoff();
+      }
       return event.getYaw() * (float) (Math.PI / 180.0);
     }
     return float1;

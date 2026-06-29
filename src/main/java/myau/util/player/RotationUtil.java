@@ -21,6 +21,7 @@ import net.minecraft.util.*;
 
 public class RotationUtil {
   private static final Minecraft mc = Minecraft.getMinecraft();
+  private static final float FAR_THRESHOLD = 180.0f;
 
   public static float serverYaw;
   public static float serverPitch;
@@ -187,14 +188,6 @@ public class RotationUtil {
     return mc.theWorld.rayTraceBlocks(eyePos, targetPos);
   }
 
-  // ================================================================
-  //  RAVEN BS — MULTIPOINT AIM POINT
-  // ================================================================
-
-  /**
-   * Returns the aim point Vec3 for the given entity and multipoint settings.
-   * horizontalMultipoint/verticalMultipoint: 0-100, where 0=center, 100=closest edge.
-   */
   public static Vec3 getAimPoint(
       Entity entity, double horizontalMultipoint, double verticalMultipoint) {
     if (entity == null || mc.thePlayer == null) return null;
@@ -708,6 +701,79 @@ public class RotationUtil {
     float fixedPitch =
         prevPitch + (float) (Math.round((pitch - prevPitch) / multiplier) * multiplier);
     return new float[] {fixedYaw, MathHelper.clamp_float(fixedPitch, -90.0F, 90.0F)};
+  }
+
+  public static float clampPitch(float n) {
+    return MathHelper.clamp_float(n, -90.0F, 90.0F);
+  }
+
+  public static float[] smoothRotation(
+      float baseYaw, float basePitch, float targetYaw, float targetPitch, int speed) {
+    return smoothRotation(baseYaw, basePitch, targetYaw, targetPitch, speed, 0f);
+  }
+
+  public static float[] smoothRotation(
+      float baseYaw,
+      float basePitch,
+      float targetYaw,
+      float targetPitch,
+      int speed,
+      float randomizationPercent) {
+    if (speed <= 0) {
+      return new float[] {baseYaw, clampPitch(basePitch)};
+    }
+    if (speed >= 30) {
+      return new float[] {targetYaw, clampPitch(targetPitch)};
+    }
+    float deltaYaw = MathHelper.wrapAngleTo180_float(targetYaw - baseYaw);
+    float deltaPitch = targetPitch - basePitch;
+    float magnitude = (float) MathHelper.sqrt_double(deltaYaw * deltaYaw + deltaPitch * deltaPitch);
+    if (magnitude < 0.001f) {
+      return new float[] {targetYaw, clampPitch(targetPitch)};
+    }
+    float t = speed / 30f;
+    float stepSize = t * t * 180f;
+    float range = 0.6f * (float) (randomizationPercent / 100.0);
+    float multiplier =
+        (range <= 0.001f) ? 1.0f : (1.0f - range / 2f + (float) (Math.random() * range));
+    stepSize *= multiplier;
+    float proximityFactor = Math.min(1f, magnitude / FAR_THRESHOLD);
+    proximityFactor = (float) Math.pow(proximityFactor, 0.7);
+    float maxSlowdown = (float) (randomizationPercent / 100.0);
+    float proximityMult = Math.max(0.8f, 1.0f - maxSlowdown * (1.0f - proximityFactor));
+    stepSize *= proximityMult;
+    float stepLength = Math.min(stepSize, magnitude);
+    float scale = stepLength / magnitude;
+    float stepYaw = deltaYaw * scale;
+    float stepPitch = deltaPitch * scale;
+    float yaw = baseYaw + stepYaw;
+    float pitch = basePitch + stepPitch;
+    return new float[] {yaw, clampPitch(pitch)};
+  }
+
+  public static float[] getRotationsFromEye(Vec3 eye, double tx, double ty, double tz) {
+    double dx = tx - eye.xCoord;
+    double dy = ty - eye.yCoord;
+    double dz = tz - eye.zCoord;
+    double dist = Math.sqrt(dx * dx + dz * dz);
+    float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90;
+    float pitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
+    return new float[] {yaw, pitch};
+  }
+
+  public static MovingObjectPosition rayCastBlock(double distance, float yaw, float pitch) {
+    Vec3 eyeVec = mc.thePlayer.getPositionEyes(1.0f);
+    Vec3 lookVec =
+        new Vec3(
+            -Math.sin(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)),
+            -Math.sin(Math.toRadians(pitch)),
+            Math.cos(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)));
+    Vec3 sumVec =
+        eyeVec.addVector(
+            lookVec.xCoord * distance, lookVec.yCoord * distance, lookVec.zCoord * distance);
+    MovingObjectPosition mop = mc.theWorld.rayTraceBlocks(eyeVec, sumVec, false, false, false);
+    if (mop == null || mop.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) return null;
+    return mop;
   }
 
   public static float[] smooth(
