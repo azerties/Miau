@@ -1,18 +1,25 @@
 package myau.clientanticheat;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import myau.util.client.ChatUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.scoreboard.ScorePlayerTeam;
 import net.minecraft.scoreboard.Scoreboard;
 
 /**
- * Beautiful anticheat alert system. Format:
+ * Simplified anticheat alert. Format:
  *
- * <p>{@code [Miau] <teamColor>playerName &7detected for &bKillAura &8[silent(snap)] &7[&aVL:
- * &f69&7] &7- &f5m}
+ * <p>{@code [Miau] &lt;teamColor&gt;playerName &7detected for &bKillAura &8[silent(snap)] &7[&aVL:
+ * &f69&7] - 5m}
  *
- * <p>With team-colored names, detailed component breakdown, VL, and distance.
+ * <p>The client prefix + username color is handled automatically by ChatUtil. Username color is
+ * pulled from the player's Scoreboard team prefix (works on any server with team-colored names).
+ * Distance is computed from the local player to the suspect.
  */
 public class AntiCheatAlertStyle {
 
@@ -42,36 +49,29 @@ public class AntiCheatAlertStyle {
   // ── Main alert method ──────────────────────────────────────────────────
 
   /**
-   * Display a beautiful anticheat alert.
+   * Display a simple anticheat alert.
    *
    * @param playerName suspect name
    * @param cheatName type of cheat (KillAura, Scaffold, etc.)
    * @param detail sub-type / component detail
    * @param vl violation level
-   * @param distance distance in blocks from local player
    */
-  public static void displayFlag(
-      String playerName, String cheatName, String detail, int vl, int distance) {
+  public static void displayFlag(String playerName, String cheatName, String detail, int vl) {
     if (playerName == null || playerName.isEmpty()) return;
 
     String teamColor = getPlayerTeamColor(playerName);
     String normalized = normalizeCheatName(cheatName);
+    // VL: scale vl to a friendly number (aimVl/10)
     int visualVl = Math.max(1, vl);
 
     // Mark for nametag overlay
     markCheater(playerName, normalized, visualVl);
 
     StringBuilder sb = new StringBuilder();
-
-    // Alert prefix
-    sb.append("&8[&c⚠&8] ");
-
     // Username in team color
     sb.append(teamColor).append(playerName);
-
     // " detected for "
     sb.append(" &7detected for &b").append(normalized);
-
     // [detail]
     if (detail != null
         && !detail.isEmpty()
@@ -79,11 +79,10 @@ public class AntiCheatAlertStyle {
         && !"vl".equalsIgnoreCase(detail)) {
       sb.append(" &8[").append(detail).append("&8]");
     }
-
     // [VL: number]
     sb.append(" &7[&aVL: &f").append(visualVl).append("&7]");
-
     // - Xm
+    int distance = getPlayerDistance(playerName);
     if (distance >= 0) {
       sb.append(" &7- &f").append(distance).append("m");
     }
@@ -122,12 +121,6 @@ public class AntiCheatAlertStyle {
     pruneExpired();
   }
 
-  public static void unmarkCheater(String playerName) {
-    if (playerName != null) {
-      markedCheaters.remove(playerName.toLowerCase(Locale.ROOT));
-    }
-  }
-
   public static boolean hasMarkedCheaters() {
     pruneExpired();
     return !markedCheaters.isEmpty();
@@ -162,13 +155,26 @@ public class AntiCheatAlertStyle {
     if (team != null) {
       String prefix = team.getColorPrefix();
       if (prefix != null) {
+        // Extract the last §-style colour from the prefix
         int idx = prefix.lastIndexOf('\u00A7');
         if (idx >= 0 && idx + 1 < prefix.length()) {
           return "&" + prefix.charAt(idx + 1);
         }
       }
     }
-    return "&f";
+    return "&f"; // default white
+  }
+
+  /** Distance in integer blocks from the local player to the suspect. */
+  private static int getPlayerDistance(String playerName) {
+    Minecraft mc = Minecraft.getMinecraft();
+    if (mc.thePlayer == null || mc.theWorld == null) return -1;
+    for (EntityPlayer p : mc.theWorld.playerEntities) {
+      if (p.getName().equals(playerName)) {
+        return (int) Math.round(mc.thePlayer.getDistanceToEntity(p));
+      }
+    }
+    return -1;
   }
 
   private static void pruneExpired() {
