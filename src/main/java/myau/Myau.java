@@ -114,6 +114,7 @@ public class Myau {
     moduleManager.modules.put(AutoReconnect.class, new AutoReconnect());
     moduleManager.modules.put(AutoTool.class, new AutoTool());
     moduleManager.modules.put(AutoWeapon.class, new AutoWeapon());
+    moduleManager.modules.put(BridgeAssist.class, new BridgeAssist());
     moduleManager.modules.put(AutoSwap.class, new AutoSwap());
     moduleManager.modules.put(AutoBedDef.class, new AutoBedDef());
     moduleManager.modules.put(BedNuker.class, new BedNuker());
