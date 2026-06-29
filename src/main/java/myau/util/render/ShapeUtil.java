@@ -20,13 +20,20 @@ public class ShapeUtil {
     if (color == 0) {
       return;
     }
+    boolean texture2D = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
+    boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
+    if (texture2D) GL11.glDisable(GL11.GL_TEXTURE_2D);
+    if (!blend) GL11.glEnable(GL11.GL_BLEND);
+    GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     RenderUtil.setColor(color);
-    GL11.glBegin(GL11.GL_POLYGON);
+    GL11.glBegin(GL11.GL_QUADS);
     GL11.glVertex2f(x1, y1);
     GL11.glVertex2f(x1, y2);
     GL11.glVertex2f(x2, y2);
     GL11.glVertex2f(x2, y1);
     GL11.glEnd();
+    if (!blend) GL11.glDisable(GL11.GL_BLEND);
+    if (texture2D) GL11.glEnable(GL11.GL_TEXTURE_2D);
     GlStateManager.resetColor();
   }
 

@@ -35,4 +35,22 @@ public abstract class MixinAbstractClientPlayer extends MixinEntityPlayer {
       return attributeValue;
     }
   }
+
+  @org.spongepowered.asm.mixin.injection.Inject(
+      method = "getLocationCape",
+      at = @At("RETURN"),
+      cancellable = true)
+  public void onGetLocationCape(
+      org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<
+              net.minecraft.util.ResourceLocation>
+          cir) {
+    if (Myau.moduleManager != null) {
+      myau.module.modules.render.Capes capes =
+          (myau.module.modules.render.Capes)
+              Myau.moduleManager.modules.get(myau.module.modules.render.Capes.class);
+      if (capes != null && capes.isEnabled() && cir.getReturnValue() == null) {
+        cir.setReturnValue(capes.getCape());
+      }
+    }
+  }
 }

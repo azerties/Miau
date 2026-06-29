@@ -229,6 +229,7 @@ public enum Themes {
   GOTHIC("Gothic", new Color(31, 30, 30), new Color(196, 190, 190), RESET, KeyColors.GRAY),
   SEN("Rue", new Color(234, 118, 176), new Color(31, 30, 30), DARK_PURPLE, KeyColors.PINK),
   PURPLE("Purple", new Color(0x524391), new Color(0x524391).brighter(), RESET),
+  FAITHS("Faiths", new Color(164, 53, 144), new Color(100, 30, 90), DARK_PURPLE, KeyColors.PURPLE),
   TEST("Rainbow", data -> ColorUtil.rainbow((int) ((data.getX() + data.getY()) * 10)), RED);
 
   private final String themeName;

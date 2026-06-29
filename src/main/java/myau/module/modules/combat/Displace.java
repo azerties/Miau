@@ -22,6 +22,7 @@ import myau.property.properties.ItemListProperty;
 import myau.property.properties.ModeProperty;
 import myau.util.player.CombatTargeting;
 import myau.util.player.MoveUtil;
+import myau.util.player.RotationUtil;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
@@ -379,7 +380,7 @@ public class Displace extends Module {
   }
 
   private float getFixedDisplaceYaw() {
-    float baseYaw = mc.thePlayer.rotationYaw;
+    float baseYaw = RotationUtil.serverYaw != 0 ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
     float offset = yawOffset.getValue();
     return displaceLeft ? baseYaw - offset : baseYaw + offset;
   }
@@ -681,7 +682,7 @@ public class Displace extends Module {
                   true,
                   ignoreTeammates.getValue(),
                   true,
-                  3.0,
+                  9.0,
                   CombatTargeting.SortMode.DISTANCE);
     }
 
@@ -731,7 +732,7 @@ public class Displace extends Module {
 
     if (!displaceThisTick || renderDisplaceYaw == null) return;
 
-    e.setRotation(renderDisplaceYaw, e.getPitch(), 100);
+    e.setRotation(renderDisplaceYaw, e.getPitch(), Integer.MAX_VALUE);
     MoveUtil.fixMovement(renderDisplaceYaw);
   }
 }

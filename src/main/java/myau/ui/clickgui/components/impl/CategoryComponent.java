@@ -391,6 +391,12 @@ public class CategoryComponent {
       RenderUtil.scissor(this.renderX - 3, this.renderY - 3, this.width + 6, scissorHeight + 6);
     }
 
+    Color themeColor1 =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(this.renderX, this.renderY));
+    Color themeColor2 =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(this.renderX + this.width, extra));
     drawRoundedGradientOutlinedRectangle(
         this.renderX - 2,
         this.renderY,
@@ -398,8 +404,8 @@ public class CategoryComponent {
         extra,
         10,
         TRANSLUCENT_BACKGROUND,
-        REGULAR_OUTLINE,
-        REGULAR_OUTLINE2);
+        themeColor1.getRGB(),
+        themeColor2.getRGB());
 
     // Lift everything via glTranslatef
     GL11.glPushMatrix();
