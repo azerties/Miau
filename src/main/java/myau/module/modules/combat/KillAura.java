@@ -122,11 +122,6 @@ public class KillAura extends Module {
   public final BooleanProperty smartKill;
   public final BooleanProperty tacticalKD;
   public final FloatProperty kdOffset;
-  // Raven BS multipoint/backup properties
-  public final PercentProperty multipointH;
-  public final PercentProperty multipointV;
-  public final PercentProperty randomization;
-  public final BooleanProperty backupPoints;
   public int keepSprintBlinkTicks = 0;
   private int ticks = 255;
 
@@ -645,10 +640,6 @@ public class KillAura extends Module {
     this.smartKill = new BooleanProperty("smart-kill", true);
     this.tacticalKD = new BooleanProperty("tactical-kd", false);
     this.kdOffset = new FloatProperty("kd-offset", 45.0F, 15.0F, 90.0F);
-    this.multipointH = new PercentProperty("multipoint-h", 100);
-    this.multipointV = new PercentProperty("multipoint-v", 100);
-    this.randomization = new PercentProperty("randomization", 0);
-    this.backupPoints = new BooleanProperty("backup-points", true);
   }
 
   public EntityLivingBase getTarget() {
@@ -761,16 +752,10 @@ public class KillAura extends Module {
               case 1:
                 {
                   if (rotSpeed != 0) {
-                    float[] baseRots = targetRots;
-                    if (this.backupPoints.getValue()) {
-                      baseRots =
-                          RotationUtil.calculate(
-                              this.target.getEntity(), true, this.attackRange.getValue());
-                    }
                     rotations =
                         RotationUtil.smooth(
                             lastRots,
-                            baseRots,
+                            targetRots,
                             rotSpeed,
                             this.target.getEntity(),
                             this.attackRange.getValue());
