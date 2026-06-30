@@ -433,6 +433,13 @@ public class CategoryComponent {
       GL11.glPopMatrix();
 
       GL11.glDisable(GL11.GL_SCISSOR_TEST);
+
+      // Render overlays outside category scissor so dropdowns always draw on top (Fix D)
+      for (Component c2 : this.modules) {
+        if (c2 instanceof ModuleComponent) {
+          ((ModuleComponent) c2).renderOverlays();
+        }
+      }
     }
 
     if (openAnimationValue < 1.0f) {

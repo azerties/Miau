@@ -11,6 +11,7 @@ import myau.ui.clickgui.components.impl.BindComponent;
 import myau.ui.clickgui.components.impl.CategoryComponent;
 import myau.ui.clickgui.components.impl.ModuleComponent;
 import myau.ui.clickgui.components.impl.SearchBarComponent;
+import myau.ui.clickgui.components.impl.SliderComponent;
 import myau.util.animation.AnimationTimer;
 import myau.util.shader.RoundedUtils;
 import net.minecraft.client.gui.GuiScreen;
@@ -26,6 +27,11 @@ public class ClickGui extends GuiScreen {
   private AnimationTimer scaleAnimation = new AnimationTimer(300.0F);
   private ScaledResolution sr;
   public static ArrayList<CategoryComponent> categories;
+  public static int lastMouseX;
+  public static int lastMouseY;
+
+  // Post-render overlay queue: stores the active mode dropdown to render after all categories
+  public static SliderComponent activeModeDropdown = null;
 
   private ConfigWindow configWindow;
 
@@ -171,6 +177,8 @@ public class ClickGui extends GuiScreen {
 
     int scaledX = x;
     int scaledY = y;
+    lastMouseX = scaledX;
+    lastMouseY = scaledY;
 
     updateAutoLayout(delta);
 
@@ -224,6 +232,15 @@ public class ClickGui extends GuiScreen {
       }
     }
     GL11.glColor3f(1.0f, 1.0f, 1.0f);
+
+    // Post-render: render active mode dropdown overlay outside any category scissor
+    // but still inside the scale transform so coordinates match
+    SliderComponent dropdown = activeModeDropdown;
+    activeModeDropdown = null; // reset for next frame
+    if (dropdown != null && dropdown.isModeDropdownActive()) {
+      GL11.glDisable(GL11.GL_SCISSOR_TEST);
+      dropdown.renderModeDropdownOverlay(scaledX, scaledY);
+    }
 
     // Vẽ Config Window
     if (configWindow != null) {

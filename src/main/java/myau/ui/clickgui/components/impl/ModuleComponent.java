@@ -18,6 +18,7 @@ import myau.ui.clickgui.components.Component;
 import myau.util.animation.AnimationTimer;
 import myau.util.font.Font;
 import myau.util.font.FontRepository;
+import myau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import org.lwjgl.BufferUtils;
@@ -69,8 +70,35 @@ public class ModuleComponent extends Component {
     if (mod != null) {
       ArrayList<Property<?>> props = myau.Myau.propertyManager.properties.get(mod.getClass());
       if (props != null) {
-        for (Property<?> v : props) {
+        for (int i = 0; i < props.size(); i++) {
+          Property<?> v = props.get(i);
           if (!v.isVisible()) {
+            continue;
+          }
+          // Group consecutive target-* BooleanProperties together
+          if (v instanceof BooleanProperty && v.getName().startsWith("target-")) {
+            java.util.List<BooleanProperty> groupProps = new java.util.ArrayList<>();
+            groupProps.add((BooleanProperty) v);
+            for (int j = i + 1; j < props.size(); j++) {
+              Property<?> next = props.get(j);
+              if (next instanceof BooleanProperty
+                  && next.getName().startsWith("target-")
+                  && next.isVisible()) {
+                groupProps.add((BooleanProperty) next);
+                i = j;
+              } else {
+                break;
+              }
+            }
+            if (groupProps.size() > 1) {
+              GroupComponent gc = new GroupComponent("Targets", this, y, groupProps);
+              this.settings.add(gc);
+              y += GroupComponent.GROUP_HEADER_HEIGHT;
+            } else {
+              ButtonComponent c = new ButtonComponent(mod, groupProps.get(0), this, y);
+              this.settings.add(c);
+              y += 12;
+            }
             continue;
           }
           if (v instanceof BooleanProperty) {
@@ -99,17 +127,26 @@ public class ModuleComponent extends Component {
 
   public void reloadSettings() {
     boolean wasOpened = this.isOpened;
+    Map<String, Boolean> groupExpandedStates = new HashMap<>();
     Map<Property<?>, Boolean> sliderHeldStates = new HashMap<>();
     Map<Property<?>, Boolean> sliderMinStates = new HashMap<>();
     Map<Property<?>, Boolean> sliderMaxStates = new HashMap<>();
     Map<Property<?>, Boolean> colorExpandedStates = new HashMap<>();
+    Map<Property<?>, Boolean> modeExpandedStates = new HashMap<>();
 
     for (Component component : this.settings) {
-      if (component instanceof SliderComponent) {
+      if (component instanceof GroupComponent) {
+        groupExpandedStates.put(
+            ((GroupComponent) component).getGroupName(),
+            ((GroupComponent) component).isExpanded());
+      } else if (component instanceof SliderComponent) {
         SliderComponent sliderComponent = (SliderComponent) component;
         sliderHeldStates.put(sliderComponent.property, sliderComponent.heldDown);
         sliderMinStates.put(sliderComponent.property, sliderComponent.draggingMin);
         sliderMaxStates.put(sliderComponent.property, sliderComponent.draggingMax);
+        if (sliderComponent.property instanceof ModeProperty) {
+          modeExpandedStates.put(sliderComponent.property, sliderComponent.isExpanded);
+        }
       } else if (component instanceof ColorComponent) {
         ColorComponent colorComponent = (ColorComponent) component;
         colorExpandedStates.put(colorComponent.property, colorComponent.expanded);
@@ -126,11 +163,23 @@ public class ModuleComponent extends Component {
         if (wasDraggingMin != null) sliderComponent.draggingMin = wasDraggingMin;
         Boolean wasDraggingMax = sliderMaxStates.get(sliderComponent.property);
         if (wasDraggingMax != null) sliderComponent.draggingMax = wasDraggingMax;
+        if (sliderComponent.property instanceof ModeProperty) {
+          Boolean wasExpanded = modeExpandedStates.get(sliderComponent.property);
+          if (wasExpanded != null) {
+            sliderComponent.restoreModeDropdownState(wasExpanded);
+          }
+        }
       } else if (component instanceof ColorComponent) {
         ColorComponent colorComponent = (ColorComponent) component;
         Boolean wasExpanded = colorExpandedStates.get(colorComponent.property);
         if (wasExpanded != null) {
           colorComponent.restoreExpandedState(wasExpanded);
+        }
+      } else if (component instanceof GroupComponent) {
+        GroupComponent groupComponent = (GroupComponent) component;
+        Boolean wasExpanded = groupExpandedStates.get(groupComponent.getGroupName());
+        if (wasExpanded != null) {
+          groupComponent.restoreExpandedState(wasExpanded);
         }
       }
     }
@@ -179,6 +228,8 @@ public class ModuleComponent extends Component {
         ((BindComponent) co).xOffset = 0;
       } else if (co instanceof ColorComponent) {
         ((ColorComponent) co).xOffset = 0;
+      } else if (co instanceof GroupComponent) {
+        ((GroupComponent) co).xOffset = 0;
       }
       y += getBaseComponentHeightF(co);
     }
@@ -217,7 +268,7 @@ public class ModuleComponent extends Component {
       float textY = this.categoryComponent.getY() + this.yPos + 5;
       titleRenderer.draw(this.mod.getName(), textX, textY, button_rgb, true);
     }
-    boolean scissorRequired = smoothTimer != null;
+    boolean scissorRequired = smoothTimer != null || this.isOpened;
     if (scissorRequired) {
       ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
       int scale = sr.getScaleFactor();
@@ -252,12 +303,24 @@ public class ModuleComponent extends Component {
     if (scissorRequired) {
       popScissor();
     }
+
   }
 
   private void renderSettings() {
     for (Component c : settings) {
       if (isVisibleBase(c)) {
         c.render();
+      }
+    }
+  }
+
+  public void renderOverlays() {
+    for (Component c : settings) {
+      if (c instanceof SliderComponent && isVisibleBase(c)) {
+        SliderComponent slider = (SliderComponent) c;
+        if (slider.isModeDropdownActive()) {
+          ClickGui.activeModeDropdown = slider;
+        }
       }
     }
   }
@@ -347,12 +410,34 @@ public class ModuleComponent extends Component {
       return true;
     }
 
+    SliderComponent activeDropdown = getActiveModeDropdown();
+    if (activeDropdown != null) {
+      if (activeDropdown.onClick(x, y, mouse)) {
+        return true;
+      }
+      activeDropdown.collapseModeDropdown();
+      return true;
+    }
+
     for (Component settingComponent : this.settings) {
       if (settingComponent.onClick(x, y, mouse)) {
         return true;
       }
     }
     return false;
+  }
+
+  private SliderComponent getActiveModeDropdown() {
+    for (int i = this.settings.size() - 1; i >= 0; i--) {
+      Component component = this.settings.get(i);
+      if (component instanceof SliderComponent && isVisibleBase(component)) {
+        SliderComponent slider = (SliderComponent) component;
+        if (slider.isModeDropdownActive()) {
+          return slider;
+        }
+      }
+    }
+    return null;
   }
 
   public void mouseReleased(int x, int y, int m) {
@@ -398,7 +483,7 @@ public class ModuleComponent extends Component {
   public void updateSettingPositions() {
     this.categoryComponent.updateHeight();
   }
-
+ 
   public boolean isVisible(Component component) {
     return isVisibleBase(component);
   }
@@ -411,6 +496,11 @@ public class ModuleComponent extends Component {
       ColorComponent cc = (ColorComponent) component;
       float progress = cc.getAnimationProgress();
       return 12f + (cc.getExpandedHeight() - 12f) * progress;
+    }
+    if (component instanceof GroupComponent) {
+      GroupComponent gc = (GroupComponent) component;
+      return GroupComponent.GROUP_HEADER_HEIGHT
+          + gc.getSubCount() * 12f * gc.getAnimationProgress();
     }
     return 12f;
   }

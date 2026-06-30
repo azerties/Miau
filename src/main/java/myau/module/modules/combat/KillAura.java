@@ -994,7 +994,7 @@ public class KillAura extends Module {
           mc.thePlayer.stopUsingItem();
         }
       }
-      if (this.debugLog.getValue() == 1 && this.isAttackAllowed()) {
+      if (this.debugLog.getValue() == 1 && mc.thePlayer != null) {
         if (event.getPacket() instanceof S06PacketUpdateHealth) {
           float packet =
               ((S06PacketUpdateHealth) event.getPacket()).getHealth() - mc.thePlayer.getHealth();

@@ -9,6 +9,8 @@ import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
 import myau.property.properties.PercentProperty;
 import myau.ui.clickgui.components.Component;
+import myau.util.animation.AnimationTimer;
+import myau.util.font.Font;
 import myau.util.font.FontRepository;
 import myau.util.render.RenderUtil;
 import org.lwjgl.opengl.GL11;
@@ -32,7 +34,17 @@ public class SliderComponent extends Component {
   private double targetSecondValue;
   private double displayedSecondValue;
 
+  public boolean isExpanded = false;
+  private AnimationTimer dropdownTimer;
+  private float dropdownProgress = 0f;
+  private float dropdownStartProgress = 0f;
+  private float dropdownTargetProgress = 0f;
+
   private static final double SLIDER_SPEED = 0.6;
+  private static final float MODE_HEADER_HEIGHT = 14f;
+  private static final float MODE_OPTION_HEIGHT = 12f;
+  private static final float MODE_DROPDOWN_GAP = 2f;
+  private static final float MODE_ANIMATION_DURATION = 180f;
 
   public SliderComponent(Property<?> property, ModuleComponent moduleComponent, float o) {
     this.property = property;
@@ -160,6 +172,11 @@ public class SliderComponent extends Component {
 
   @Override
   public void render() {
+    if (isString()) {
+      renderModeHeader();
+      return;
+    }
+
     float cx = this.moduleComponent.categoryComponent.getX();
     float cy = this.moduleComponent.categoryComponent.getY() + this.o;
     float cw = this.moduleComponent.categoryComponent.getWidth();
@@ -168,25 +185,12 @@ public class SliderComponent extends Component {
     String suffix = getSuffix();
     String valueText;
 
-    if (isString()) {
-      int idx = (int) Math.round(input);
-      String[] opts = getOptions();
-      if (opts != null && opts.length > 0) {
-        idx = Math.max(0, Math.min(idx, opts.length - 1));
-        valueText = opts[idx];
-      } else {
-        valueText = "";
-      }
+    if (property instanceof IntProperty || property instanceof PercentProperty) {
+      valueText = String.valueOf((int) Math.round(input));
+    } else if (isDouble()) {
+      valueText = String.format("%.1f - %.1f", input, getSecondValue());
     } else {
-      if (property instanceof IntProperty || property instanceof PercentProperty) {
-        valueText = String.valueOf((int) Math.round(input));
-      } else {
-        if (isDouble()) {
-          valueText = String.format("%.1f - %.1f", input, getSecondValue());
-        } else {
-          valueText = String.format("%.2f", input);
-        }
-      }
+      valueText = String.format("%.2f", input);
     }
 
     GL11.glPushMatrix();
@@ -260,10 +264,181 @@ public class SliderComponent extends Component {
     }
   }
 
+  private void renderModeHeader() {
+    float cx = this.moduleComponent.categoryComponent.getX();
+    float cy = this.moduleComponent.categoryComponent.getY() + this.o;
+    float cw = this.moduleComponent.categoryComponent.getWidth();
+    float left = cx + 4 + (xOffset / 2);
+    float top = cy + 1;
+    float right = cx + cw - 4 + (xOffset / 2);
+    float bottom = top + MODE_HEADER_HEIGHT;
+
+    RenderUtil.drawRoundedRectangle(
+        left, top, right, bottom, 4f, new Color(22, 22, 28, 185).getRGB());
+
+    Font font = FontRepository.getMinecraftFont();
+    String valueText = getModeText();
+    GL11.glPushMatrix();
+    GL11.glScaled(0.5, 0.5, 0.5);
+    font.draw(
+        property.getName(), (left + 5) * 2, (top + 4) * 2, new Color(235, 235, 240).getRGB(), true);
+    float valueWidth = font.getStringWidth(valueText) / 2f;
+    font.draw(
+        valueText,
+        (right - 17 - valueWidth) * 2,
+        (top + 4) * 2,
+        new Color(160, 205, 255).getRGB(),
+        true);
+    GL11.glPopMatrix();
+
+    drawArrow(right - 10, top + MODE_HEADER_HEIGHT / 2f, getDropdownProgress());
+  }
+
+  public void renderModeDropdownOverlay(int mouseX, int mouseY) {
+    if (!isString()
+        || getDropdownProgress() <= 0.01f
+        || !moduleComponent.isOpened
+        || !moduleComponent.isVisible(this)) {
+      return;
+    }
+
+    String[] options = getOptions();
+    if (options == null || options.length == 0) {
+      return;
+    }
+
+    float progress = getDropdownProgress();
+    float cx = this.moduleComponent.categoryComponent.getX();
+    float cy = this.y;
+    float cw = this.moduleComponent.categoryComponent.getWidth();
+    float left = cx + 4 + (xOffset / 2);
+    float top = cy + 1 + MODE_HEADER_HEIGHT + MODE_DROPDOWN_GAP;
+    float right = cx + cw - 4 + (xOffset / 2);
+    float fullHeight = options.length * MODE_OPTION_HEIGHT + 6f;
+    float shownHeight = fullHeight * progress;
+
+    // Isolate GL state to prevent leaking transforms/scissors
+    GL11.glPushMatrix();
+    GL11.glDisable(GL11.GL_SCISSOR_TEST);
+
+    RenderUtil.drawRoundedRectangle(
+        left, top, right, top + shownHeight, 5f, new Color(15, 15, 22, 235).getRGB());
+    RenderUtil.scissorPushGui(left, top, right - left, shownHeight);
+
+    Font font = FontRepository.getMinecraftFont();
+    int selected = (int) Math.round(getValue());
+    int accentColor =
+        Color.getHSBColor((float) (System.currentTimeMillis() % 11000L) / 11000.0F, 0.65F, 0.95F)
+            .getRGB();
+    for (int i = 0; i < options.length; i++) {
+      float rowTop = top + 3f + i * MODE_OPTION_HEIGHT;
+      float rowBottom = rowTop + MODE_OPTION_HEIGHT - 1f;
+      boolean hovered =
+          mouseX >= left + 3 && mouseX <= right - 3 && mouseY >= rowTop && mouseY <= rowBottom;
+      if (hovered || i == selected) {
+        int rowColor =
+            hovered ? new Color(255, 255, 255, 24).getRGB() : new Color(255, 255, 255, 14).getRGB();
+        RenderUtil.drawRoundedRectangle(left + 3, rowTop, right - 3, rowBottom, 3f, rowColor);
+      }
+      if (i == selected) {
+        RenderUtil.drawRoundedRectangle(
+            left + 5, rowTop + 3, left + 7, rowBottom - 3, 1f, accentColor);
+      }
+
+      GL11.glPushMatrix();
+      GL11.glScaled(0.5, 0.5, 0.5);
+      int textColor =
+          i == selected ? new Color(230, 245, 255).getRGB() : new Color(205, 205, 214).getRGB();
+      font.draw(options[i], (left + 12) * 2, (rowTop + 3.5f) * 2, textColor, true);
+      GL11.glPopMatrix();
+    }
+
+    RenderUtil.scissorPop();
+    GL11.glPopMatrix();
+  }
+
+  private void drawArrow(float centerX, float centerY, float progress) {
+    GL11.glPushMatrix();
+    GL11.glTranslatef(centerX, centerY, 0f);
+    GL11.glRotatef(progress * 180f, 0f, 0f, 1f);
+    RenderUtil.drawRect(-3, -1, 0, 2, new Color(220, 220, 228).getRGB());
+    RenderUtil.drawRect(0, -1, 3, 2, new Color(220, 220, 228).getRGB());
+    GL11.glPopMatrix();
+  }
+
+  private String getModeText() {
+    String[] opts = getOptions();
+    if (opts == null || opts.length == 0) {
+      return "";
+    }
+    int idx = (int) Math.round(getValue());
+    idx = Math.max(0, Math.min(idx, opts.length - 1));
+    return opts[idx];
+  }
+
+  public float getDropdownProgress() {
+    if (dropdownTimer != null) {
+      if (System.currentTimeMillis() - dropdownTimer.last >= MODE_ANIMATION_DURATION + 30) {
+        dropdownTimer = null;
+        dropdownProgress = dropdownTargetProgress;
+        dropdownStartProgress = dropdownTargetProgress;
+      } else {
+        dropdownProgress =
+            dropdownTimer.getValueFloat(dropdownStartProgress, dropdownTargetProgress, 1);
+        if (dropdownProgress == dropdownTargetProgress) {
+          dropdownTimer = null;
+          dropdownStartProgress = dropdownTargetProgress;
+        }
+      }
+    }
+    return dropdownProgress;
+  }
+
+  private void setExpanded(boolean expanded) {
+    float currentProgress = getDropdownProgress();
+    this.dropdownStartProgress = currentProgress;
+    this.isExpanded = expanded;
+    this.dropdownTargetProgress = expanded ? 1f : 0f;
+    (this.dropdownTimer = new AnimationTimer(MODE_ANIMATION_DURATION)).start();
+  }
+
+  public boolean isModeDropdownActive() {
+    return isString() && (isExpanded || getDropdownProgress() > 0.01f);
+  }
+
+  public boolean isMouseOverModeDropdown(int mouseX, int mouseY) {
+    if (!isString()) {
+      return false;
+    }
+    String[] options = getOptions();
+    if (options == null) {
+      return false;
+    }
+    float cx = this.moduleComponent.categoryComponent.getX();
+    float cy = this.y;
+    float cw = this.moduleComponent.categoryComponent.getWidth();
+    float left = cx + 4 + (xOffset / 2);
+    float top = cy + 1 + MODE_HEADER_HEIGHT + MODE_DROPDOWN_GAP;
+    float right = cx + cw - 4 + (xOffset / 2);
+    float bottom = top + options.length * MODE_OPTION_HEIGHT + 6f;
+    return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
+  }
+
+  public void collapseModeDropdown() {
+    if (isString() && isExpanded) {
+      setExpanded(false);
+    }
+  }
+
   @Override
   public void drawScreen(int mouseX, int mouseY) {
     this.y = this.moduleComponent.categoryComponent.getModuleY() + this.o;
     this.x = this.moduleComponent.categoryComponent.getX();
+
+    if (isString()) {
+      getDropdownProgress();
+      return;
+    }
 
     if (this.heldDown || this.draggingMin || this.draggingMax) {
       float trackLeft = this.x + 6 + (xOffset / 2);
@@ -333,6 +508,10 @@ public class SliderComponent extends Component {
 
   @Override
   public boolean onClick(int mouseX, int mouseY, int button) {
+    if (isString()) {
+      return onModeClick(mouseX, mouseY, button);
+    }
+
     if ((u(mouseX, mouseY) || i(mouseX, mouseY))
         && button == 0
         && this.moduleComponent.isOpened
@@ -362,6 +541,45 @@ public class SliderComponent extends Component {
     return false;
   }
 
+  private boolean onModeClick(int mouseX, int mouseY, int button) {
+    if (button != 0 || !this.moduleComponent.isOpened || !this.moduleComponent.isVisible(this)) {
+      return false;
+    }
+
+    float cw = this.moduleComponent.categoryComponent.getWidth();
+    boolean overHeader =
+        mouseX > this.x + 4 + (xOffset / 2)
+            && mouseX < this.x + cw - 4 + (xOffset / 2)
+            && mouseY > this.y + 1
+            && mouseY < this.y + 1 + MODE_HEADER_HEIGHT;
+
+    if (overHeader) {
+      setExpanded(!this.isExpanded);
+      return true;
+    }
+
+    if (isModeDropdownActive()) {
+      String[] options = getOptions();
+      if (options != null) {
+        float left = this.x + 4 + (xOffset / 2);
+        float top = this.y + 1 + MODE_HEADER_HEIGHT + MODE_DROPDOWN_GAP;
+        float right = this.x + cw - 4 + (xOffset / 2);
+        float bottom = top + options.length * MODE_OPTION_HEIGHT + 6f;
+        if (mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom) {
+          int optionIndex = (int) ((mouseY - top - 3f) / MODE_OPTION_HEIGHT);
+          if (optionIndex >= 0 && optionIndex < options.length) {
+            property.setValue(optionIndex);
+            setExpanded(false);
+            moduleComponent.reloadSettings();
+          }
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   @Override
   public void mouseReleased(int mouseX, int mouseY, int button) {
     this.heldDown = false;
@@ -388,6 +606,19 @@ public class SliderComponent extends Component {
     this.heldDown = false;
     this.draggingMin = false;
     this.draggingMax = false;
+    this.isExpanded = false;
+    this.dropdownTimer = null;
+    this.dropdownProgress = 0f;
+    this.dropdownStartProgress = 0f;
+    this.dropdownTargetProgress = 0f;
+  }
+
+  public void restoreModeDropdownState(boolean expanded) {
+    this.isExpanded = expanded;
+    this.dropdownTimer = null;
+    this.dropdownProgress = expanded ? 1f : 0f;
+    this.dropdownStartProgress = this.dropdownProgress;
+    this.dropdownTargetProgress = this.dropdownProgress;
   }
 
   public void updateHeight(float n) {
