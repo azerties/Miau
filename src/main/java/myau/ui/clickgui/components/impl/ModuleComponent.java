@@ -216,39 +216,6 @@ public class ModuleComponent extends Component {
       float textX = this.categoryComponent.getX() + 6;
       float textY = this.categoryComponent.getY() + this.yPos + 5;
       titleRenderer.draw(this.mod.getName(), textX, textY, button_rgb, true);
-
-      float maxH = getCollapsedHeight();
-      for (Component c : this.settings) {
-        maxH += getAnimatedComponentHeightF(c);
-      }
-      float progress = 0;
-      if (maxH > getCollapsedHeight()) {
-        progress =
-            Math.max(
-                0,
-                Math.min(1, (smoothingY - getCollapsedHeight()) / (maxH - getCollapsedHeight())));
-      } else {
-        progress = isOpened ? 1 : 0;
-      }
-      float rotation = progress * 180f;
-
-      Font iconFont = FontRepository.getFont("materialicons-regular", 18);
-      String arrowIcon = "\ue5cf";
-      float iconW = iconFont.width(arrowIcon);
-      float iconH = iconFont.height();
-
-      float arrowX =
-          this.categoryComponent.getX() + this.categoryComponent.getWidth() - 14 - (iconW / 2.0f);
-      float arrowY = this.categoryComponent.getY() + this.yPos + 6;
-
-      GL11.glPushMatrix();
-      float centerX = arrowX + iconW / 2.0f;
-      float centerY = arrowY + iconH / 2.0f;
-      GL11.glTranslatef(centerX, centerY, 0);
-      GL11.glRotatef(rotation, 0, 0, 1);
-      GL11.glTranslatef(-centerX, -centerY, 0);
-      iconFont.draw(arrowIcon, arrowX, arrowY, button_rgb, false);
-      GL11.glPopMatrix();
     }
     boolean scissorRequired = smoothTimer != null;
     if (scissorRequired) {

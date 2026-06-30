@@ -80,7 +80,13 @@ public abstract class MixinGuiChat extends GuiScreen {
     float bgY = this.height - bgHeight;
 
     GlStateManager.disableDepth();
-    RoundedUtils.drawRound(2, bgY, this.width - 4, 12, 4, new Color(0, 0, 0, 150));
+
+    // Rise-style: rounded background with themed accent outline border
+    Color outlineColor =
+        myau.util.render.Themes.getCurrentTheme()
+            .getAccentColor(new myau.util.vector.Vector2d(2, bgY));
+    RoundedUtils.drawRoundOutline(
+        2, bgY, this.width - 4, 12, 4, 1.0f, new Color(0, 0, 0, 150), outlineColor);
     GlStateManager.enableDepth();
   }
 }

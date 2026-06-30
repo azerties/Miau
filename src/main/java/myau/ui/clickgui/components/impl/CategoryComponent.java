@@ -341,7 +341,8 @@ public class CategoryComponent {
     moduleY = Math.max(layoutMetrics.minScrollY, Math.min(this.y, moduleY));
     float renderModuleY = moduleY - (this.y - this.renderY);
 
-    float middlePos = this.renderX + this.width / 2 - titleRenderer.width(this.category) / 2.0f;
+    float middlePos =
+        this.renderX + this.width / 2 - titleRenderer.width(this.category.toLowerCase()) / 2.0f;
 
     float contentBottom = layoutMetrics.contentBottom - (this.y - this.renderY);
 
@@ -411,9 +412,9 @@ public class CategoryComponent {
     GL11.glPushMatrix();
     GL11.glTranslatef(0f, -liftY, 0f);
 
-    renderItemForCategory(
-        this.category, (int) (this.renderX + 1), (int) (this.renderY + 4), opened || hovering);
-    titleRenderer.draw(this.category, namePos, this.renderY + 4, CATEGORY_NAME_COLOR, false);
+    renderItemForCategory(this.category, (int) (this.renderX + 1), (int) (this.renderY + 4), false);
+    titleRenderer.draw(
+        this.category.toLowerCase(), namePos, this.renderY + 4, CATEGORY_NAME_COLOR, false);
 
     float moduleAreaTop = this.renderY + this.titleHeight + 3 - liftY;
     float scissorBottom = extra - 2f - liftY;
@@ -565,7 +566,9 @@ public class CategoryComponent {
       return lastNamePos;
     }
     float middlePos =
-        this.x + this.width / 2 - FontRepository.getMinecraftFont().width(this.category) / 2.0f;
+        this.x
+            + this.width / 2
+            - FontRepository.getMinecraftFont().width(this.category.toLowerCase()) / 2.0f;
     return this.opened ? middlePos : (this.x + 12);
   }
 

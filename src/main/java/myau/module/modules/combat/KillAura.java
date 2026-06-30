@@ -816,12 +816,14 @@ public class KillAura extends Module {
             "autoblock-aps", 8.0F, 10.0F, 1.0F, 10.0F, () -> this.autoBlock.getValue() != 0);
     this.rotations =
         new ModeProperty(
-            "rotations", 1, new String[] {"NONE", "LEGIT/NORMAL", "SNAP", "NCP", "AUTISTIC"});
+            "rotations", 1, new String[] {"NONE", "LEGIT/NORMAL", "SNAP", "NCP", "LOCK_VIEW"});
     this.smoothing = new PercentProperty("smoothing", 0);
     this.angleStep = new IntProperty("angle-step", 90, 30, 180);
     this.moveFix =
         new ModeProperty(
-            "move-fix", 0, new String[] {"OFF", "MIAU", "TRADITIONAL", "BACKWARDS_SPRINT"});
+            "move-fix",
+            0,
+            new String[] {"OFF", "Normal", "Traditional", "Backwards_Sprint", "Silent"});
     this.keepSprint = new BooleanProperty("keep-sprint", false);
     this.rayCast = new BooleanProperty("ray-cast", false);
     this.throughWalls = new BooleanProperty("through-walls", true);
@@ -1040,27 +1042,38 @@ public class KillAura extends Module {
                   }
                 }
                 break;
-              case 4: // AUTISTIC
-                rotations = new float[] {(float) (lastRots[0] + rotSpeed * 10), 0};
+              case 4: // LOCK_VIEW
+                {
+                  float[] lockViewRots =
+                      RotationUtil.getRotationsToBox(
+                          this.target.getBox(),
+                          event.getYaw(),
+                          event.getPitch(),
+                          (float) this.angleStep.getValue() + RandomUtil.nextFloat(-5.0F, 5.0F),
+                          (float) this.smoothing.getValue() / 100.0F);
+                  if (lockViewRots != null) {
+                    rotations = new float[] {lockViewRots[0], lockViewRots[1]};
+                  }
+                }
                 break;
             }
 
-            // Áp dụng sensitivity quantization dùng SERVER rotation (lastRots) làm base
-            // Không dùng mc.thePlayer.prevRotationYaw vì đó là client rotation khác biệt
             float[] quantized =
                 RotationUtil.flexRotation(rotations[0], rotations[1], lastRots[0], lastRots[1]);
             event.setRotation(quantized[0], quantized[1], 1);
 
-            // Rise-style RotationComponent: update state cho movefix
+            if (this.rotations.getValue() == 4) {
+              Myau.rotationManager.setRotation(quantized[0], quantized[1], 1, true);
+            }
+
+            // Bloom dev tech
             RotationComponent.update(quantized[0], quantized[1], this.moveFix.getValue());
 
-            if (this.moveFix.getValue() != 0) {
+            if (this.moveFix.getValue() != 0 || this.rotations.getValue() == 4) {
               event.setPervRotation(quantized[0], 1);
             }
           }
-          // ----------------------------------------
-          //  KNOCKBACK DISPLACEMENT INTERCEPT
-          // ----------------------------------------
+
           if (attack
               && this.tacticalKD.getValue()
               && this.target.getEntity() instanceof EntityPlayer) {
@@ -1296,6 +1309,13 @@ public class KillAura extends Module {
     if (this.isEnabled()) {
       if (this.moveFix.getValue() == 1 && RotationState.isActived()) {
         MoveUtil.fixMovement(RotationState.getRotationYawHead());
+      }
+      // bloom dev tech
+      if (this.moveFix.getValue() == 4
+          && this.rotations.getValue() != 4
+          && RotationState.isActived()
+          && MoveUtil.isForwardPressed()) {
+        MoveUtil.fixStrafe(RotationState.getSmoothedYaw());
       }
       if (this.shouldAutoBlock()) {
         mc.thePlayer.movementInput.jump = false;

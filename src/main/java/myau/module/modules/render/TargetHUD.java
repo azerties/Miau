@@ -414,6 +414,14 @@ public class TargetHUD extends Module {
             true,
             new Color(mergeAlpha(Color.black.getRGB(), maxAlphaOutline)));
         BlurUtils.blurEnd(2, blurRadius);
+      } else {
+        drawRoundedRectangle(
+            n6,
+            n7,
+            Math.abs(n6 - n8),
+            Math.abs(n7 - (n9 + 13f * invSc)),
+            8.0f,
+            mergeAlpha(Color.black.getRGB(), maxAlphaBackground));
       }
 
       float n13 = n6 + 6f * invSc;

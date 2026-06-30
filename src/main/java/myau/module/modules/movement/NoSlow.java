@@ -22,7 +22,7 @@ public class NoSlow extends Module {
           "Mode",
           0,
           new String[] {
-            "VANILLA", "NCP", "NEW_NCP", "WATCHDOG", "INTAVE", "Grim 1.9", "VERUS", "AAC", "SPARTAN"
+            "Vanilla", "NCP", "NewNcp", "Watchdog", "Intave", "Grim 1.9", "Verus", "AAC", "Spartan"
           });
   public final BooleanProperty swordValue = new BooleanProperty("sword", true);
   public final BooleanProperty foodValue = new BooleanProperty("food", true);
@@ -34,15 +34,15 @@ public class NoSlow extends Module {
 
   public NoSlow() {
     super("NoSlow", false);
-    modes.add(new OMVanillaNoSlow("VANILLA", this));
+    modes.add(new OMVanillaNoSlow("Vanilla", this));
     modes.add(new OMNCPNoSlow("NCP", this));
-    modes.add(new OMNewNCPNoSlow("NEW_NCP", this));
-    modes.add(new OMWatchdogNoSlow("WATCHDOG", this));
-    modes.add(new OMIntaveNoSlow("INTAVE", this));
-    modes.add(new OMGrimNoSlow("GRIM", this));
-    modes.add(new OMVerusNoSlow("VERUS", this));
+    modes.add(new OMNewNCPNoSlow("NewNcp", this));
+    modes.add(new OMWatchdogNoSlow("Watchdog", this));
+    modes.add(new OMIntaveNoSlow("Intave", this));
+    modes.add(new OMGrimNoSlow("Grim", this));
+    modes.add(new OMVerusNoSlow("Verus", this));
     modes.add(new OMAACNoSlow("AAC", this));
-    modes.add(new OMSpartanNoSlow("SPARTAN", this));
+    modes.add(new OMSpartanNoSlow("Spartan", this));
   }
 
   private NoSlowMode getActiveMode() {
