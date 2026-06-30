@@ -9,6 +9,8 @@ import miau.property.properties.IntProperty;
 import miau.property.properties.ModeProperty;
 import miau.property.properties.PercentProperty;
 import miau.ui.clickgui.components.Component;
+import miau.util.animation.AnimationTimer;
+import miau.util.font.Font;
 import miau.util.font.FontRepository;
 import miau.util.render.RenderUtil;
 import org.lwjgl.opengl.GL11;

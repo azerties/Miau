@@ -1,14 +1,14 @@
-package myau.ui.clickgui.components.impl;
+package miau.ui.clickgui.components.impl;
 
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
-import myau.property.properties.BooleanProperty;
-import myau.ui.clickgui.components.Component;
-import myau.util.animation.AnimationTimer;
-import myau.util.font.Font;
-import myau.util.font.FontRepository;
-import myau.util.render.RenderUtil;
+import miau.property.properties.BooleanProperty;
+import miau.ui.clickgui.components.Component;
+import miau.util.animation.AnimationTimer;
+import miau.util.font.Font;
+import miau.util.font.FontRepository;
+import miau.util.render.RenderUtil;
 import org.lwjgl.opengl.GL11;
 
 public class GroupComponent extends Component {
@@ -49,7 +49,8 @@ public class GroupComponent extends Component {
     this.moduleComponent = moduleComponent;
     this.o = o;
     this.subProperties = new ArrayList<>(subProperties);
-    this.x = moduleComponent.categoryComponent.getX() + moduleComponent.categoryComponent.getWidth();
+    this.x =
+        moduleComponent.categoryComponent.getX() + moduleComponent.categoryComponent.getWidth();
     this.y = moduleComponent.categoryComponent.getY() + moduleComponent.yPos;
   }
 
@@ -68,8 +69,7 @@ public class GroupComponent extends Component {
         animationProgress = animationTarget;
         animationStart = animationTarget;
       } else {
-        animationProgress =
-            smoothTimer.getValueFloat(animationStart, animationTarget, 1);
+        animationProgress = smoothTimer.getValueFloat(animationStart, animationTarget, 1);
         if (animationProgress == animationTarget) {
           smoothTimer = null;
           animationStart = animationTarget;
@@ -140,8 +140,7 @@ public class GroupComponent extends Component {
       float shownHeight = subFullHeight * progress;
 
       RenderUtil.drawRoundedRectangle(
-          left, subTop, right, subTop + shownHeight, 4f,
-          new Color(15, 15, 22, 235).getRGB());
+          left, subTop, right, subTop + shownHeight, 4f, new Color(15, 15, 22, 235).getRGB());
 
       RenderUtil.scissorPushGui(left, subTop, right - left, shownHeight);
 
@@ -155,8 +154,8 @@ public class GroupComponent extends Component {
         // Label
         GL11.glPushMatrix();
         GL11.glScaled(0.5, 0.5, 0.5);
-        font.draw(propName, (left + 8) * 2, (rowTop + 3) * 2,
-            new Color(210, 210, 220).getRGB(), true);
+        font.draw(
+            propName, (left + 8) * 2, (rowTop + 3) * 2, new Color(210, 210, 220).getRGB(), true);
         GL11.glPopMatrix();
 
         // Toggle switch
@@ -184,8 +183,12 @@ public class GroupComponent extends Component {
         float circleY = switchY + switchH / 2f;
 
         RenderUtil.drawRoundedRectangle(
-            circleX - circleR, circleY - circleR,
-            circleX + circleR, circleY + circleR, circleR, -1);
+            circleX - circleR,
+            circleY - circleR,
+            circleX + circleR,
+            circleY + circleR,
+            circleR,
+            -1);
       }
 
       RenderUtil.scissorPop();
@@ -203,7 +206,7 @@ public class GroupComponent extends Component {
     if (button != 0 || !this.moduleComponent.isOpened) return false;
 
     float cx = this.moduleComponent.categoryComponent.getX();
-    float cy = this.moduleComponent.categoryComponent.getY() + this.o;
+    float cy = this.moduleComponent.categoryComponent.getModuleY() + this.o;
     float cw = this.moduleComponent.categoryComponent.getWidth();
     float left = cx + 4 + (xOffset / 2);
     float top = cy + 1;

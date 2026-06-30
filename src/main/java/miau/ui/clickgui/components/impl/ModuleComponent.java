@@ -5,20 +5,6 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import myau.module.Module;
-import myau.property.Property;
-import myau.property.properties.BooleanProperty;
-import myau.property.properties.ColorProperty;
-import myau.property.properties.FloatProperty;
-import myau.property.properties.IntProperty;
-import myau.property.properties.ModeProperty;
-import myau.property.properties.PercentProperty;
-import myau.ui.clickgui.ClickGui;
-import myau.ui.clickgui.components.Component;
-import myau.util.animation.AnimationTimer;
-import myau.util.font.Font;
-import myau.util.font.FontRepository;
-import myau.util.render.RenderUtil;
 import miau.module.Module;
 import miau.property.Property;
 import miau.property.properties.BooleanProperty;
@@ -150,8 +136,7 @@ public class ModuleComponent extends Component {
     for (Component component : this.settings) {
       if (component instanceof GroupComponent) {
         groupExpandedStates.put(
-            ((GroupComponent) component).getGroupName(),
-            ((GroupComponent) component).isExpanded());
+            ((GroupComponent) component).getGroupName(), ((GroupComponent) component).isExpanded());
       } else if (component instanceof SliderComponent) {
         SliderComponent sliderComponent = (SliderComponent) component;
         sliderHeldStates.put(sliderComponent.property, sliderComponent.heldDown);
@@ -316,7 +301,6 @@ public class ModuleComponent extends Component {
     if (scissorRequired) {
       popScissor();
     }
-
   }
 
   private void renderSettings() {
@@ -496,7 +480,7 @@ public class ModuleComponent extends Component {
   public void updateSettingPositions() {
     this.categoryComponent.updateHeight();
   }
- 
+
   public boolean isVisible(Component component) {
     return isVisibleBase(component);
   }

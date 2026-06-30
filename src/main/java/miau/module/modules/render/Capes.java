@@ -40,11 +40,13 @@ public class Capes extends Module {
           }
         } else if (url.getProtocol().equals("jar")) {
           String jarPath = url.getPath().substring(5, url.getPath().indexOf("!"));
-          try (java.util.jar.JarFile jar = new java.util.jar.JarFile(java.net.URLDecoder.decode(jarPath, "UTF-8"))) {
+          try (java.util.jar.JarFile jar =
+              new java.util.jar.JarFile(java.net.URLDecoder.decode(jarPath, "UTF-8"))) {
             java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
             while (entries.hasMoreElements()) {
               String name = entries.nextElement().getName();
-              if (name.startsWith("assets/keystrokesmod/textures/capes/") && name.endsWith(".png")) {
+              if (name.startsWith("assets/keystrokesmod/textures/capes/")
+                  && name.endsWith(".png")) {
                 String capeName = name.substring(name.lastIndexOf("/") + 1).replace(".png", "");
                 capes.add(capeName);
               }
@@ -60,6 +62,7 @@ public class Capes extends Module {
     }
     return capes;
   }
+
   public final BooleanProperty btnLoadCapes = new BooleanProperty("Load capes", false);
   public final BooleanProperty btnOpenFolder = new BooleanProperty("Open folder", false);
 
