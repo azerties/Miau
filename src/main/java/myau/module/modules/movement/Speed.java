@@ -150,7 +150,6 @@ public class Speed extends Module {
         if (mc.thePlayer.onGround && MoveUtil.isForwardPressed()) {
           mc.thePlayer.jump();
         }
-        mc.thePlayer.setSprinting(mc.thePlayer.movementInput.moveForward > 0.8F);
         return;
       }
       mc.thePlayer.movementInput.jump = false;

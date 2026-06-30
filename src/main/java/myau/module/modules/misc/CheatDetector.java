@@ -74,6 +74,7 @@ public class CheatDetector extends Module {
 
   @EventTarget
   public void onUpdate(UpdateEvent e) {
+    if (!this.isEnabled()) return;
     if (mc.theWorld == null) return;
 
     for (EntityPlayer player : mc.theWorld.playerEntities) {
@@ -96,6 +97,7 @@ public class CheatDetector extends Module {
 
   @EventTarget
   public void onPacket(PacketEvent e) {
+    if (!this.isEnabled()) return;
     if (mc.theWorld == null) return;
 
     for (EntityPlayer player : mc.theWorld.playerEntities) {
