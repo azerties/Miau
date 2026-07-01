@@ -112,13 +112,13 @@ public class Miau {
     moduleManager.modules.put(AutoSoup.class, new AutoSoup());
     moduleManager.modules.put(AutoReconnect.class, new AutoReconnect());
     moduleManager.modules.put(AutoTool.class, new AutoTool());
-    moduleManager.modules.put(AutoWeapon.class, new AutoWeapon());
     moduleManager.modules.put(BridgeAssist.class, new BridgeAssist());
     moduleManager.modules.put(AutoSwap.class, new AutoSwap());
     moduleManager.modules.put(AutoBedDef.class, new AutoBedDef());
     moduleManager.modules.put(BedNuker.class, new BedNuker());
     moduleManager.modules.put(BedESP.class, new BedESP());
     moduleManager.modules.put(BedwarUtils.class, new BedwarUtils());
+    moduleManager.modules.put(miau.module.modules.minigames.ThePit3F.class, new miau.module.modules.minigames.ThePit3F());
     moduleManager.modules.put(Blink.class, new Blink());
     moduleManager.modules.put(BlockHit.class, new BlockHit());
     moduleManager.modules.put(BlockOverlay.class, new BlockOverlay());

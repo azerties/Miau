@@ -3,23 +3,21 @@ package miau.module.modules.misc;
 import java.util.*;
 import miau.Miau;
 import miau.event.EventTarget;
-import miau.event.impl.LoadWorldEvent;
 import miau.event.impl.PacketEvent;
 import miau.event.types.EventType;
-import miau.mixin.IAccessorS14PacketEntity;
 import miau.module.Module;
 import miau.notification.NotificationType;
 import miau.property.properties.BooleanProperty;
+import miau.property.properties.ModeProperty;
 import miau.util.client.ChatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Packet;
-import net.minecraft.network.play.server.*;
+import net.minecraft.network.play.server.S38PacketPlayerListItem;
 
 public class StaffDetector extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  public final BooleanProperty vanishDetect = new BooleanProperty("vanish-detect", true);
-  public final BooleanProperty teamScanner = new BooleanProperty("team-scanner", true);
+  public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"3FMC"});
   public final BooleanProperty autoLeave = new BooleanProperty("auto-leave", false);
 
   private static final Set<String> STAFF_LIST =
@@ -33,37 +31,8 @@ public class StaffDetector extends Module {
               "novapev4",
               "khoaho01623"));
 
-  private final Set<Integer> validEntities = new HashSet<>();
-  private final Set<Integer> flaggedGhost = new HashSet<>();
-  private final Set<String> alertedStaffTeams = new HashSet<>();
-  private final Set<String> alertedStaffPlayers = new HashSet<>();
-  private final Map<Integer, Long> lastGhostAlert = new HashMap<>();
-
   public StaffDetector() {
     super("StaffDetector", false, false);
-  }
-
-  @Override
-  public void onEnabled() {
-    clearCache();
-  }
-
-  @Override
-  public void onDisabled() {
-    clearCache();
-  }
-
-  @EventTarget
-  public void onLoadWorld(LoadWorldEvent event) {
-    clearCache();
-  }
-
-  private void clearCache() {
-    validEntities.clear();
-    flaggedGhost.clear();
-    alertedStaffTeams.clear();
-    alertedStaffPlayers.clear();
-    lastGhostAlert.clear();
   }
 
   @EventTarget
@@ -106,128 +75,6 @@ public class StaffDetector extends Module {
                 name + " left the server",
                 "&a[STAFF] &f" + name + " &cleft the server.");
           }
-        }
-      }
-      return;
-    }
-
-    if (packet instanceof S0CPacketSpawnPlayer) {
-      validEntities.add(((S0CPacketSpawnPlayer) packet).getEntityID());
-      return;
-    }
-
-    if (packet instanceof S13PacketDestroyEntities) {
-      for (int id : ((S13PacketDestroyEntities) packet).getEntityIDs()) {
-        validEntities.remove(id);
-        flaggedGhost.remove(id);
-      }
-      return;
-    }
-
-    if (vanishDetect.getValue()) {
-      if (packet instanceof S14PacketEntity) {
-        int entityId = ((IAccessorS14PacketEntity) packet).getEntityId();
-        checkVanish(entityId);
-      } else if (packet instanceof S18PacketEntityTeleport) {
-        int entityId = ((S18PacketEntityTeleport) packet).getEntityId();
-        checkVanish(entityId);
-      }
-    }
-
-    if (teamScanner.getValue() && packet instanceof S3EPacketTeams) {
-      S3EPacketTeams teamsPacket = (S3EPacketTeams) packet;
-      checkTeamLeak(teamsPacket);
-    }
-  }
-
-  private void checkVanish(int entityId) {
-    if (mc.theWorld == null) return;
-    if (mc.thePlayer != null && entityId == mc.thePlayer.getEntityId()) return;
-    if (validEntities.contains(entityId) || flaggedGhost.contains(entityId)) return;
-
-    if (mc.theWorld.getEntityByID(entityId) == null) {
-      flaggedGhost.add(entityId);
-
-      long now = System.currentTimeMillis();
-      if (now - lastGhostAlert.getOrDefault(entityId, 0L) > 10000L) {
-        lastGhostAlert.put(entityId, now);
-
-        Miau.notificationManager
-            .builder(NotificationType.WARN)
-            .title("Staff Detector")
-            .description("Vanish Staff Movement Detected! ID: " + entityId)
-            .duration(3000)
-            .buildAndPublish();
-
-        ChatUtil.display(
-            "&c&l[StaffDetector] &r&fVanish staff movement detected! &7(ID: " + entityId + ")");
-        triggerAutoLeave("VanishStaff#" + entityId);
-      }
-    }
-  }
-
-  private void checkTeamLeak(S3EPacketTeams teamsPacket) {
-    miau.mixin.IAccessorS3EPacketTeams accessor = (miau.mixin.IAccessorS3EPacketTeams) teamsPacket;
-    String teamName = accessor.getTeamName();
-    Collection<String> players = accessor.getPlayers();
-
-    if (teamName != null && !alertedStaffTeams.contains(teamName)) {
-      String lowerTeam = teamName.toLowerCase();
-
-      if (lowerTeam.contains("admin")
-          || lowerTeam.contains("mod")
-          || lowerTeam.contains("helper")
-          || lowerTeam.contains("staff")
-          || lowerTeam.contains("owner")
-          || lowerTeam.contains("dev")
-          || lowerTeam.contains("support")
-          || lowerTeam.contains("system")) {
-
-        alertedStaffTeams.add(teamName);
-
-        Miau.notificationManager
-            .builder(NotificationType.WARN)
-            .title("Staff Detector")
-            .description("Staff Team Leak Detected! Team: " + teamName)
-            .duration(3000)
-            .buildAndPublish();
-
-        ChatUtil.display("&c&l[StaffDetector] &r&fStaff Team Leak Detected! Team: &b" + teamName);
-      }
-    }
-
-    if (players != null) {
-      for (String player : players) {
-        if (player == null || alertedStaffPlayers.contains(player)) continue;
-
-        String lowerPlayer = player.toLowerCase();
-        boolean isStaff = STAFF_LIST.contains(lowerPlayer);
-
-        if (!isStaff) {
-          if (lowerPlayer.contains("admin")
-              || lowerPlayer.contains("mod_")
-              || lowerPlayer.contains("helper")
-              || lowerPlayer.contains("staff")
-              || lowerPlayer.contains("owner")
-              || lowerPlayer.contains("dev_")
-              || lowerPlayer.contains("support")) {
-            isStaff = true;
-          }
-        }
-
-        if (isStaff) {
-          alertedStaffPlayers.add(player);
-
-          Miau.notificationManager
-              .builder(NotificationType.WARN)
-              .title("Staff Detector")
-              .description("Vanish Staff Player Detected in Team: " + player)
-              .duration(3000)
-              .buildAndPublish();
-
-          ChatUtil.display(
-              "&c&l[StaffDetector] &r&fStaff member detected via Team leak: &e" + player);
-          triggerAutoLeave(player);
         }
       }
     }
