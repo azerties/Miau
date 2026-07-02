@@ -20,7 +20,8 @@ import net.minecraft.util.BlockPos;
 public class ThePitUtils extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final BooleanProperty autoFlashQuestion = new BooleanProperty("autoflashquestion", true);
-  public final BooleanProperty safe = new BooleanProperty("safe", false);
+  public final BooleanProperty safe =
+      new BooleanProperty("safe", false, autoFlashQuestion::getValue);
   public final BooleanProperty autoEgg = new BooleanProperty("autoegg", true);
   public final BooleanProperty debug = new BooleanProperty("debug", false);
 
@@ -96,7 +97,7 @@ public class ThePitUtils extends Module {
 
           if (safe.getValue()) {
             pendingAnswer = answerStr;
-            answerTime = System.currentTimeMillis() + 500 + (long) (Math.random() * 2000);
+            answerTime = System.currentTimeMillis() + 3500 + (long) (Math.random() * 500);
           } else {
             mc.thePlayer.sendChatMessage(answerStr);
             if (debug.getValue()) {
