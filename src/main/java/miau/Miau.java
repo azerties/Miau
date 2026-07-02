@@ -19,8 +19,7 @@ import miau.module.Module;
 import miau.module.ModuleManager;
 import miau.module.modules.combat.*;
 import miau.module.modules.ghost.*;
-import miau.module.modules.minigames.AutoBuy;
-import miau.module.modules.minigames.BedwarUtils;
+import miau.module.modules.minigames.*;
 import miau.module.modules.misc.*;
 import miau.module.modules.movement.*;
 import miau.module.modules.network.*;
@@ -119,10 +118,7 @@ public class Miau {
     moduleManager.modules.put(BedNuker.class, new BedNuker());
     moduleManager.modules.put(BedESP.class, new BedESP());
     moduleManager.modules.put(BedwarUtils.class, new BedwarUtils());
-    moduleManager.modules.put(
-        miau.module.modules.minigames.ThePit3F.class, new miau.module.modules.minigames.ThePit3F());
-    moduleManager.modules.put(
-        miau.module.modules.grind.AutoGrind.class, new miau.module.modules.grind.AutoGrind());
+    moduleManager.modules.put(ThePitUtils.class, new ThePitUtils());
     moduleManager.modules.put(Blink.class, new Blink());
     moduleManager.modules.put(BlockHit.class, new BlockHit());
     moduleManager.modules.put(BlockOverlay.class, new BlockOverlay());

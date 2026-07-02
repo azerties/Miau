@@ -14,7 +14,7 @@ import java.util.Map;
 public class MiauAPI {
 
   public static final String APIBASE = "https://api.rinbounce.wtf/";
-  public static final String BRANCH = "miau";
+  public static final String BRANCH = "myau";
 
   private static final String API_V1 = APIBASE + "api/v1";
   private static final int TIMEOUT_MS = 10000;
