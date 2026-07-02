@@ -134,6 +134,8 @@ public class KillAura extends Module {
   public final BooleanProperty targetGolems = new BooleanProperty("target-golems", false);
   public final BooleanProperty targetSilverfish = new BooleanProperty("target-silverfish", false);
   public final BooleanProperty targetTeams = new BooleanProperty("target-teams", true);
+  public final BooleanProperty antiSpawn = new BooleanProperty("anti-spawn", false);
+  public final IntProperty spawnRadius = new IntProperty("spawn-radius", 25, 5, 100);
 
   private static final int KD_DIRECTIONS = 24;
   private static final int KD_VOID_RINGS = 7;
@@ -496,6 +498,14 @@ public class KillAura extends Module {
     if (TeamUtil.isFriend(player)) {
       return false;
     }
+    if (this.antiSpawn.getValue() && mc.theWorld != null && mc.theWorld.getSpawnPoint() != null) {
+      BlockPos spawn = mc.theWorld.getSpawnPoint();
+      double dist =
+          player.getDistance((double) spawn.getX(), (double) spawn.getY(), (double) spawn.getZ());
+      if (dist <= this.spawnRadius.getValue()) {
+        return false;
+      }
+    }
     return this.allowSameTeam(player) && (isInvisible || !AntiBot.isBot(player));
   }
 
@@ -790,7 +800,7 @@ public class KillAura extends Module {
                   }
                 }
                 break;
-              case 4: // LOCK_VIEW
+              case 4: // LOCK_VIEW (OpenMyau port)
                 {
                   float[] lockViewRots =
                       RotationUtil.getRotationsToBox(
@@ -801,6 +811,13 @@ public class KillAura extends Module {
                           (float) this.smoothing.getValue() / 100.0F);
                   if (lockViewRots != null) {
                     rotations = new float[] {lockViewRots[0], lockViewRots[1]};
+                    // Directly apply rotation to player's head/body like OpenMyau
+                    mc.thePlayer.rotationYaw = rotations[0];
+                    mc.thePlayer.rotationPitch = rotations[1];
+                    mc.thePlayer.rotationYawHead = rotations[0];
+                    mc.thePlayer.renderYawOffset = rotations[0];
+                    // Set prev rotation for move fix
+                    event.setPervRotation(rotations[0], 1);
                   }
                 }
                 break;

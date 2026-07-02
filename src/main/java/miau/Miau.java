@@ -121,6 +121,8 @@ public class Miau {
     moduleManager.modules.put(BedwarUtils.class, new BedwarUtils());
     moduleManager.modules.put(
         miau.module.modules.minigames.ThePit3F.class, new miau.module.modules.minigames.ThePit3F());
+    moduleManager.modules.put(
+        miau.module.modules.grind.AutoGrind.class, new miau.module.modules.grind.AutoGrind());
     moduleManager.modules.put(Blink.class, new Blink());
     moduleManager.modules.put(BlockHit.class, new BlockHit());
     moduleManager.modules.put(BlockOverlay.class, new BlockOverlay());
@@ -191,7 +193,6 @@ public class Miau {
     moduleManager.modules.put(Spammer.class, new Spammer());
     moduleManager.modules.put(Speed.class, new Speed());
     moduleManager.modules.put(SpeedMine.class, new SpeedMine());
-    moduleManager.modules.put(AutoWalk.class, new AutoWalk());
     moduleManager.modules.put(Sprint.class, new Sprint());
     moduleManager.modules.put(TargetHUD.class, new TargetHUD());
     moduleManager.modules.put(Scoreboard.class, new Scoreboard());

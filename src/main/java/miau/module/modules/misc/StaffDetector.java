@@ -29,6 +29,7 @@ public class StaffDetector extends Module {
               "sennekoi",
               "lasgana",
               "novapev4",
+              "_DuckVN_",
               "khoaho01623"));
 
   public StaffDetector() {

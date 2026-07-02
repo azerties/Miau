@@ -707,6 +707,7 @@ public class CategoryComponent {
           "Misc",
           "Network",
           "Minigames",
+          "Grind",
           "Search",
           "Themes"
         };
@@ -738,6 +739,8 @@ public class CategoryComponent {
       itemStack = new ItemStack(Items.redstone);
     } else if (category.equalsIgnoreCase("Minigames")) {
       itemStack = new ItemStack(Items.gold_ingot);
+    } else if (category.equalsIgnoreCase("Grind")) {
+      itemStack = new ItemStack(Items.iron_pickaxe);
     } else if (category.equalsIgnoreCase("Target")) {
       itemStack = new ItemStack(Items.arrow);
     } else if (category.equalsIgnoreCase("Search")) {

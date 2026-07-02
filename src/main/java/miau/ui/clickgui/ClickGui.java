@@ -54,7 +54,8 @@ public class ClickGui extends GuiScreen {
           "Search",
           "Themes",
           "Network",
-          "Minigames"
+          "Minigames",
+          "Grind"
         };
 
     net.minecraft.client.gui.ScaledResolution sr =
