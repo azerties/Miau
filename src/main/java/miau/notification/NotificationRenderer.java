@@ -16,7 +16,7 @@ import net.minecraft.client.gui.ScaledResolution;
 
 public final class NotificationRenderer {
 
-  private static final Font ICON_FONT = FontRepository.getFont("materialicons-regular", 22f);
+  private static final Font ICON_FONT = FontRepository.getFont("materialicons-regular", 24f);
   private static final Font TITLE_FONT = FontRepository.getFont("productsans-bold", 14f);
   private static final Font DESCRIPTION_FONT = FontRepository.getFont("productsans-medium", 13f);
 
@@ -44,7 +44,7 @@ public final class NotificationRenderer {
   public void render(ScaledResolution sr) {
     final List<Notification> notifications = Miau.notificationManager.getNotifications();
 
-    final float padding = 3;
+    final float padding = 5;
     final float height = 21;
     final float iconSize = 14;
     final float iconOffset = iconSize + padding;
@@ -117,7 +117,7 @@ public final class NotificationRenderer {
 
       RoundedUtils.drawRound(
           x + padding - 0.5F,
-          y + padding / 2 + 0.5F,
+          y + (height - iconOffset) / 2F,
           iconOffset,
           iconOffset,
           2.75F,

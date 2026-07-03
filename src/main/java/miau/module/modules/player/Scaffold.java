@@ -2,7 +2,7 @@ package miau.module.modules.player;
 
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.List;
 import miau.Miau;
 import miau.component.BadPacketsComponent;
 import miau.event.EventTarget;
@@ -48,13 +48,6 @@ import org.lwjgl.opengl.GL11;
 
 public class Scaffold extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-
-  private static final double[] placeOffsets =
-      new double[] {
-        0.03125, 0.09375, 0.15625, 0.21875, 0.28125, 0.34375,
-        0.40625, 0.46875, 0.53125, 0.59375, 0.65625, 0.71875,
-        0.78125, 0.84375, 0.90625, 0.96875
-      };
 
   private int rotationTick = 0;
   private int lastSlot = -1;
@@ -108,29 +101,39 @@ public class Scaffold extends Module {
   private int watchdogTicks = 0;
   private int watchdogOngroundticks = 0;
 
+  private int cloudTicks = 0;
+  private int cloudPlacementDelay = 0;
+  private boolean cloudTriggered = false;
+
+  private final double[] placeOffsets = new double[] {0.0, 0.5, 1.0};
+
   public final ModeProperty rotationMode =
       new ModeProperty(
           "rotations",
           2,
           new String[] {
-            "NONE",
-            "DEFAULT",
-            "BACKWARDS",
-            "SIDEWAYS",
-            "GRIM_TEST",
-            "GODBRIDGE",
-            "EAGLE",
-            "BREESILY",
-            "SNAP",
-            "TELLY"
+            "NONE", "STATIC_GOD", "POLAR", "INTAVE", "HYPIXEL", "DIRECT", "KEEP", "SNAP", "TELLY"
           });
+
+  public final miau.module.modules.player.scaffold.rotation.RotationMode[] rotationStrategies;
+  public final miau.module.modules.player.scaffold.rotation.RotationContext rotationCtx =
+      new miau.module.modules.player.scaffold.rotation.RotationContext();
 
   public final ModeProperty sprintMode =
       new ModeProperty(
           "sprint",
           0,
           new String[] {
-            "NONE", "VANILLA", "LEGIT", "WATCHDOG_SLOW", "WATCHDOG_FAST", "WATCHDOG_JUMP"
+            "NONE",
+            "VANILLA",
+            "LEGIT",
+            "WATCHDOG_SLOW",
+            "WATCHDOG_FAST",
+            "WATCHDOG_JUMP",
+            "MOTION",
+            "NO_PACKET",
+            "PACKET_LEGIT",
+            "OLD_INTAVE"
           });
   public final BooleanProperty jumpSprint =
       new BooleanProperty("jump-sprint", true, () -> this.sprintMode.getValue() == 1);
@@ -148,8 +151,10 @@ public class Scaffold extends Module {
       new BooleanProperty("no-keep-y-on-jump-potion", false, () -> this.keepY.getValue() != 0);
 
   public final ModeProperty moveFix =
-      new ModeProperty("move-fix", 1, new String[] {"NONE", "SILENT"});
+      new ModeProperty("move-fix", 1, new String[] {"NONE", "SILENT", "NORMAL"});
   public final BooleanProperty safeWalk = new BooleanProperty("safe-walk", true);
+  public final ModeProperty cloudBypass =
+      new ModeProperty("cloud-bypass", 0, new String[] {"OFF", "NORMAL", "STRICT"});
   public final BooleanProperty multiplace = new BooleanProperty("multi-place", true);
   public final BooleanProperty blockCounter = new BooleanProperty("block-counter", true);
   public final PercentProperty groundMotion = new PercentProperty("ground-motion", 100);
@@ -202,6 +207,18 @@ public class Scaffold extends Module {
 
   public Scaffold() {
     super("Scaffold", false);
+    this.rotationStrategies =
+        new miau.module.modules.player.scaffold.rotation.RotationMode[] {
+          null, // NONE (index 0)
+          new miau.module.modules.player.scaffold.rotation.StaticGodMode(), // STATIC_GOD (1)
+          new miau.module.modules.player.scaffold.rotation.PolarMode(), // POLAR (2)
+          new miau.module.modules.player.scaffold.rotation.IntaveMode(), // INTAVE (3)
+          new miau.module.modules.player.scaffold.rotation.HypixelMode(), // HYPIXEL (4)
+          new miau.module.modules.player.scaffold.rotation.DirectMode(), // DIRECT (5)
+          new miau.module.modules.player.scaffold.rotation.KeepMode(), // KEEP (6)
+          new miau.module.modules.player.scaffold.rotation.SnapMode(), // SNAP (7)
+          new miau.module.modules.player.scaffold.rotation.TellyMode(), // TELLY (8)
+        };
   }
 
   public int getSlot() {
@@ -225,10 +242,45 @@ public class Scaffold extends Module {
       case 3: // WATCHDOG_SLOW
       case 4: // WATCHDOG_FAST
       case 5: // WATCHDOG_JUMP
+      case 6: // MOTION
+      case 7: // NO_PACKET
+      case 8: // PACKET_LEGIT
+      case 9: // OLD_INTAVE
         return false;
       default:
         return false;
     }
+  }
+
+  private boolean isCloudReady() {
+    int bypass = this.cloudBypass.getValue();
+    if (bypass == 0) return true; // OFF
+
+    if (mc.thePlayer.onGround || !PlayerUtil.isAirBelow()) return true;
+
+    // In air — apply cloud delay
+    int requiredDelay;
+    double skipChance;
+    if (bypass == 1) { // NORMAL
+      requiredDelay = 2 + RandomUtil.nextInt(0, 3); // 2-4 ticks
+      skipChance = 0.2;
+    } else { // STRICT
+      requiredDelay = 5 + RandomUtil.nextInt(0, 5); // 5-9 ticks
+      skipChance = 0.4;
+    }
+
+    // Initialize delay on first cloud tick
+    if (!this.cloudTriggered) {
+      this.cloudTriggered = true;
+      this.cloudPlacementDelay = requiredDelay;
+    }
+
+    // Random skip to avoid pattern
+    if (Math.random() < skipChance) {
+      return false;
+    }
+
+    return this.cloudTicks >= this.cloudPlacementDelay;
   }
 
   private boolean canPlace() {
@@ -238,51 +290,71 @@ public class Scaffold extends Module {
     return !longJump.isEnabled() || !longJump.isAutoMode() || longJump.isJumping();
   }
 
-  private EnumFacing getBestFacing(BlockPos blockPos1, BlockPos blockPos3) {
-    double offset = 0.0;
-    EnumFacing enumFacing = null;
-    for (EnumFacing facing : EnumFacing.VALUES) {
-      if (facing == EnumFacing.DOWN) continue;
-      BlockPos pos = blockPos1.offset(facing);
-      if (pos.getY() <= blockPos3.getY()) {
-        double distance =
-            pos.distanceSqToCenter(
-                blockPos3.getX() + 0.5, blockPos3.getY() + 0.5, blockPos3.getZ() + 0.5);
-        if (enumFacing == null
-            || distance < offset
-            || (distance == offset && facing == EnumFacing.UP)) {
-          offset = distance;
-          enumFacing = facing;
-        }
+  private BlockData getBlockData() {
+    List<BlockData> blocks = findBlocks(0, 0);
+    if (blocks == null || blocks.isEmpty()) return null;
+    for (BlockData data : blocks) {
+      if (this.stage == 0 || this.shouldKeepY || data.blockPos().getY() < this.startY) {
+        return data;
       }
     }
-    return enumFacing;
+    return null;
   }
 
-  private BlockData getBlockData() {
+  private List<BlockData> findBlocks(int yOffset, int xOffset) {
     int sy = MathHelper.floor_double(mc.thePlayer.posY);
-    BlockPos targetPos =
-        new BlockPos(
-            MathHelper.floor_double(mc.thePlayer.posX),
-            (this.stage != 0 && !this.shouldKeepY ? Math.min(sy, this.startY) : sy) - 1,
-            MathHelper.floor_double(mc.thePlayer.posZ));
-    if (!BlockUtil.isReplaceable(targetPos)) return null;
+    int baseY = (this.stage != 0 && !this.shouldKeepY ? Math.min(sy, this.startY) : sy) + yOffset;
+    int x = MathHelper.floor_double(mc.thePlayer.posX + xOffset);
+    int z = MathHelper.floor_double(mc.thePlayer.posZ);
 
-    ArrayList<BlockPos> positions = new ArrayList<>();
-    for (int x = -4; x <= 4; x++) {
-      for (int y = -4; y <= 0; y++) {
-        for (int z = -4; z <= 4; z++) {
-          BlockPos pos = targetPos.add(x, y, z);
-          if (!BlockUtil.isReplaceable(pos)
-              && !BlockUtil.isInteractable(pos)
-              && mc.thePlayer.getDistance(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)
-                  <= mc.playerController.getBlockReachDistance()
-              && (this.stage == 0 || this.shouldKeepY || pos.getY() < this.startY)) {
-            for (EnumFacing facing : EnumFacing.VALUES) {
-              if (facing != EnumFacing.DOWN) {
-                BlockPos bp = pos.offset(facing);
-                if (BlockUtil.isReplaceable(bp)) {
-                  positions.add(pos);
+    BlockPos base = new BlockPos(x, baseY - 1, z);
+    if (!BlockUtil.isReplaceable(base)) return null;
+
+    EnumFacing[] allFacings = getFacingsSorted();
+    List<EnumFacing> validFacings = new ArrayList<>(5);
+    for (EnumFacing facing : allFacings) {
+      if (facing != EnumFacing.UP && placeConditions(facing, yOffset, xOffset)) {
+        validFacings.add(facing);
+      }
+    }
+
+    int maxYLayer = 2;
+    List<BlockData> possibleBlocks = new ArrayList<>();
+
+    for (int dy = 1; dy <= maxYLayer; dy++) {
+      BlockPos layerBase = new BlockPos(x, baseY - dy, z);
+      if (dy == 1) {
+        for (EnumFacing facing : validFacings) {
+          BlockPos neighbor = layerBase.offset(facing);
+          if (!BlockUtil.isReplaceable(neighbor)
+              && !BlockUtil.isInteractable(BlockUtil.getBlock(neighbor))) {
+            possibleBlocks.add(new BlockData(neighbor, facing.getOpposite()));
+          }
+        }
+      }
+      for (EnumFacing facing : validFacings) {
+        BlockPos adjacent = layerBase.offset(facing);
+        if (BlockUtil.isReplaceable(adjacent)) {
+          for (EnumFacing nestedFacing : validFacings) {
+            BlockPos nestedNeighbor = adjacent.offset(nestedFacing);
+            if (!BlockUtil.isReplaceable(nestedNeighbor)
+                && !BlockUtil.isInteractable(BlockUtil.getBlock(nestedNeighbor))) {
+              possibleBlocks.add(new BlockData(nestedNeighbor, nestedFacing.getOpposite()));
+            }
+          }
+        }
+      }
+      for (EnumFacing facing : validFacings) {
+        BlockPos adjacent = layerBase.offset(facing);
+        if (BlockUtil.isReplaceable(adjacent)) {
+          for (EnumFacing nestedFacing : validFacings) {
+            BlockPos nestedNeighbor = adjacent.offset(nestedFacing);
+            if (BlockUtil.isReplaceable(nestedNeighbor)) {
+              for (EnumFacing thirdFacing : validFacings) {
+                BlockPos thirdNeighbor = nestedNeighbor.offset(thirdFacing);
+                if (!BlockUtil.isReplaceable(thirdNeighbor)
+                    && !BlockUtil.isInteractable(BlockUtil.getBlock(thirdNeighbor))) {
+                  possibleBlocks.add(new BlockData(thirdNeighbor, thirdFacing.getOpposite()));
                 }
               }
             }
@@ -290,15 +362,59 @@ public class Scaffold extends Module {
         }
       }
     }
-    if (positions.isEmpty()) return null;
-    positions.sort(
-        Comparator.comparingDouble(
-            o ->
-                o.distanceSqToCenter(
-                    targetPos.getX() + 0.5, targetPos.getY() + 0.5, targetPos.getZ() + 0.5)));
-    BlockPos blockPos = positions.get(0);
-    EnumFacing facing = this.getBestFacing(blockPos, targetPos);
-    return facing == null ? null : new BlockData(blockPos, facing);
+
+    return possibleBlocks.isEmpty() ? null : possibleBlocks;
+  }
+
+  private EnumFacing[] getFacingsSorted() {
+    float currentYaw = this.getCurrentYaw();
+    EnumFacing lastFacing =
+        EnumFacing.getHorizontal(MathHelper.floor_double((currentYaw * 4.0F / 360.0F) + 0.5D) & 3);
+
+    EnumFacing perpClockwise = lastFacing.rotateY();
+    EnumFacing perpCounterClockwise = lastFacing.rotateYCCW();
+    EnumFacing opposite = lastFacing.getOpposite();
+
+    float yaw = currentYaw % 360;
+    if (yaw > 180) yaw -= 360;
+    else if (yaw < -180) yaw += 360;
+
+    float diffClockwise =
+        Math.abs(MathHelper.wrapAngleTo180_float(yaw - getFacingAngle(perpClockwise)));
+    float diffCounterClockwise =
+        Math.abs(MathHelper.wrapAngleTo180_float(yaw - getFacingAngle(perpCounterClockwise)));
+
+    EnumFacing firstPerp, secondPerp;
+    if (diffClockwise <= diffCounterClockwise) {
+      firstPerp = perpClockwise;
+      secondPerp = perpCounterClockwise;
+    } else {
+      firstPerp = perpCounterClockwise;
+      secondPerp = perpClockwise;
+    }
+
+    return new EnumFacing[] {
+      EnumFacing.UP, EnumFacing.DOWN, lastFacing, firstPerp, secondPerp, opposite
+    };
+  }
+
+  private float getFacingAngle(EnumFacing facing) {
+    switch (facing) {
+      case WEST:
+        return 90;
+      case NORTH:
+        return 180;
+      case EAST:
+        return -90;
+      default:
+        return 0;
+    }
+  }
+
+  private boolean placeConditions(EnumFacing enumFacing, int yCondition, int xCondition) {
+    if (xCondition == -1) return enumFacing == EnumFacing.EAST;
+    if (yCondition == 1) return enumFacing == EnumFacing.DOWN;
+    return true;
   }
 
   private void place(BlockPos blockPos, EnumFacing enumFacing, Vec3 vec3) {
@@ -724,6 +840,18 @@ public class Scaffold extends Module {
       this.onGroundTicks = 0;
     }
 
+    // Cloud bypass tick tracking
+    if (this.cloudBypass.getValue() != 0) {
+      if (!mc.thePlayer.onGround && PlayerUtil.isAirBelow()) {
+        // In cloud state — increment counter
+        this.cloudTicks++;
+      } else {
+        this.cloudTicks = 0;
+        this.cloudTriggered = false;
+        this.cloudPlacementDelay = 0;
+      }
+    }
+
     if (mc.thePlayer.onGround) {
       if (this.stage > 0) this.stage--;
       if (this.stage < 0) this.stage++;
@@ -917,195 +1045,36 @@ public class Scaffold extends Module {
 
     int mode = this.rotationMode.getValue();
 
-    if (mode >= 5) {
+    // ====== ROTATION COMPUTATION (Strategy) ======
+    if (mode >= 1) {
+      rotationCtx.blockPos = blockFace;
+      rotationCtx.facing = enumFacing != null ? enumFacing.getEnumFacing() : null;
+      rotationCtx.scaffoldYaw = this.yaw;
+      rotationCtx.scaffoldPitch = this.pitch;
+      rotationCtx.lastYaw = this.yaw;
+      rotationCtx.lastPitch = this.pitch;
+      rotationCtx.moving = MoveUtil.isMoving();
+      rotationCtx.onGround = mc.thePlayer.onGround;
+      rotationCtx.enabledTicks = this.offGroundTicks;
+      rotationCtx.polarTicks += 0.05F;
+      rotationCtx.playerYaw = mc.thePlayer.rotationYaw;
+      rotationCtx.playerPitch = mc.thePlayer.rotationPitch;
 
-      this.canRotate = true;
-
-      switch (mode) {
-        case 5:
-          {
-            ItemStack held = mc.thePlayer.inventory.getCurrentItem();
-            if (held != null && held.getItem() instanceof ItemBlock && ticksOnAir > 0) {
-              ((IAccessorMinecraft) mc).callRightClickMouse();
-            }
-
-            targetYaw =
-                (mc.thePlayer.rotationYaw - mc.thePlayer.rotationYaw % 90)
-                    - 180
-                    + 45 * (mc.thePlayer.rotationYaw > 0 ? 1 : -1);
-            targetPitch = 76.4F;
-
-            directionalChange++;
-            if (Math.abs(MathHelper.wrapAngleTo180_double(targetYaw - (mc.thePlayer.rotationYaw)))
-                > 10) {
-              directionalChange = (int) (Math.random() * 4);
-              yawDrift = (float) (Math.random() - 0.5) / 10f;
-              pitchDrift = (float) (Math.random() - 0.5) / 10f;
-            }
-            if (Math.random() > 0.99) {
-              yawDrift = (float) (Math.random() - 0.5) / 10f;
-              pitchDrift = (float) (Math.random() - 0.5) / 10f;
-            }
-            targetYaw += yawDrift;
-            targetPitch += pitchDrift;
-            break;
-          }
-        case 6:
-          {
-            float yawWrapped = (mc.thePlayer.rotationYaw + 10000000) % 360;
-            float staticYaw = (yawWrapped - 180) - (yawWrapped % 90) + 45;
-            float staticPitch = 78;
-
-            boolean straight =
-                (Math.min(Math.abs(yawWrapped % 90), Math.abs(90 - yawWrapped) % 90)
-                    < Math.min(
-                        Math.abs(yawWrapped + 45) % 90, Math.abs(90 - (yawWrapped + 45)) % 90));
-
-            if (straight) {
-              MovingObjectPosition check90 = RayCastUtil.rayCast(staticYaw + 90, staticPitch, 3);
-              MovingObjectPosition checkMain = RayCastUtil.rayCast(staticYaw, staticPitch, 3);
-              if (check90 != null
-                  && check90.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
-                  && (checkMain == null
-                      || checkMain.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK)) {
-                staticYaw += 90;
-              }
-            }
-            if (!straight) staticYaw += 90;
-
-            targetYaw = staticYaw + yawDrift / 2;
-            targetPitch = staticPitch + pitchDrift / 2;
-
-            ItemStack held = mc.thePlayer.inventory.getCurrentItem();
-            if (Math.random() > (mc.thePlayer.onGround ? 0.5 : 0.2)
-                && held != null
-                && held.getItem() instanceof ItemBlock) {
-              ((IAccessorMinecraft) mc).callRightClickMouse();
-            }
-
-            mc.thePlayer.movementInput.sneak = mc.theWorld != null;
-            if (this.offGroundTicks >= 4 && MoveUtil.isMoving()) {
-              ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak).setPressed(true);
-            }
-            if (this.onGroundTicks == 1)
-              ((IAccessorKeyBinding) mc.gameSettings.keyBindSneak).setPressed(false);
-            break;
-          }
-        case 7:
-          {
-            if (enumFacing != null) {
-              if (enumFacing.getEnumFacing() == EnumFacing.UP) {
-                targetPitch = 90;
-              } else {
-                double staticYaw =
-                    (Math.toDegrees(
-                                Math.atan2(
-                                    enumFacing.getOffset().zCoord, enumFacing.getOffset().xCoord))
-                            % 360)
-                        - 90;
-                double staticPitch = 80;
-
-                targetYaw = (float) staticYaw + yawDrift;
-                targetPitch = (float) staticPitch + pitchDrift;
-              }
-            }
-            if (Math.random() > 0.99 || targetPitch % 90 == 0) {
-              yawDrift = (float) (Math.random() - 0.5);
-              pitchDrift = (float) (Math.random() - 0.5);
-            }
-            break;
-          }
-        case 8:
-          {
-            if (enumFacing != null
-                && blockFace != null
-                && !(ticksOnAir > 0
-                    && !overBlockCheck(enumFacing.getEnumFacing(), blockFace, true))) {
-              snappedYaw = targetYaw;
-
-              this.getRotations(Integer.parseInt(this.yawOffsetProp.getModeString()));
-
-              float movementYaw =
-                  (float)
-                          (Math.toDegrees(
-                              MoveUtil.direction(mc.thePlayer.rotationYaw, forward, strafe)))
-                      - Integer.parseInt(this.yawOffsetProp.getModeString());
-              targetYaw = movementYaw;
-            } else {
-              this.getRotations(Integer.parseInt(this.yawOffsetProp.getModeString()));
-            }
-            break;
-          }
-        case 9: // TELLY
-          {
-            if (recursions == 0) {
-              int time = this.offGroundTicks;
-
-              // Auto right-click at tick 0 or 2 (like Rise Telly)
-              if (time == 2 || time == 0) {
-                ItemStack held = mc.thePlayer.inventory.getCurrentItem();
-                if (held != null && held.getItem() instanceof ItemBlock) {
-                  ((IAccessorMinecraft) mc).callRightClickMouse();
-                }
-              }
-
-              int yawOff = Integer.parseInt(this.yawOffsetProp.getModeString());
-              int maxOffTicks = (this.keepY.getValue() != 0) ? 10 : 7;
-
-              if (time >= 3 && this.offGroundTicks <= maxOffTicks) {
-                // Check if we're over the target block
-                if (enumFacing == null
-                    || blockFace == null
-                    || !overBlockCheck(
-                        enumFacing.getEnumFacing(), blockFace, this.rayCast.getValue() == 2)) {
-                  this.getRotations(yawOff);
-                }
-              } else {
-                this.getRotations(yawOff);
-                targetYaw = mc.thePlayer.rotationYaw;
-              }
-
-              if (this.offGroundTicks <= 3) {
-                // Block placement disabled early in air
-              }
-            }
-            break;
-          }
-      }
-      this.yaw = targetYaw;
-      this.pitch = targetPitch;
-
-    } else {
-
-      if (!this.canRotate) {
-        switch (mode) {
-          case 1:
-            if (this.yaw == -180.0F && this.pitch == 0.0F) {
-              this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
-              this.pitch = RotationUtil.quantizeAngle(85.0F);
-            } else {
-              this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
-            }
-            break;
-          case 2:
-            if (this.yaw == -180.0F && this.pitch == 0.0F) {
-              this.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
-              this.pitch = RotationUtil.quantizeAngle(85.0F);
-            } else {
-              this.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
-            }
-            break;
-          case 3:
-          case 4:
-            if (this.yaw == -180.0F && this.pitch == 0.0F) {
-              this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
-              this.pitch = RotationUtil.quantizeAngle(85.0F);
-            } else {
-              this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
-            }
-            break;
+      miau.module.modules.player.scaffold.rotation.RotationMode strat =
+          this.rotationStrategies[mode];
+      if (strat != null) {
+        float[] rots = strat.getRotations(rotationCtx);
+        if (rots != null) {
+          targetYaw = rots[0];
+          targetPitch = rots[1];
+          this.yaw = targetYaw;
+          this.pitch = targetPitch;
         }
       }
+    }
+
+    // ====== BASIC MODE PLACEMENT PATH (mode 1-4) ======
+    if (mode >= 1 && mode < 5) {
 
       BlockData blockData = this.getBlockData();
       Vec3 hitVec = null;
@@ -1179,20 +1148,6 @@ public class Scaffold extends Module {
         }
       }
 
-      if (this.canRotate
-          && MoveUtil.isForwardPressed()
-          && Math.abs(MathHelper.wrapAngleTo180_float(yawDiffTo180 - this.yaw)) < 90.0F) {
-        switch (mode) {
-          case 2:
-            this.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
-            break;
-          case 3:
-          case 4:
-            this.yaw = RotationUtil.quantizeAngle(diagonalYaw);
-            break;
-        }
-      }
-
       if (mode != 0) {
         if (this.towering
             && (mc.thePlayer.motionY > 0.0 || mc.thePlayer.posY > (double) (this.startY + 1))) {
@@ -1218,10 +1173,17 @@ public class Scaffold extends Module {
           this.towering = true;
         }
         event.setRotation(this.yaw, this.pitch, 3);
-        if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
+        RotationUtil.serverYaw = this.yaw;
+        RotationUtil.serverPitch = this.pitch;
+        RotationUtil.customRots = true;
+        if (this.moveFix.getValue() == 1 || this.moveFix.getValue() == 2)
+          event.setPervRotation(this.yaw, 3);
       }
 
-      if (blockData != null && hitVec != null && this.rotationTick <= 0) {
+      // Cloud bypass delay check
+      boolean cloudReady = isCloudReady();
+
+      if (blockData != null && hitVec != null && this.rotationTick <= 0 && cloudReady) {
         this.place(blockData.blockPos(), blockData.facing(), hitVec);
         if (this.multiplace.getValue()) {
           for (int i = 0; i < 3; i++) {
@@ -1284,10 +1246,15 @@ public class Scaffold extends Module {
       }
     }
 
-    if (mode >= 5) {
+    // ====== ADVANCED MODE PLACEMENT PATH (mode 5-8) ======
+    if (mode >= 5 && mode < 9) {
 
       event.setRotation(this.yaw, this.pitch, 3);
-      if (this.moveFix.getValue() == 1) event.setPervRotation(this.yaw, 3);
+      RotationUtil.serverYaw = this.yaw;
+      RotationUtil.serverPitch = this.pitch;
+      RotationUtil.customRots = true;
+      if (this.moveFix.getValue() == 1 || this.moveFix.getValue() == 2)
+        event.setPervRotation(this.yaw, 3);
 
       BlockData bd = this.getBlockData();
 
@@ -1318,7 +1285,42 @@ public class Scaffold extends Module {
           }
         }
 
-        boolean canPlaceNow = !badPackets && ticksOnAir > 0;
+        boolean canPlaceNow = !badPackets && ticksOnAir > 0 && isCloudReady();
+
+        // Hybrid rotation validation: use yaw-based pitch scanning to ensure rotation hits block
+        if (canPlaceNow) {
+          float optPitch =
+              miau.module.modules.player.scaffold.rotation.IntaveMode.getYawBasedPitch(
+                  bd.blockPos(), bd.facing(), this.yaw, this.pitch, 84);
+          MovingObjectPosition checkPitch = RotationUtil.rayTrace(this.yaw, optPitch, 4.5, 1.0F);
+          if (checkPitch == null
+              || !checkPitch.getBlockPos().equals(bd.blockPos())
+              || checkPitch.sideHit != bd.facing()) {
+            // Pitch scan failed — try scanning yaw slightly
+            float bestYaw = this.yaw;
+            float bestPitch = optPitch;
+            for (int yawOff = -8; yawOff <= 8; yawOff += 2) {
+              float testYaw = this.yaw + yawOff;
+              float testPitch =
+                  miau.module.modules.player.scaffold.rotation.IntaveMode.getYawBasedPitch(
+                      bd.blockPos(), bd.facing(), testYaw, this.pitch, 84);
+              MovingObjectPosition check = RotationUtil.rayTrace(testYaw, testPitch, 4.5, 1.0F);
+              if (check != null
+                  && check.getBlockPos().equals(bd.blockPos())
+                  && check.sideHit == bd.facing()) {
+                bestYaw = testYaw;
+                bestPitch = testPitch;
+                break;
+              }
+            }
+            this.yaw = bestYaw;
+            this.pitch = bestPitch;
+            event.setRotation(this.yaw, this.pitch, 3);
+          } else {
+            this.pitch = optPitch;
+            event.setRotation(this.yaw, this.pitch, 3);
+          }
+        }
 
         if (canPlaceNow
             && (rayCast.getValue() == 0
@@ -1389,6 +1391,35 @@ public class Scaffold extends Module {
         mc.thePlayer.motionY = 0.42;
         watchdogHasC08Packet = 0;
       }
+    }
+
+    // MOTION mode - modify sprint motion for anti-cheat bypass
+    if (sprint == 6) {
+      if (mc.thePlayer.onGround && MoveUtil.isMoving()) {
+        // Slightly modify motion to look less predictable
+        if (mc.thePlayer.ticksExisted % 4 == 0) {
+          mc.thePlayer.motionX *= 0.99;
+          mc.thePlayer.motionZ *= 0.99;
+        }
+        if (mc.thePlayer.ticksExisted % 7 == 0) {
+          mc.thePlayer.motionX *= 1.01;
+          mc.thePlayer.motionZ *= 1.01;
+        }
+      }
+    }
+
+    // OLD_INTAVE mode - bypass old Intave sprint checks
+    if (sprint == 9) {
+      ((IAccessorKeyBinding) mc.gameSettings.keyBindSprint).setPressed(true);
+      mc.thePlayer.setSprinting(true);
+    }
+
+    // Unified move-fix: Gothaj style silentMoveFix for both SILENT and NORMAL modes
+    if (this.moveFix.getValue() != 0 && RotationUtil.customRots && !mc.isSingleplayer()) {
+      MoveUtil.silentMoveFix(event);
+      event.setStrafe(0);
+      event.setForward(0);
+      event.setFriction(0);
     }
 
     if (!this.yawOffsetProp.getModeString().equals("0") && this.moveFix.getValue() == 0) {}
@@ -1546,15 +1577,11 @@ public class Scaffold extends Module {
   public void onMoveInput(MoveInputEvent event) {
     if (!this.isEnabled()) return;
 
-    if (this.moveFix.getValue() == 1
-        && RotationState.isActived()
-        && RotationState.getPriority() == 3.0F
-        && MoveUtil.isForwardPressed()) {
-      MoveUtil.fixStrafe(RotationState.getSmoothedYaw());
-    }
+    // NOTE: MoveFix is now handled in onStrafe via silentMoveFix (Gothaj style)
+    // No longer need fixStrafe here
 
-    // Telly rotation mode auto-jump (equivalent to Rise's runMode)
-    if (this.rotationMode.getValue() == 9 && mc.thePlayer.onGround && MoveUtil.isMoving()) {
+    // Telly rotation mode auto-jump (mode index 8)
+    if (this.rotationMode.getValue() == 8 && mc.thePlayer.onGround && MoveUtil.isMoving()) {
       mc.thePlayer.movementInput.jump = true;
     }
 
@@ -1576,6 +1603,19 @@ public class Scaffold extends Module {
     if (!this.isEnabled()) return;
 
     int sprint = this.sprintMode.getValue();
+
+    // NO_PACKET mode - sprint client-side but don't send C0B packets
+    if (sprint == 7) {
+      mc.thePlayer.setSprinting(true);
+      // C0B packet suppression is handled in onPacketSend
+    }
+
+    // PACKET_LEGIT mode - send sprint packets with delays like legit client
+    if (sprint == 8) {
+      if (mc.thePlayer.ticksExisted % 20 == 0) {
+        mc.thePlayer.setSprinting(true);
+      }
+    }
 
     float speed = this.getSpeed();
     if (speed != 1.0F) {
@@ -1654,6 +1694,18 @@ public class Scaffold extends Module {
     if (event.getType() != EventType.SEND) return;
     Packet<?> packet = event.getPacket();
 
+    // NO_PACKET mode - cancel C0B sprint packets
+    if (this.sprintMode.getValue() == 7) {
+      if (packet instanceof C0BPacketEntityAction) {
+        C0BPacketEntityAction action = (C0BPacketEntityAction) packet;
+        if (action.getAction() == C0BPacketEntityAction.Action.START_SPRINTING
+            || action.getAction() == C0BPacketEntityAction.Action.STOP_SPRINTING) {
+          event.setCancelled(true);
+          return;
+        }
+      }
+    }
+
     if (packet instanceof C08PacketPlayerBlockPlacement) {
       C08PacketPlayerBlockPlacement p = (C08PacketPlayerBlockPlacement) packet;
       if (!p.getPosition().equals(new BlockPos(-1, -1, -1))) {
@@ -1717,6 +1769,17 @@ public class Scaffold extends Module {
     this.watchdogTicks = 0;
     this.watchdogOngroundticks = 0;
 
+    // Cloud bypass state reset
+    this.cloudTicks = 0;
+    this.cloudPlacementDelay = 0;
+    this.cloudTriggered = false;
+
+    // Gothaj: init serverYaw/serverPitch if not already set
+    if (!RotationUtil.customRots) {
+      RotationUtil.serverYaw = mc.thePlayer.rotationYaw;
+      RotationUtil.serverPitch = mc.thePlayer.rotationPitch;
+    }
+
     BadPacketsComponent.reset();
   }
 
@@ -1743,6 +1806,10 @@ public class Scaffold extends Module {
         MoveUtil.stop();
       }
     }
+
+    RotationUtil.customRots = false;
+    RotationUtil.serverYaw = mc.thePlayer.rotationYaw;
+    RotationUtil.serverPitch = mc.thePlayer.rotationPitch;
   }
 
   public static class BlockData {

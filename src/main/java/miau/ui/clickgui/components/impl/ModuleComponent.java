@@ -89,12 +89,9 @@ public class ModuleComponent extends Component {
                 break;
               }
             }
-            if (groupProps.size() > 1) {
-              GroupComponent gc = new GroupComponent("Targets", this, y, groupProps);
-              this.settings.add(gc);
-              y += GroupComponent.GROUP_HEADER_HEIGHT;
-            } else {
-              ButtonComponent c = new ButtonComponent(mod, groupProps.get(0), this, y);
+            // Individual buttons for each target-* property instead of GroupComponent
+            for (BooleanProperty prop : groupProps) {
+              ButtonComponent c = new ButtonComponent(mod, prop, this, y);
               this.settings.add(c);
               y += 12;
             }
@@ -424,7 +421,7 @@ public class ModuleComponent extends Component {
     return false;
   }
 
-  private SliderComponent getActiveModeDropdown() {
+  public SliderComponent getActiveModeDropdown() {
     for (int i = this.settings.size() - 1; i >= 0; i--) {
       Component component = this.settings.get(i);
       if (component instanceof SliderComponent && isVisibleBase(component)) {
