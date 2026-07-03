@@ -9,7 +9,6 @@ import miau.event.EventTarget;
 import miau.event.impl.*;
 import miau.event.types.EventType;
 import miau.event.types.Priority;
-import miau.management.RotationState;
 import miau.mixin.IAccessorKeyBinding;
 import miau.mixin.IAccessorMinecraft;
 import miau.module.Module;

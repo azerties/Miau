@@ -411,7 +411,12 @@ public class MoveUtil {
   }
 
   public static void silentMoveFix(StrafeEvent event) {
-    int dif = (int)((MathHelper.wrapAngleTo180_float(mc.thePlayer.rotationYaw - RotationUtil.serverYaw - 23.5F - 135.0F) + 180.0F) / 45.0F);
+    int dif =
+        (int)
+            ((MathHelper.wrapAngleTo180_float(
+                        mc.thePlayer.rotationYaw - RotationUtil.serverYaw - 23.5F - 135.0F)
+                    + 180.0F)
+                / 45.0F);
     float yaw = RotationUtil.serverYaw;
     float strafe = event.getStrafe();
     float forward = event.getForward();
@@ -460,11 +465,17 @@ public class MoveUtil {
         calcStrafe += strafe;
     }
 
-    if (calcForward > 1.0F || (calcForward < 0.9F && calcForward > 0.3F) || calcForward < -1.0F || (calcForward > -0.9F && calcForward < -0.3F)) {
+    if (calcForward > 1.0F
+        || (calcForward < 0.9F && calcForward > 0.3F)
+        || calcForward < -1.0F
+        || (calcForward > -0.9F && calcForward < -0.3F)) {
       calcForward *= 0.5F;
     }
 
-    if (calcStrafe > 1.0F || (calcStrafe < 0.9F && calcStrafe > 0.3F) || calcStrafe < -1.0F || (calcStrafe > -0.9F && calcStrafe < -0.3F)) {
+    if (calcStrafe > 1.0F
+        || (calcStrafe < 0.9F && calcStrafe > 0.3F)
+        || calcStrafe < -1.0F
+        || (calcStrafe > -0.9F && calcStrafe < -0.3F)) {
       calcStrafe *= 0.5F;
     }
 
@@ -478,10 +489,10 @@ public class MoveUtil {
       d = friction / d;
       calcStrafe *= d;
       calcForward *= d;
-      float yawSin = MathHelper.sin((float)((double)yaw * Math.PI / 180.0));
-      float yawCos = MathHelper.cos((float)((double)yaw * Math.PI / 180.0));
-      mc.thePlayer.motionX += (double)(calcStrafe * yawCos - calcForward * yawSin);
-      mc.thePlayer.motionZ += (double)(calcForward * yawCos + calcStrafe * yawSin);
+      float yawSin = MathHelper.sin((float) ((double) yaw * Math.PI / 180.0));
+      float yawCos = MathHelper.cos((float) ((double) yaw * Math.PI / 180.0));
+      mc.thePlayer.motionX += (double) (calcStrafe * yawCos - calcForward * yawSin);
+      mc.thePlayer.motionZ += (double) (calcForward * yawCos + calcStrafe * yawSin);
     }
   }
 }

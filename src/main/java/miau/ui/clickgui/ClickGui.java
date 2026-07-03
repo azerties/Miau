@@ -261,7 +261,8 @@ public class ClickGui extends GuiScreen {
     int scaledX = (int) (centerX + (mouseX - centerX) / scaleFactor);
     int scaledY = (int) (centerY + (mouseY - centerY) / scaleFactor);
 
-    // Priority 0: Check active mode dropdown clicks first (dropdown may extend outside category bounds)
+    // Priority 0: Check active mode dropdown clicks first (dropdown may extend outside category
+    // bounds)
     for (CategoryComponent category : categories) {
       if (!category.isOpened() || category.getModules().isEmpty()) continue;
       for (Component module : category.getModules()) {
