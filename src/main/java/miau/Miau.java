@@ -112,7 +112,6 @@ public class Miau {
     moduleManager.modules.put(AutoSoup.class, new AutoSoup());
     moduleManager.modules.put(AutoReconnect.class, new AutoReconnect());
     moduleManager.modules.put(AutoTool.class, new AutoTool());
-    moduleManager.modules.put(BridgeAssist.class, new BridgeAssist());
     moduleManager.modules.put(AutoSwap.class, new AutoSwap());
     moduleManager.modules.put(AutoBedDef.class, new AutoBedDef());
     moduleManager.modules.put(BedNuker.class, new BedNuker());
@@ -132,7 +131,6 @@ public class Miau {
     moduleManager.modules.put(ChestStealer.class, new ChestStealer());
     moduleManager.modules.put(ClientSpoofer.class, new ClientSpoofer());
     moduleManager.modules.put(Eagle.class, new Eagle());
-    moduleManager.modules.put(LegitScaffold.class, new LegitScaffold());
     moduleManager.modules.put(ESP.class, new ESP());
     moduleManager.modules.put(Capes.class, new Capes());
     moduleManager.modules.put(FastPlace.class, new FastPlace());
