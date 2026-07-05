@@ -1,10 +1,10 @@
 package miau.event.impl;
 
-import miau.event.Event;
+import miau.event.callables.EventCancellable;
 import miau.event.types.EventType;
 import net.minecraft.entity.EntityLivingBase;
 
-public class RenderLivingEvent implements Event {
+public class RenderLivingEvent extends EventCancellable {
   private final EventType type;
   private final EntityLivingBase entity;
 

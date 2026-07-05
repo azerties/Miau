@@ -2104,6 +2104,14 @@ public class RenderUtil {
         (float) (n >> 24 & 0xFF) / 255.0f);
   }
 
+  public static void glColor(final int n, final float alpha) {
+    GL11.glColor4f(
+        (float) (n >> 16 & 0xFF) / 255.0f,
+        (float) (n >> 8 & 0xFF) / 255.0f,
+        (float) (n & 0xFF) / 255.0f,
+        alpha);
+  }
+
   public static void drawRoundedGradientOutlinedRectangle(
       float x,
       float y,

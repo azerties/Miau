@@ -14,6 +14,7 @@
     "IAccessorS3EPacketTeams",
     "MixinRenderEntityItem",
     "MixinBlockRendererDispatcher",
+    "MixinMathHelper",
     "viaversion.MixinBlockLadder",
     "viaversion.MixinBlockLilyPad",
     "viaversion.MixinC0FPacketConfirmTransaction",
