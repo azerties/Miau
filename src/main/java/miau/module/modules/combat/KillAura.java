@@ -552,8 +552,7 @@ public class KillAura extends Module {
     this.autoBlockModes.add(
         new miau.module.modules.combat.killaura.autoblocks.LegitAutoBlock(this));
     this.autoBlockModes.add(new miau.module.modules.combat.killaura.autoblocks.FakeAutoBlock(this));
-    this.autoBlockModes.add(
-        new miau.module.modules.combat.killaura.autoblocks.TestAutoBlock(this));
+    this.autoBlockModes.add(new miau.module.modules.combat.killaura.autoblocks.TestAutoBlock(this));
 
     String[] autoBlockNames =
         this.autoBlockModes.stream()
