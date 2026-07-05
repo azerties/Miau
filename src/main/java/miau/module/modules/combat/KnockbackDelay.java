@@ -27,6 +27,8 @@ public class KnockbackDelay extends Module {
   public final FloatProperty distanceToTarget =
       new FloatProperty("Distance-to-target", 6.0f, 3.0f, 12.0f);
   public final FloatProperty chance = new FloatProperty("Chance", 100.0f, 0.0f, 100.0f);
+  public final FloatProperty minimumDelay =
+      new FloatProperty("Minimum-delay", 100.0f, 0.0f, 1000.0f);
   public final FloatProperty maximumDelay =
       new FloatProperty("Maximum-delay", 200.0f, 50.0f, 1000.0f);
   public final BooleanProperty inAir = new BooleanProperty("In-air", true);
@@ -39,6 +41,7 @@ public class KnockbackDelay extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   private final ConcurrentLinkedDeque<Packet<?>> delayedPackets = new ConcurrentLinkedDeque<>();
   private long lagStartTime = -1;
+  private long targetDelay = 0;
 
   public KnockbackDelay() {
     super("KnockbackDelay", false);
@@ -95,6 +98,10 @@ public class KnockbackDelay extends Module {
     e.setCancelled(true);
     delayedPackets.addLast(e.getPacket());
     lagStartTime = System.currentTimeMillis();
+    long minD = minimumDelay.getValue().longValue();
+    long maxD = maximumDelay.getValue().longValue();
+    if (minD > maxD) minD = maxD;
+    targetDelay = minD + (long) (Math.random() * (maxD - minD + 1));
   }
 
   @EventTarget(Priority.LOWEST)
@@ -114,9 +121,8 @@ public class KnockbackDelay extends Module {
     }
 
     long nowMs = System.currentTimeMillis();
-    long maxDelayMs = maximumDelay.getValue().longValue();
 
-    if (nowMs - lagStartTime >= maxDelayMs) {
+    if (nowMs - lagStartTime >= targetDelay) {
       flushDelayedPackets();
     }
   }

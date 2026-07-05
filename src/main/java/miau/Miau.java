@@ -120,7 +120,7 @@ public class Miau {
     moduleManager.modules.put(BackTrack.class, new BackTrack());
     moduleManager.modules.put(BedESP.class, new BedESP());
     moduleManager.modules.put(BedNuker.class, new BedNuker());
-    moduleManager.modules.put(BedwarUtils.class, new BedwarUtils());
+
     moduleManager.modules.put(Blink.class, new Blink());
     moduleManager.modules.put(BlockHit.class, new BlockHit());
     moduleManager.modules.put(BlockOverlay.class, new BlockOverlay());
@@ -180,6 +180,9 @@ public class Miau {
     moduleManager.modules.put(Panic.class, new Panic());
     moduleManager.modules.put(Piercing.class, new Piercing());
     moduleManager.modules.put(PingSpoof.class, new PingSpoof());
+    moduleManager.modules.put(
+        miau.module.modules.minigames.PlayerList.class,
+        new miau.module.modules.minigames.PlayerList());
     moduleManager.modules.put(ProjectileAimBot.class, new ProjectileAimBot());
     moduleManager.modules.put(RPC.class, new RPC());
     moduleManager.modules.put(Reach.class, new Reach());
