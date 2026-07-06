@@ -671,7 +671,10 @@ public class Displace extends Module {
     boolean passesItemCondition = true;
     if (hasKnockback.getValue() || itemWhitelistToggle.getValue()) {
       boolean kbPass =
-          !hasKnockback.getValue() || EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0;
+          !hasKnockback.getValue()
+              || (EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0
+                  && mc.thePlayer.getHeldItem() != null
+                  && mc.thePlayer.getHeldItem().getItem() == net.minecraft.init.Items.stick);
       boolean wlPass =
           !itemWhitelistToggle.getValue() || itemWhitelist.matches(mc.thePlayer.getHeldItem());
       passesItemCondition = kbPass || wlPass;
@@ -701,7 +704,10 @@ public class Displace extends Module {
                   CombatTargeting.SortMode.DISTANCE);
     }
 
-    boolean hasKBEnchant = EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0;
+    boolean hasKBEnchant =
+        EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0
+            && mc.thePlayer.getHeldItem() != null
+            && mc.thePlayer.getHeldItem().getItem() == net.minecraft.init.Items.stick;
     active = target != null && (hasKBEnchant || anyMovementKey());
     if (!active) {
       clearActiveState();

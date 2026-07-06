@@ -88,7 +88,7 @@ public class KillAura extends Module {
   public int blockTick = 0;
   public boolean cancelAttack = false;
   private int lastTickProcessed;
-  private int ticksSinceVelocity = 0;
+  public int ticksSinceVelocity = 0;
   private double expandRange = 0.0;
   public final ModeProperty mode;
   public final IntProperty switchDelay;
@@ -138,26 +138,6 @@ public class KillAura extends Module {
   public final BooleanProperty antiSpawn = new BooleanProperty("anti-spawn", false);
   public final IntProperty spawnRadius = new IntProperty("spawn-radius", 25, 5, 100);
 
-  private static final int KD_DIRECTIONS = 24;
-  private static final int KD_VOID_RINGS = 7;
-  private static final int KD_VOID_DEPTH = 8;
-  private static final double KD_RING_STEP = 0.5;
-  private static final double KD_WALL_BEHIND_DIST = 1.2;
-  private static final double KD_WALL_SIDE_STEP = 0.6;
-
-  private static final double[] KD_COS = new double[KD_DIRECTIONS];
-  private static final double[] KD_SIN = new double[KD_DIRECTIONS];
-
-  static {
-    for (int i = 0; i < KD_DIRECTIONS; i++) {
-      double theta = Math.PI * 2.0 * i / KD_DIRECTIONS;
-      KD_COS[i] = Math.cos(theta);
-      KD_SIN[i] = Math.sin(theta);
-    }
-  }
-
-  private int kdHitCounter = 0;
-
   private long getAttackDelay() {
     float min = this.cps.getValue();
     float max = this.cps.getSecondValue();
@@ -189,7 +169,7 @@ public class KillAura extends Module {
         net.minecraft.util.MovingObjectPosition rayCastPos = null;
         boolean rayCastHit = false;
 
-        boolean useRaycast = this.rayCast.getValue() || this.tickLookahead.getValue();
+        boolean useRaycast = this.rayCast.getValue();
 
         if (this.rotations.getValue() != 0) {
           rayCastHit = true;
@@ -514,11 +494,7 @@ public class KillAura extends Module {
     this.autoBlockModes.add(new InteractAutoBlock(this));
     this.autoBlockModes.add(new LegitAutoBlock(this));
     this.autoBlockModes.add(new FakeAutoBlock(this));
-    this.autoBlockModes.add(new GrimAutoBlock(this));
-    this.autoBlockModes.add(new WatchdogAutoBlock(this));
-    this.autoBlockModes.add(new Watchdog2AutoBlock(this));
-    this.autoBlockModes.add(new Watchdog3AutoBlock(this));
-    this.autoBlockModes.add(new OpalWatchdogAutoBlock(this));
+    this.autoBlockModes.add(new TestAutoBlock(this));
 
     this.lastTickProcessed = 0;
     this.mode = new ModeProperty("Mode", 0, new String[] {"SINGLE", "SWITCH"});
@@ -548,6 +524,7 @@ public class KillAura extends Module {
         new miau.module.modules.combat.killaura.autoblocks.OpalWatchdogAutoBlock(this));
     this.autoBlockModes.add(
         new miau.module.modules.combat.killaura.autoblocks.UniversalAutoBlock(this));
+    this.autoBlockModes.add(new miau.module.modules.combat.killaura.autoblocks.TestAutoBlock(this));
 
     String[] autoBlockNames =
         this.autoBlockModes.stream()
@@ -578,6 +555,7 @@ public class KillAura extends Module {
               "WATCHDOG3",
               "TEST",
               "UNIVERSAL"
+              "TEST"
             });
     this.autoBlockRequirePress = new BooleanProperty("autoblock-require-press", false);
     this.preventServersideBlocking = new BooleanProperty("prevent-serverside-blocking", false);
@@ -610,10 +588,6 @@ public class KillAura extends Module {
         new ModeProperty(
             "show-target", 0, new String[] {"NONE", "SIGMA_RING", "ABOVE_BOX", "FULL_BOX"});
     this.debugLog = new ModeProperty("debug-log", 0, new String[] {"NONE", "HEALTH"});
-    this.tickLookahead = new BooleanProperty("tick-lookahead", false);
-    this.smartKill = new BooleanProperty("smart-kill", true);
-    this.tacticalKD = new BooleanProperty("tactical-kd", false);
-    this.kdOffset = new FloatProperty("kd-offset", 45.0F, 15.0F, 90.0F);
   }
 
   public EntityLivingBase getTarget() {
@@ -621,11 +595,6 @@ public class KillAura extends Module {
   }
 
   private boolean shouldDelayHit() {
-    if (this.target == null || this.target.getEntity() == null) return false;
-    net.minecraft.entity.EntityLivingBase living = this.target.getEntity();
-    if (this.smartKill.getValue() && living.getHealth() <= this.getDamage(living)) {
-      return false;
-    }
     return false;
   }
 
@@ -783,48 +752,19 @@ public class KillAura extends Module {
             event.setRotation(quantized[0], quantized[1], 1);
           }
 
-          if (attack
-              && this.tacticalKD.getValue()
-              && this.target.getEntity() instanceof EntityPlayer) {
-
-            EntityPlayer kdTarget = (EntityPlayer) this.target.getEntity();
-            float kdYaw = this.getTacticalKDYaw(kdTarget, event.getNewYaw());
-            float kdPitch = this.getTacticalKDPitch(kdTarget, event.getNewPitch());
-
-            // Raycast verification - revert to normal if KD yaw would miss
-            if (RayCastUtil.getEntityIntercept(
-                    kdTarget, kdYaw, kdPitch, this.attackRange.getValue())
-                != null) {
-              // Apply sensitivity patch for more natural rotation
-              float[] patched =
-                  RotationUtil.applySensitivityPatch(
-                      kdYaw, kdPitch, mc.thePlayer.prevRotationYaw, mc.thePlayer.prevRotationPitch);
-              event.setRotation(patched[0], patched[1], 1);
-            } else {
-              event.setRotation(kdYaw, event.getNewPitch(), 1);
-            }
-            this.kdHitCounter++;
-          }
           if (attack) {
-            // === KeepSprint Bypass ===
             if (this.keepSprint.getValue() > 0) {
-              // Send start sprint before attack to maintain sprint state
               PacketUtil.sendPacket(
                   new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.START_SPRINTING));
-              if (this.keepSprint.getValue() == 2 /* SPOOF */) {
-                // Enable PingSpoof for blink category: delays C02 attack packet
-                // While C0B (sprint) was already sent and arrives at server BEFORE
-                // the delayed C02, so attack happens while sprinting
+              if (this.keepSprint.getValue() == 2) {
                 PingSpoofComponent.spoof(
                     this.keepSprintDelay.getValue(),
                     false, false, false, false, true, false);
-                // Force enabled=true immediately so packets get intercepted this tick
                 PingSpoofComponent.enabled = true;
               }
             }
             attacked = this.performAttack(event.getNewYaw(), event.getNewPitch());
-            // After attack, ensure sprint stays active (NORMAL mode)
-            if (attacked && this.keepSprint.getValue() == 1 /* NORMAL */) {
+            if (attacked && this.keepSprint.getValue() == 1) {
               PacketUtil.sendPacket(
                   new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.START_SPRINTING));
             }
@@ -1380,213 +1320,6 @@ public class KillAura extends Module {
     return new String[] {
       CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, this.mode.getModeString())
     };
-  }
-
-  private float getTacticalKDYaw(EntityPlayer target, float currentYaw) {
-    float voidPushYaw = this.scanVoidPushKD(target, currentYaw);
-    if (!Float.isNaN(voidPushYaw)) {
-      return voidPushYaw;
-    }
-
-    float voidYaw = this.scanVoidKD(target);
-    if (!Float.isNaN(voidYaw)) {
-      return voidYaw;
-    }
-
-    Float wallYaw = this.scanWallKD(target);
-    if (wallYaw != null) {
-      return wallYaw;
-    }
-
-    Float nearWallYaw = this.scanNearWallKD(target, currentYaw);
-    if (nearWallYaw != null) {
-      return nearWallYaw;
-    }
-
-    float velYaw = this.predictVelocityKD(target, currentYaw);
-    if (!Float.isNaN(velYaw)) {
-      return velYaw;
-    }
-
-    return this.zigzagKD(currentYaw, target);
-  }
-
-  private float scanVoidKD(EntityPlayer target) {
-    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-
-    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
-      final double radius = ring * KD_RING_STEP;
-
-      for (int dir = 0; dir < KD_DIRECTIONS; dir++) {
-        final double wx = target.posX + KD_COS[dir] * radius;
-        final double wz = target.posZ + KD_SIN[dir] * radius;
-
-        if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
-          return RotationUtil.calculate(new Vec3(wx, target.posY, wz))[0];
-        }
-      }
-    }
-    return Float.NaN;
-  }
-
-  private float scanVoidPushKD(EntityPlayer target, float aimYaw) {
-    final double dx = target.posX - mc.thePlayer.posX;
-    final double dz = target.posZ - mc.thePlayer.posZ;
-    final double dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.01) return Float.NaN;
-
-    final double nx = dx / dist;
-    final double nz = dz / dist;
-
-    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-
-    for (int ring = 1; ring <= KD_VOID_RINGS; ring++) {
-      final double radius = ring * KD_RING_STEP;
-      final double wx = target.posX + nx * radius;
-      final double wz = target.posZ + nz * radius;
-
-      if (this.isVoidColumn(wx, target.posY, wz, cursor)) {
-        return aimYaw;
-      }
-    }
-    return Float.NaN;
-  }
-
-  private boolean isVoidColumn(double x, double y, double z, BlockPos.MutableBlockPos cursor) {
-    final int bx = MathHelper.floor_double(x);
-    final int bz = MathHelper.floor_double(z);
-    final int startY = MathHelper.floor_double(y) - 1;
-    final int bottomY = Math.max(0, startY - KD_VOID_DEPTH);
-
-    for (int by = startY; by >= bottomY; by--) {
-      cursor.set(bx, by, bz);
-      if (!mc.theWorld.isAirBlock(cursor)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private Float scanWallKD(EntityPlayer target) {
-    final double dx = target.posX - mc.thePlayer.posX;
-    final double dz = target.posZ - mc.thePlayer.posZ;
-    final double dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.01) return null;
-
-    final double nx = dx / dist;
-    final double nz = dz / dist;
-    final double sx = -nz;
-    final double sz = nx;
-
-    final double baseX = target.posX + nx * KD_WALL_BEHIND_DIST;
-    final double baseZ = target.posZ + nz * KD_WALL_BEHIND_DIST;
-    final int baseY = MathHelper.floor_double(target.posY);
-
-    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-
-    for (int side = -1; side <= 1; side++) {
-      final double cx = baseX + sx * side * KD_WALL_SIDE_STEP;
-      final double cz = baseZ + sz * side * KD_WALL_SIDE_STEP;
-
-      final int bx = MathHelper.floor_double(cx);
-      final int bz = MathHelper.floor_double(cz);
-
-      boolean solid = false;
-      for (int by = baseY; by < baseY + 2; by++) {
-        if (by < 0 || by >= 256) continue;
-        cursor.set(bx, by, bz);
-        if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
-          solid = true;
-          break;
-        }
-      }
-      if (!solid) continue;
-
-      final double wallCX = bx + 0.5;
-      final double wallCZ = bz + 0.5;
-      final double normDx = target.posX - wallCX;
-      final double normDz = target.posZ - wallCZ;
-      final double normLen = Math.sqrt(normDx * normDx + normDz * normDz);
-      if (normLen < 0.01) continue;
-
-      final float normalYaw = (float) Math.toDegrees(Math.atan2(normDz, normDx)) - 90.0F;
-      final boolean slideRight = (target.ticksExisted & 2) == 0;
-      return normalYaw + (slideRight ? 90.0F : -90.0F);
-    }
-    return null;
-  }
-
-  private Float scanNearWallKD(EntityPlayer target, float aimYaw) {
-    if (mc.thePlayer == null) return null;
-
-    // Direction vector from player ? target
-    final double dx = target.posX - mc.thePlayer.posX;
-    final double dz = target.posZ - mc.thePlayer.posZ;
-    final double dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.01) return null;
-
-    final double nx = dx / dist;
-    final double nz = dz / dist;
-
-    final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-    final int px = MathHelper.floor_double(mc.thePlayer.posX);
-    final int py = MathHelper.floor_double(mc.thePlayer.posY + 0.5);
-    final int pz = MathHelper.floor_double(mc.thePlayer.posZ);
-
-    // Check both sides (perpendicular to player?target vector)
-    for (int side : new int[] {-1, 1}) {
-      final double sx = -nz * side;
-      final double sz = nx * side;
-
-      for (int d = 1; d <= 3; d++) {
-        final int bx = px + (int) Math.round(sx * d);
-        final int bz = pz + (int) Math.round(sz * d);
-
-        for (int by = py - 1; by <= py + 1; by++) {
-          if (by < 0 || by >= 256) continue;
-          cursor.set(bx, by, bz);
-          if (mc.theWorld.getBlockState(cursor).getBlock().isFullBlock()) {
-            // Wall beside player ? aim to push target into wall
-            return aimYaw + side * 45.0F;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  private float predictVelocityKD(EntityPlayer target, float aimYaw) {
-    // Determine which direction the target is moving
-    final double velX = target.posX - target.prevPosX;
-    final double velZ = target.posZ - target.prevPosZ;
-    final double vel = Math.sqrt(velX * velX + velZ * velZ);
-
-    if (vel < 0.03) return Float.NaN;
-
-    // Heading the target is moving toward
-    final float velYaw = (float) Math.toDegrees(Math.atan2(velZ, velX)) - 90.0F;
-    final float diff = MathHelper.wrapAngleTo180_float(velYaw - aimYaw);
-
-    // Only offset if they're moving away (positive knockback direction)
-    if (Math.abs(diff) < 90.0F && Math.abs(diff) > 5.0F) {
-      return aimYaw + diff * 0.35F;
-    }
-    return Float.NaN;
-  }
-
-  private float getTacticalKDPitch(EntityPlayer target, float currentPitch) {
-    // If target is airborne ? tilt pitch for extra vertical displacement
-    if (!target.onGround && target.hurtTime <= 0 && target.fallDistance > 0.5F) {
-      return Math.min(currentPitch + 8.0F, 15.0F);
-    }
-    return currentPitch;
-  }
-
-  private float zigzagKD(float currentYaw, EntityPlayer target) {
-    final boolean phase = ((this.kdHitCounter / 2) & 1) == 0;
-    float offset = phase ? this.kdOffset.getValue() : -this.kdOffset.getValue();
-    offset += (target.ticksExisted % 3) * 2.0F - 3.0F;
-    return currentYaw + offset;
   }
 
   private long getPing() {

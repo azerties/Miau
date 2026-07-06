@@ -14,6 +14,12 @@ public interface IAccessorEntity {
   @Accessor
   boolean getIsInWeb();
 
+  @Accessor
+  int getFire();
+
+  @Accessor
+  int getNextStepDistance();
+
   @Invoker
   Vec3 callGetVectorForRotation(float float1, float float2);
 }

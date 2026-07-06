@@ -48,8 +48,11 @@ public abstract class MixinAbstractClientPlayer extends MixinEntityPlayer {
       miau.module.modules.render.Capes capes =
           (miau.module.modules.render.Capes)
               Miau.moduleManager.modules.get(miau.module.modules.render.Capes.class);
-      if (capes != null && capes.isEnabled() && cir.getReturnValue() == null) {
-        cir.setReturnValue(capes.getCape());
+      if (capes != null && capes.isEnabled()) {
+        boolean isSelf = ((Object) this) instanceof net.minecraft.client.entity.EntityPlayerSP;
+        if (capes.allPlayer.getValue() || isSelf) {
+          cir.setReturnValue(capes.getCape());
+        }
       }
     }
   }

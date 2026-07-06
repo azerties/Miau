@@ -2,10 +2,8 @@ package miau.module.modules.render;
 
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 import miau.Miau;
 import miau.enums.BlinkModules;
 import miau.enums.ChatColors;
@@ -33,6 +31,12 @@ public class HUD extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
   private final java.util.Map<Module, InterfaceComponent> components = new java.util.HashMap<>();
+  private final java.util.List<InterfaceComponent> animatingComponents =
+      new java.util.ArrayList<>();
+  private final java.util.Comparator<InterfaceComponent> componentComparator =
+      (a, b) -> Integer.compare(this.getModuleWidth(b.module), this.getModuleWidth(a.module));
+  private final java.util.List<net.minecraft.potion.PotionEffect> sortedEffects =
+      new java.util.ArrayList<>();
 
   private long lastMS = System.currentTimeMillis();
   private List<Module> activeModules = new ArrayList<>();
@@ -188,15 +192,16 @@ public class HUD extends Module {
       }
     }
     if (this.isEnabled() && event.getType() == EventType.POST) {
-      this.activeModules =
-          Miau.moduleManager.modules.values().stream()
-              .filter(
-                  module ->
-                      module.isEnabled()
-                          && (this.modulesToShow.getValue() == 0 || !module.isHidden())
-                          && getComponent(module).shouldDisplay(this))
-              .sorted(Comparator.comparingInt(this::getModuleWidth).reversed())
-              .collect(Collectors.<Module>toList());
+      this.activeModules.clear();
+      for (Module module : Miau.moduleManager.modules.values()) {
+        if (module.isEnabled()
+            && (this.modulesToShow.getValue() == 0 || !module.isHidden())
+            && getComponent(module).shouldDisplay(this)) {
+          this.activeModules.add(module);
+        }
+      }
+      this.activeModules.sort(
+          (a, b) -> Integer.compare(this.getModuleWidth(b), this.getModuleWidth(a)));
       try {
         Miau.clientName = ChatColors.getDynamicPrefix();
       } catch (Exception e) {
@@ -276,14 +281,14 @@ public class HUD extends Module {
       }
     }
 
-    java.util.List<InterfaceComponent> animatingComponents =
-        Miau.moduleManager.modules.values().stream()
-            .map(this::getComponent)
-            .filter(c -> c.animationTime > 0.001)
-            .sorted(
-                Comparator.comparingInt((InterfaceComponent c) -> this.getModuleWidth(c.module))
-                    .reversed())
-            .collect(Collectors.toList());
+    this.animatingComponents.clear();
+    for (Module module : Miau.moduleManager.modules.values()) {
+      InterfaceComponent c = getComponent(module);
+      if (c.animationTime > 0.001) {
+        this.animatingComponents.add(c);
+      }
+    }
+    this.animatingComponents.sort(this.componentComparator);
 
     boolean isMcFont = FontRepository.isMinecraftSelected();
     float heightExhibition = 9.0f + 3.0f;
@@ -364,6 +369,7 @@ public class HUD extends Module {
     }
   }
 
+<<<<<<< HEAD
   private void renderPotions(ScaledResolution sr, int renderPass) {
     if (mc.thePlayer != null) {
       java.util.Collection<net.minecraft.potion.PotionEffect> effects =
@@ -373,6 +379,13 @@ public class HUD extends Module {
         float drawY = sr.getScaledHeight() - 3;
         java.util.List<net.minecraft.potion.PotionEffect> sortedEffects = new ArrayList<>(effects);
         sortedEffects.sort(
+=======
+      this.sortedEffects.clear();
+      if (mc.thePlayer != null) {
+        this.sortedEffects.addAll(mc.thePlayer.getActivePotionEffects());
+        miau.util.font.Font font = getFont();
+        this.sortedEffects.sort(
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
             (a, b) -> {
               String nameA = net.minecraft.client.resources.I18n.format(a.getEffectName());
               String nameB = net.minecraft.client.resources.I18n.format(b.getEffectName());
@@ -390,6 +403,12 @@ public class HUD extends Module {
                       + timeB;
               return Float.compare(-font.getStringWidth(textA), -font.getStringWidth(textB));
             });
+<<<<<<< HEAD
+=======
+      }
+
+      if (this.shaders.getValue()) {
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 
         for (net.minecraft.potion.PotionEffect effect : sortedEffects) {
           net.minecraft.potion.Potion potion =
@@ -553,7 +572,12 @@ public class HUD extends Module {
         int alpha = (int) (255 * animProgress);
         long finalY = (long) component.position.y;
         int color = (alpha << 24) | (this.getColor(l, finalY).getRGB() & 0x00FFFFFF);
+<<<<<<< HEAD
         int bgAlphaVal = (int) (this.backgroundAlpha.getValue() * animProgress);
+=======
+        int alphaVal = (int) (this.backgroundAlpha.getValue() * animProgress);
+        int bgColor = (alphaVal << 24);
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 
         if (renderPass == 0) {
           miau.util.shader.RoundedUtils.drawRound(
@@ -659,7 +683,12 @@ public class HUD extends Module {
 
         long finalY = (long) component.position.y;
         int color = (alpha << 24) | (this.getColor(l, finalY).getRGB() & 0x00FFFFFF);
+<<<<<<< HEAD
         int bgAlphaVal = (int) (this.backgroundAlpha.getValue() * animProgress);
+=======
+        int alphaVal = (int) (this.backgroundAlpha.getValue() * animProgress);
+        int bgColor = (alphaVal << 24);
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 
         if (renderPass == 0) {
           miau.util.shader.RoundedUtils.drawRound(
@@ -768,6 +797,58 @@ public class HUD extends Module {
       GlStateManager.enableDepth();
       GlStateManager.popMatrix();
     }
+<<<<<<< HEAD
+=======
+
+    if (mc.thePlayer != null) {
+      if (!this.sortedEffects.isEmpty()) {
+        miau.util.font.Font font = getFont();
+        float drawY = sr.getScaledHeight() - 3;
+
+        for (net.minecraft.potion.PotionEffect effect : this.sortedEffects) {
+          net.minecraft.potion.Potion potion =
+              net.minecraft.potion.Potion.potionTypes[effect.getPotionID()];
+          if (potion == null) continue;
+
+          String name = net.minecraft.client.resources.I18n.format(potion.getName());
+          if (lowerCase.getValue()) name = name.toLowerCase();
+          if (effect.getAmplifier() > 0) name += " " + (effect.getAmplifier() + 1);
+
+          String time = net.minecraft.potion.Potion.getDurationString(effect);
+          String text = name + " §7" + time;
+          int textWidth = font.getStringWidth(text);
+          float drawX = sr.getScaledWidth() - 2;
+
+          drawY -= (font.height() + 1.5f);
+
+          int effectColor = potion.getLiquidColor() | 0xFF000000;
+          font.drawWithShadow(text, drawX - textWidth - 1, drawY, effectColor);
+
+          if (potion.hasStatusIcon()) {
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            GlStateManager.enableBlend();
+            mc.getTextureManager()
+                .bindTexture(
+                    new net.minecraft.util.ResourceLocation(
+                        "textures/gui/container/inventory.png"));
+            int iconIndex = potion.getStatusIconIndex();
+            net.minecraft.client.gui.Gui.drawScaledCustomSizeModalRect(
+                (int) (drawX - textWidth - 14),
+                (int) drawY,
+                (iconIndex % 8) * 18,
+                198 + (iconIndex / 8) * 18,
+                18,
+                18,
+                9,
+                9,
+                256,
+                256);
+            GlStateManager.disableBlend();
+          }
+        }
+      }
+    }
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
   }
 
   private String toRoman(int value) {

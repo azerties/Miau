@@ -5,7 +5,13 @@ import java.util.List;
 import miau.event.EventTarget;
 import miau.event.impl.*;
 import miau.module.Module;
+<<<<<<< HEAD
 import miau.module.modules.misc.disabler.*;
+=======
+import miau.module.modules.misc.disabler.DelayedTransaction;
+import miau.module.modules.misc.disabler.DisablerMode;
+import miau.module.modules.misc.disabler.VulcanDisabler;
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 import miau.property.Property;
 import miau.property.properties.ModeProperty;
 

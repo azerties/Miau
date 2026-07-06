@@ -1,6 +1,5 @@
 package miau.event;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -22,6 +21,9 @@ public final class EventManager {
    * HashMap containing all the registered MethodData sorted on the event parameters of the methods.
    */
   private static final HashMap<Class<? extends Event>, List<MethodData>> REGISTRY_MAP =
+      new HashMap<>();
+
+  private static final HashMap<Class<? extends Event>, MethodData[]> CACHED_HANDLERS =
       new HashMap<>();
 
   /**
@@ -68,8 +70,11 @@ public final class EventManager {
     if (object == null) {
       return;
     }
-    for (final List<MethodData> dataList : REGISTRY_MAP.values()) {
-      dataList.removeIf(data -> data.getSource().equals(object));
+    for (final Map.Entry<Class<? extends Event>, List<MethodData>> entry :
+        REGISTRY_MAP.entrySet()) {
+      if (entry.getValue().removeIf(data -> data.getSource().equals(object))) {
+        CACHED_HANDLERS.put(entry.getKey(), entry.getValue().toArray(new MethodData[0]));
+      }
     }
     cleanMap(true);
   }
@@ -86,7 +91,9 @@ public final class EventManager {
     }
     List<MethodData> dataList = REGISTRY_MAP.get(eventClass);
     if (dataList != null) {
-      dataList.removeIf(data -> data.getSource().equals(object));
+      if (dataList.removeIf(data -> data.getSource().equals(object))) {
+        CACHED_HANDLERS.put(eventClass, dataList.toArray(new MethodData[0]));
+      }
       cleanMap(true);
     }
   }
@@ -106,9 +113,6 @@ public final class EventManager {
     Class<? extends Event> indexClass = (Class<? extends Event>) method.getParameterTypes()[0];
     final MethodData data =
         new MethodData(object, method, method.getAnnotation(EventTarget.class).value());
-    if (!data.getTarget().isAccessible()) {
-      data.getTarget().setAccessible(true);
-    }
     if (REGISTRY_MAP.containsKey(indexClass)) {
       if (!REGISTRY_MAP.get(indexClass).contains(data)) {
         REGISTRY_MAP.get(indexClass).add(data);
@@ -124,6 +128,7 @@ public final class EventManager {
               add(data);
             }
           });
+      CACHED_HANDLERS.put(indexClass, new MethodData[] {data});
     }
   }
 
@@ -138,6 +143,7 @@ public final class EventManager {
     while (mapIterator.hasNext()) {
       if (mapIterator.next().getKey().equals(indexClass)) {
         mapIterator.remove();
+        CACHED_HANDLERS.remove(indexClass);
         break;
       }
     }
@@ -153,8 +159,10 @@ public final class EventManager {
     Iterator<Map.Entry<Class<? extends Event>, List<MethodData>>> mapIterator =
         REGISTRY_MAP.entrySet().iterator();
     while (mapIterator.hasNext()) {
-      if (!onlyEmptyEntries || mapIterator.next().getValue().isEmpty()) {
+      Map.Entry<Class<? extends Event>, List<MethodData>> entry = mapIterator.next();
+      if (!onlyEmptyEntries || entry.getValue().isEmpty()) {
         mapIterator.remove();
+        CACHED_HANDLERS.remove(entry.getKey());
       }
     }
   }
@@ -174,6 +182,7 @@ public final class EventManager {
       }
     }
     REGISTRY_MAP.put(indexClass, sortedList);
+    CACHED_HANDLERS.put(indexClass, sortedList.toArray(new MethodData[0]));
   }
 
   /**
@@ -216,7 +225,7 @@ public final class EventManager {
    * @return Event in the state after dispatching it.
    */
   public static Event call(final Event event) {
-    List<MethodData> dataList = REGISTRY_MAP.get(event.getClass());
+    MethodData[] dataList = CACHED_HANDLERS.get(event.getClass());
     if (dataList != null) {
       if (event instanceof EventStoppable) {
         EventStoppable stoppable = (EventStoppable) event;
@@ -242,11 +251,15 @@ public final class EventManager {
    * @param argument The called Event which should be used as an argument for the targeted Method.
    */
   private static void invoke(MethodData data, Event argument) {
+    if (data.getSource() instanceof miau.module.Module) {
+      if (!((miau.module.Module) data.getSource()).isEnabled()) {
+        return;
+      }
+    }
     try {
-      data.getTarget().invoke(data.getSource(), argument);
-    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-      Throwable cause =
-          e instanceof InvocationTargetException && e.getCause() != null ? e.getCause() : e;
+      data.getTargetHandle().invoke(data.getSource(), argument);
+    } catch (Throwable e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
       LOGGER.log(
           Level.WARNING,
           String.format(
@@ -266,6 +279,7 @@ public final class EventManager {
     private final Object source;
     private final Method target;
     private final byte priority;
+    private final java.lang.invoke.MethodHandle targetHandle;
 
     /**
      * Sets the values of the data.
@@ -279,6 +293,18 @@ public final class EventManager {
       this.source = source;
       this.target = target;
       this.priority = priority;
+      try {
+        if (!target.isAccessible()) {
+          target.setAccessible(true);
+        }
+        this.targetHandle = java.lang.invoke.MethodHandles.lookup().unreflect(target);
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    public java.lang.invoke.MethodHandle getTargetHandle() {
+      return targetHandle;
     }
 
     /**

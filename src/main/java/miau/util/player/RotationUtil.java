@@ -304,13 +304,13 @@ public class RotationUtil {
       return new float[] {baseYaw, clampPitch(basePitch)};
     }
     if (speed >= 30) {
-      return flexRotation(targetYaw, targetPitch, baseYaw, basePitch);
+      return new float[] {targetYaw, clampPitch(targetPitch)};
     }
     float deltaYaw = MathHelper.wrapAngleTo180_float(targetYaw - baseYaw);
     float deltaPitch = targetPitch - basePitch;
     float magnitude = (float) MathHelper.sqrt_double(deltaYaw * deltaYaw + deltaPitch * deltaPitch);
     if (magnitude < 0.001f) {
-      return flexRotation(targetYaw, targetPitch, baseYaw, basePitch);
+      return new float[] {targetYaw, clampPitch(targetPitch)};
     }
     float t = speed / 30f;
     float stepSize = t * t * 180f;
@@ -420,11 +420,11 @@ public class RotationUtil {
 
   public static MovingObjectPosition rayCastBlock(double distance, float yaw, float pitch) {
     Vec3 eyeVec = mc.thePlayer.getPositionEyes(1.0f);
-    Vec3 lookVec =
-        new Vec3(
-            -Math.sin(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)),
-            -Math.sin(Math.toRadians(pitch)),
-            Math.cos(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)));
+    float f = MathHelper.cos(-yaw * ((float) Math.PI / 180F) - (float) Math.PI);
+    float f1 = MathHelper.sin(-yaw * ((float) Math.PI / 180F) - (float) Math.PI);
+    float f2 = -MathHelper.cos(-pitch * ((float) Math.PI / 180F));
+    float f3 = MathHelper.sin(-pitch * ((float) Math.PI / 180F));
+    Vec3 lookVec = new Vec3(f1 * f2, f3, f * f2);
     Vec3 sumVec =
         eyeVec.addVector(
             lookVec.xCoord * distance, lookVec.yCoord * distance, lookVec.zCoord * distance);

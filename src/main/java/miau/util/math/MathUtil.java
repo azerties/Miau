@@ -36,6 +36,25 @@ public class MathUtil {
     return ThreadLocalRandom.current().nextDouble(min, max);
   }
 
+  public static double roundToPlace(final double value, final int places) {
+    if (places < 0) {
+      throw new IllegalArgumentException();
+    }
+
+    BigDecimal bd = new BigDecimal(value);
+    bd = bd.setScale(places, RoundingMode.HALF_UP);
+    return bd.doubleValue();
+  }
+
+  public static float calculateGaussianValue(float x, float sigma) {
+    double output = 1.0 / Math.sqrt(2.0 * Math.PI * (sigma * sigma));
+    return (float) (output * Math.exp(-(x * x) / (2.0 * (sigma * sigma))));
+  }
+
+  public static double roundToHalf(double d) {
+    return Math.round(d * 2) / 2.0;
+  }
+
   public static double round(final double value, final int places) {
     try {
       final BigDecimal bigDecimal = BigDecimal.valueOf(value);
@@ -120,10 +139,5 @@ public class MathUtil {
     double deltaZ = location2.z - location1.z;
     double yawToLocation = Math.toDegrees(Math.atan2(deltaZ, deltaX)) - 90;
     return MathHelper.wrapAngleTo180_float((float) yawToLocation);
-  }
-
-  public static float calculateGaussianValue(float x, float sigma) {
-    double output = 1.0 / Math.sqrt(2.0 * Math.PI * (sigma * sigma));
-    return (float) (output * Math.exp(-(x * x) / (2.0 * (sigma * sigma))));
   }
 }

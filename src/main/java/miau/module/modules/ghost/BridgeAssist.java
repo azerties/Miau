@@ -1,51 +1,51 @@
 package miau.module.modules.ghost;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Objects;
 import miau.event.EventTarget;
 import miau.event.impl.MoveInputEvent;
-import miau.event.impl.PacketEvent;
+import miau.event.impl.TickEvent;
 import miau.event.impl.UpdateEvent;
-import miau.event.types.EventType;
 import miau.event.types.Priority;
 import miau.module.Module;
+import miau.module.modules.ghost.bridgeassist.mode.NormalMode;
+import miau.module.modules.ghost.bridgeassist.mode.SilentMode;
 import miau.property.properties.BooleanProperty;
 import miau.property.properties.FloatProperty;
-import miau.property.properties.IntProperty;
-import miau.util.client.KeyBindUtil;
-import miau.util.player.RotationUtil;
-import miau.util.world.BlockUtil;
+import miau.property.properties.ModeProperty;
+import miau.util.player.ItemUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.item.ItemBlock;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.play.client.C08PacketPlayerBlockPlacement;
-import net.minecraft.util.*;
 
 public class BridgeAssist extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private static final EnumFacing[] SIDES = {
-    EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.EAST, EnumFacing.WEST
-  };
 
-  public final FloatProperty edgeOffset = new FloatProperty("edge-offset", 0.0F, 0.0F, 0.3F);
-  public final IntProperty unsneakDelay = new IntProperty("unsneak-delay", 50, 50, 300);
-  public final IntProperty sneakOnJump = new IntProperty("sneak-on-jump", 0, 0, 500);
+  public final ModeProperty mode = new ModeProperty("Mode", 0, new String[] {"Normal", "Silent"});
 
-  public final BooleanProperty sneakKeyPressed = new BooleanProperty("sneak-key-pressed", false);
-  public final BooleanProperty holdingBlocks = new BooleanProperty("holding-blocks", false);
-  public final BooleanProperty lookingDown = new BooleanProperty("looking-down", false);
-  public final BooleanProperty notMovingForward = new BooleanProperty("not-moving-forward", false);
+  public final FloatProperty delayMs =
+      new FloatProperty(
+          "delay", 2.0F, 3.0F, 0.0F, 10.0F, () -> mode.getModeString().equals("Normal"));
+  public final BooleanProperty directionCheck =
+      new BooleanProperty("direction-check", true, () -> mode.getModeString().equals("Normal"));
+  public final BooleanProperty jumpCheck =
+      new BooleanProperty("jump-check", true, () -> mode.getModeString().equals("Normal"));
+  public final BooleanProperty pitchCheck =
+      new BooleanProperty("pitch-check", true, () -> mode.getModeString().equals("Normal"));
+  public final BooleanProperty blocksOnly =
+      new BooleanProperty("blocks-only", true, () -> mode.getModeString().equals("Normal"));
+  public final BooleanProperty normalSneakOnly =
+      new BooleanProperty("sneaking-only", false, () -> mode.getModeString().equals("Normal"));
 
-  public final BooleanProperty prePlace = new BooleanProperty("pre-place", false);
+  public final BooleanProperty silentSneakingOnly =
+      new BooleanProperty("sneaking-only", false, () -> mode.getModeString().equals("Silent"));
+  public final BooleanProperty silentEdgeOnly =
+      new BooleanProperty("edge-only", true, () -> mode.getModeString().equals("Silent"));
+  public final BooleanProperty silentMoveFix =
+      new BooleanProperty("move-fix", true, () -> mode.getModeString().equals("Silent"));
+  public final FloatProperty silentRotSpeed =
+      new FloatProperty(
+          "rot-speed", 12.0F, 5.0F, 20.0F, () -> mode.getModeString().equals("Silent"));
 
-  private boolean sneakingFromModule;
-  private boolean placed;
-  private boolean forceRelease;
-  private int sneakJumpDelayTicks = -1;
-  private int sneakJumpStartTick = -1;
-  private int unsneakDelayTicks = -1;
-  private int unsneakStartTick = -1;
+  private final NormalMode normalMode = new NormalMode(this);
+  private final SilentMode silentMode = new SilentMode(this);
 
   public BridgeAssist() {
     super("Bridge Assist", false);
@@ -53,339 +53,49 @@ public class BridgeAssist extends Module {
 
   @Override
   public String[] getSuffix() {
-    float offset = edgeOffset.getValue();
-    if (offset == Math.rint(offset)) {
-      return new String[] {Integer.toString((int) offset)};
+    if (this.mode.getModeString().equals("Silent")) {
+      return new String[] {"Silent"};
     }
-    return new String[] {String.format("%.2f", offset)};
+    return Objects.equals(this.delayMs.getValue(), this.delayMs.getSecondValue())
+        ? new String[] {String.valueOf(this.delayMs.getValue().intValue())}
+        : new String[] {
+          String.format(
+              "%d-%d", this.delayMs.getValue().intValue(), this.delayMs.getSecondValue().intValue())
+        };
   }
 
   @Override
   public void onDisabled() {
-    sneakingFromModule = false;
-    resetUnsneak();
+    normalMode.onDisabled();
+    silentMode.onDisabled();
+  }
+
+  public boolean isHoldingBlock() {
+    return ItemUtil.isHoldingBlock();
   }
 
   @EventTarget(Priority.LOWEST)
-  public void onMoveInput(MoveInputEvent e) {
+  public void onTick(TickEvent event) {
     if (!this.isEnabled()) return;
-    if (mc.thePlayer == null || mc.currentScreen != null || mc.thePlayer.capabilities.isFlying)
-      return;
-
-    boolean manualSneak = isManualSneak();
-    boolean requireSneak = sneakKeyPressed.getValue();
-
-    if (manualSneak && !requireSneak) {
-      resetUnsneak();
-      return;
-    }
-
-    if (requireSneak
-        && (!manualSneak
-            || (mc.thePlayer.movementInput.moveForward == 0
-                && mc.thePlayer.movementInput.moveStrafe == 0))) {
-      if (!manualSneak) resetUnsneak();
-      repressSneak();
-      return;
-    }
-
-    if (notMovingForward.getValue() && mc.thePlayer.movementInput.moveForward > 0) {
-      clearSneak();
-      return;
-    }
-    if (lookingDown.getValue() && mc.thePlayer.rotationPitch < 70) {
-      clearSneak();
-      return;
-    }
-    if (holdingBlocks.getValue()) {
-      ItemStack held = mc.thePlayer.getHeldItem();
-      if (held == null || !(held.getItem() instanceof ItemBlock)) {
-        clearSneak();
-        return;
-      }
-    }
-
-    if (mc.thePlayer.onGround
-        && mc.gameSettings.keyBindJump.isKeyDown()
-        && (mc.thePlayer.movementInput.moveForward != 0
-            || mc.thePlayer.movementInput.moveStrafe != 0)
-        && sneakOnJump.getValue() > 0) {
-      if (!requireSneak || forceRelease) {
-        sneakJumpStartTick = mc.thePlayer.ticksExisted;
-        double raw = sneakOnJump.getValue() / 50.0;
-        int base = (int) raw;
-        sneakJumpDelayTicks = base + (Math.random() < (raw - base) ? 1 : 0);
-        pressSneak(true);
-        return;
-      }
-    }
-
-    // Predict bounding box after one tick without sneak
-    double[] motion = getPredictedMotion();
-    AxisAlignedBB simBox =
-        mc.thePlayer.getEntityBoundingBox().offset(motion[0], motion[1], motion[2]);
-
-    double offset = computeEdgeOffset(simBox);
-
-    if (Double.isNaN(offset)) {
-      if (mc.gameSettings.keyBindJump.isKeyDown()
-          && (sneakOnJump.getValue() <= 0
-              || (mc.thePlayer.movementInput.moveForward == 0
-                  && mc.thePlayer.movementInput.moveStrafe == 0))) {
-        if (sneakingFromModule) tryReleaseSneak(true);
-      } else if (mc.thePlayer.onGround) {
-        pressSneak(true);
-      } else if (sneakingFromModule) {
-        tryReleaseSneak(true);
-      }
-      return;
-    }
-
-    if (offset > edgeOffset.getValue()) {
-      pressSneak(true);
-    } else if (sneakingFromModule) {
-      tryReleaseSneak(true);
-    }
+    if (!this.mode.getModeString().equals("Normal")) return;
+    normalMode.onTick(event);
   }
 
-  @EventTarget
-  public void onSendPacket(PacketEvent e) {
-    if (!this.isEnabled()) return;
-    if (e.getType() != EventType.SEND) return;
-    if (e.getPacket() instanceof C08PacketPlayerBlockPlacement) {
-      C08PacketPlayerBlockPlacement c08 = (C08PacketPlayerBlockPlacement) e.getPacket();
-      if (c08.getPlacedBlockDirection() != 255
-          && sneakingFromModule
-          && sneakKeyPressed.getValue()) {
-        placed = true;
-      }
+  @EventTarget(Priority.LOWEST)
+  public void onMoveInput(MoveInputEvent event) {
+    if (!this.isEnabled() || mc.currentScreen != null) return;
+
+    if (this.mode.getModeString().equals("Normal")) {
+      normalMode.onMoveInput(event);
+    } else if (this.mode.getModeString().equals("Silent")) {
+      silentMode.onMoveInput(event);
     }
   }
 
   @EventTarget(Priority.HIGH)
   public void onUpdate(UpdateEvent e) {
-    if (!this.isEnabled() || e.getType() != EventType.PRE) return;
-    if (!prePlace.getValue()) return;
-    if (mc.thePlayer == null || mc.currentScreen != null || mc.thePlayer.capabilities.isFlying)
-      return;
-
-    ItemStack held = mc.thePlayer.getHeldItem();
-    if (held == null || !(held.getItem() instanceof ItemBlock)) return;
-    if (lookingDown.getValue() && mc.thePlayer.rotationPitch < 70f) return;
-    if (notMovingForward.getValue() && mc.thePlayer.movementInput.moveForward > 0f) return;
-
-    float basePitch = mc.thePlayer.rotationPitch;
-    double reach = mc.playerController.getBlockReachDistance();
-
-    TargetResult target = findTarget(basePitch, reach);
-    if (target == null) return;
-
-    float baseYaw = mc.thePlayer.rotationYaw;
-    float[] sm = RotationUtil.smoothRotation(baseYaw, basePitch, target.yaw, target.pitch, 15, 20f);
-
-    e.setRotation(sm[0], sm[1], 100);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Sneak helpers
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private void pressSneak(boolean resetDelay) {
-    mc.thePlayer.movementInput.sneak = true;
-    sneakingFromModule = true;
-    if (resetDelay) unsneakStartTick = -1;
-    repressSneak();
-  }
-
-  private void tryReleaseSneak(boolean resetDelay) {
-    int existed = mc.thePlayer.ticksExisted;
-    if (unsneakStartTick == -1 && sneakJumpStartTick == -1) {
-      unsneakStartTick = existed;
-      double raw = (unsneakDelay.getValue() - 50) / 50.0;
-      int base = (int) raw;
-      unsneakDelayTicks = base + (Math.random() < (raw - base) ? 1 : 0);
-    }
-
-    if (sneakJumpStartTick != -1 && existed - sneakJumpStartTick < sneakJumpDelayTicks) {
-      pressSneak(false);
-      return;
-    }
-    if (unsneakStartTick != -1 && existed - unsneakStartTick < unsneakDelayTicks) {
-      pressSneak(false);
-      return;
-    }
-
-    releaseSneak(resetDelay);
-  }
-
-  private void releaseSneak(boolean resetDelay) {
-    if (!sneakKeyPressed.getValue()) {
-      mc.thePlayer.movementInput.sneak = false;
-    } else if (sneakingFromModule && isManualSneak() && (placed || !mc.thePlayer.onGround)) {
-      KeyBinding.setKeyBindState(mc.gameSettings.keyBindSneak.getKeyCode(), false);
-      mc.thePlayer.movementInput.sneak = false;
-      forceRelease = true;
-    } else if (forceRelease) {
-      mc.thePlayer.movementInput.sneak = false;
-    }
-
-    sneakingFromModule = false;
-    placed = false;
-    if (resetDelay) resetUnsneak();
-  }
-
-  private void repressSneak() {
-    if (forceRelease && isManualSneak()) {
-      KeyBinding.setKeyBindState(mc.gameSettings.keyBindSneak.getKeyCode(), true);
-      mc.thePlayer.movementInput.sneak = true;
-    }
-    forceRelease = false;
-  }
-
-  private void clearSneak() {
-    sneakingFromModule = false;
-    resetUnsneak();
-    if (sneakKeyPressed.getValue()) repressSneak();
-  }
-
-  private void resetUnsneak() {
-    unsneakStartTick = -1;
-    sneakJumpStartTick = -1;
-    sneakJumpDelayTicks = -1;
-    unsneakDelayTicks = -1;
-  }
-
-  private boolean isManualSneak() {
-    return KeyBindUtil.isKeyDown(mc.gameSettings.keyBindSneak.getKeyCode());
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Edge detection (SimulatedPlayer equivalent)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private double[] getPredictedMotion() {
-    // Horizontal motion without sneak
-    double[] hMotion = miau.util.player.MoveUtil.predictMovement();
-    // Vertical: if not on ground, apply gravity
-    double vMotion = mc.thePlayer.onGround ? 0.0 : mc.thePlayer.motionY;
-    return new double[] {hMotion[0], vMotion, hMotion[1]};
-  }
-
-  private double computeEdgeOffset(AxisAlignedBB simBox) {
-    AxisAlignedBB groundCheck =
-        new AxisAlignedBB(
-            simBox.minX, simBox.minY - 0.01, simBox.minZ, simBox.maxX, simBox.minY, simBox.maxZ);
-
-    List<AxisAlignedBB> groundBoxes =
-        mc.theWorld.getCollidingBoundingBoxes(mc.thePlayer, groundCheck);
-    if (groundBoxes.isEmpty()) return Double.NaN;
-
-    double feetX = (simBox.minX + simBox.maxX) / 2.0;
-    double feetZ = (simBox.minZ + simBox.maxZ) / 2.0;
-
-    double minDist = Double.MAX_VALUE;
-    for (AxisAlignedBB box : groundBoxes) {
-      double closestX = Math.max(box.minX, Math.min(feetX, box.maxX));
-      double closestZ = Math.max(box.minZ, Math.min(feetZ, box.maxZ));
-      double dx = Math.abs(feetX - closestX);
-      double dz = Math.abs(feetZ - closestZ);
-      double dist = Math.max(dx, dz);
-      minDist = Math.min(minDist, dist);
-    }
-
-    return minDist;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Pre-place rotation
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private TargetResult findTarget(float currentPitch, double reach) {
-    float yaw = mc.thePlayer.rotationYaw;
-
-    AxisAlignedBB bbox = mc.thePlayer.getEntityBoundingBox();
-    int standY = MathHelper.floor_double(bbox.minY) - 1;
-    int minX = MathHelper.floor_double(bbox.minX);
-    int maxX = MathHelper.floor_double(bbox.maxX);
-    int minZ = MathHelper.floor_double(bbox.minZ);
-    int maxZ = MathHelper.floor_double(bbox.maxZ);
-
-    ArrayList<FaceTarget> targets = new ArrayList<>();
-    for (int x = minX; x <= maxX; x++) {
-      for (int z = minZ; z <= maxZ; z++) {
-        BlockPos standBlock = new BlockPos(x, standY, z);
-        if (BlockUtil.isReplaceable(standBlock)) continue;
-        for (EnumFacing face : SIDES) {
-          BlockPos placed = standBlock.offset(face);
-          if (!BlockUtil.isReplaceable(placed)) continue;
-          targets.add(new FaceTarget(standBlock, face));
-        }
-      }
-    }
-    if (targets.isEmpty()) return null;
-
-    float bestDelta = Float.MAX_VALUE;
-    float bestPitch = Float.NaN;
-    BlockPos bestSupport = null;
-    EnumFacing bestFace = null;
-    float randScale = 0.2f;
-
-    for (float pitch = 60f; pitch <= 90f; ) {
-      float step = 1.0f + (float) (Math.random() * 2 - 1) * (0.3f + randScale * 0.4f);
-      if (step < 0.4f) step = 0.4f;
-      if (step > 1.8f) step = 1.8f;
-      pitch += step;
-      float samplePitch = Math.min(pitch, 90f);
-
-      MovingObjectPosition mop = RotationUtil.rayCastBlock(reach, yaw, samplePitch);
-      if (mop == null) continue;
-      EnumFacing hitFace = mop.sideHit;
-      if (hitFace == EnumFacing.UP || hitFace == EnumFacing.DOWN) continue;
-
-      BlockPos hitBlock = mop.getBlockPos();
-      for (FaceTarget t : targets) {
-        if (hitBlock.equals(t.block) && hitFace == t.face) {
-          float delta = Math.abs(samplePitch - currentPitch);
-          if (delta < bestDelta) {
-            bestDelta = delta;
-            bestPitch = samplePitch;
-            bestSupport = t.block;
-            bestFace = t.face;
-          }
-          break;
-        }
-      }
-      if (pitch >= 90f) break;
-    }
-
-    if (bestSupport == null || bestFace == null || Float.isNaN(bestPitch)) return null;
-    return new TargetResult(yaw, bestPitch, bestSupport, bestFace);
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Inner classes
-  // ══════════════════════════════════════════════════════════════════════════
-
-  private static class FaceTarget {
-    final BlockPos block;
-    final EnumFacing face;
-
-    FaceTarget(BlockPos block, EnumFacing face) {
-      this.block = block;
-      this.face = face;
-    }
-  }
-
-  private static class TargetResult {
-    final float yaw, pitch;
-    final BlockPos support;
-    final EnumFacing face;
-
-    TargetResult(float yaw, float pitch, BlockPos support, EnumFacing face) {
-      this.yaw = yaw;
-      this.pitch = pitch;
-      this.support = support;
-      this.face = face;
-    }
+    if (!this.isEnabled()) return;
+    if (!this.mode.getModeString().equals("Silent")) return;
+    silentMode.onUpdate(e);
   }
 }

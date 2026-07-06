@@ -1,11 +1,6 @@
 package miau.module.modules.render;
 
-import java.awt.Color;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.Locale;
 import miau.Miau;
-import miau.enums.ChatColors;
 import miau.event.EventTarget;
 import miau.event.impl.PacketEvent;
 import miau.event.impl.Render2DEvent;
@@ -13,81 +8,37 @@ import miau.event.impl.Render3DEvent;
 import miau.event.types.EventType;
 import miau.module.Module;
 import miau.module.modules.combat.KillAura;
+import miau.module.modules.render.targethud.*;
 import miau.property.properties.*;
 import miau.util.player.TeamUtil;
-import miau.util.render.ColorUtil;
 import miau.util.render.RenderUtil;
+<<<<<<< HEAD
 import miau.util.render.ShapeUtil;
 import miau.util.render.Themes;
 import miau.util.shader.RoundedUtils;
+=======
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 import miau.util.time.TimerUtil;
 import miau.util.vector.Vector2d;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.AbstractClientPlayer;
-import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.gui.inventory.GuiInventory;
-import net.minecraft.client.network.NetworkPlayerInfo;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityArmorStand;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.EnumRarity;
-import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemBow;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemSword;
 import net.minecraft.network.play.client.C02PacketUseEntity;
 import net.minecraft.network.play.client.C02PacketUseEntity.Action;
-import net.minecraft.util.EnumChatFormatting;
-import net.minecraft.util.MathHelper;
-import net.minecraft.util.ResourceLocation;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
 
 public class TargetHUD extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
-  private static final DecimalFormat healthFormat =
-      new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
-  private static final DecimalFormat diffFormat =
-      new DecimalFormat("+0.0;-0.0", new DecimalFormatSymbols(Locale.US));
   private final TimerUtil lastAttackTimer = new TimerUtil();
-  private final TimerUtil animTimer = new TimerUtil();
   private EntityLivingBase lastTarget = null;
   private EntityLivingBase target = null;
-  private ResourceLocation headTexture = null;
-  private float oldHealth = 0.0F;
-  private float newHealth = 0.0F;
-  private float maxHealth = 0.0F;
-  private long lastAliveMS;
-  private double lastHealth;
-  private float lastHealthBar;
-  private TimerUtil fadeTimer;
-  private TimerUtil healthBarTimer;
   public EntityLivingBase renderEntity;
-  private boolean positionInitialized = false;
+
+  public TargetHUDMode[] targetHUDModes;
 
   public final ModeProperty mode =
-      new ModeProperty(
-          "Mode",
-          0,
-          new String[] {
-            "Raven",
-            "Miau",
-            "Astolfo1",
-            "OldNovoline",
-            "Simple",
-            "Astolfo",
-            "Turtle",
-            "Exhibition",
-            "Bingus"
-          });
+      new ModeProperty("Mode", 0, new String[] {"Raven", "Miau", "Exhibition"});
   public final ModeProperty ravenMode =
       new ModeProperty(
           "Raven Mode", 0, new String[] {"Modern", "Legacy"}, () -> this.mode.getValue() == 0);
@@ -120,18 +71,26 @@ public class TargetHUD extends Module {
 
   public TargetHUD() {
     super("TargetHUD", false, true);
+    targetHUDModes =
+        new TargetHUDMode[] {new RavenMode(this), new MiauMode(this), new ExhibitionMode(this)};
   }
 
   @Override
   public void onDisabled() {
     this.target = null;
     this.lastTarget = null;
-    reset();
+    if (targetHUDModes != null) {
+      ((RavenMode) targetHUDModes[0]).reset();
+      ((MiauMode) targetHUDModes[1]).reset();
+    }
   }
 
   @Override
   public void onEnabled() {
-    positionInitialized = false;
+    if (targetHUDModes != null) {
+      ((RavenMode) targetHUDModes[0]).reset();
+      ((MiauMode) targetHUDModes[1]).reset();
+    }
   }
 
   private EntityLivingBase resolveTarget() {
@@ -150,42 +109,6 @@ public class TargetHUD extends Module {
               || mc.currentScreen instanceof miau.ui.clickgui.ClickGui)
           ? mc.thePlayer
           : null;
-    }
-  }
-
-  private ResourceLocation getSkin(EntityLivingBase entityLivingBase) {
-    if (entityLivingBase instanceof EntityPlayer) {
-      NetworkPlayerInfo playerInfo = mc.getNetHandler().getPlayerInfo(entityLivingBase.getName());
-      if (playerInfo != null) {
-        return playerInfo.getLocationSkin();
-      }
-    }
-    return null;
-  }
-
-  private Color getTargetColor(EntityLivingBase entityLivingBase) {
-    if (entityLivingBase instanceof EntityPlayer) {
-      if (TeamUtil.isFriend((EntityPlayer) entityLivingBase)) {
-        return Miau.friendManager.getColor();
-      }
-      if (TeamUtil.isTarget((EntityPlayer) entityLivingBase)) {
-        return Miau.targetManager.getColor();
-      }
-    }
-    switch (this.color.getValue()) {
-      case 0:
-        if (!(entityLivingBase instanceof EntityPlayer)) {
-          return new Color(-1);
-        }
-        return TeamUtil.getTeamColor((EntityPlayer) entityLivingBase, 1.0F);
-      case 1:
-        int rgb =
-            ((HUD) Miau.moduleManager.modules.get(HUD.class))
-                .getColor(System.currentTimeMillis())
-                .getRGB();
-        return new Color(rgb);
-      default:
-        return new Color(-1);
     }
   }
 
@@ -224,7 +147,6 @@ public class TargetHUD extends Module {
   @EventTarget
   public void onRender2D(Render2DEvent event) {
     if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null) {
-      reset();
       return;
     }
 
@@ -233,10 +155,13 @@ public class TargetHUD extends Module {
         chatPreview.getValue() && mc.currentScreen instanceof net.minecraft.client.gui.GuiChat;
 
     if (modeVal == 1) {
-      EntityLivingBase previousTarget = this.target;
       this.target = this.resolveTarget();
       if (this.target != null) {
+<<<<<<< HEAD
         renderMiauStyle(previousTarget, 2, true);
+=======
+        targetHUDModes[1].render(this.target, 0, 0);
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
       }
     } else if (modeVal >= 2) {
       KillAura killAura = (KillAura) Miau.moduleManager.modules.get(KillAura.class);
@@ -252,68 +177,49 @@ public class TargetHUD extends Module {
       }
 
       if (target instanceof EntityPlayer) {
-        EntityPlayer player = (EntityPlayer) target;
         float x = (float) this.drag.position.x;
         float y = (float) this.drag.position.y;
-        switch (modeVal) {
-          case 2:
-            renderASTHUD(player, (int) x, (int) y);
-            break;
-          case 3:
-            renderOldNovoTHUD(player, (int) x, (int) y);
-            break;
-          case 4:
-            renderSimpleTargetHUD(player, (int) x, (int) y);
-            break;
-          case 5:
-            renderAstolfoTHUD(player, (int) x, (int) y);
-            break;
-          case 6:
-            renderTurtleTHUD(player, (int) x, (int) y);
-            break;
-          case 7:
-            renderExTargetHUD(player, (int) x, (int) y);
-            break;
-          case 8:
-            renderBingusTargetHUD(player, (int) x, (int) y);
-            break;
-        }
+        targetHUDModes[modeVal].render(target, x, y);
       }
     } else {
-      // Mode 0 - Raven (ported from RavenB)
       KillAura killAura = (KillAura) Miau.moduleManager.modules.get(KillAura.class);
       if (killAura == null) return;
+
+      RavenMode raven = (RavenMode) targetHUDModes[0];
 
       EntityLivingBase killTarget = killAura.getTarget();
       if (killTarget != null && killAura.isEnabled()) {
         target = killTarget;
-        lastAliveMS = System.currentTimeMillis();
-        fadeTimer = null;
+        raven.setLastAliveMS(System.currentTimeMillis());
+        raven.setFadeTimer(null);
       } else if (showChatPreview) {
         target = mc.thePlayer;
-        lastAliveMS = System.currentTimeMillis();
-        fadeTimer = null;
+        raven.setLastAliveMS(System.currentTimeMillis());
+        raven.setFadeTimer(null);
       } else if (target != null) {
-        if (System.currentTimeMillis() - lastAliveMS >= 400 && fadeTimer == null) {
-          fadeTimer = new TimerUtil();
-          fadeTimer.reset();
+        if (System.currentTimeMillis() - raven.getLastAliveMS() >= 400
+            && raven.getFadeTimer() == null) {
+          TimerUtil ft = new TimerUtil();
+          ft.reset();
+          raven.setFadeTimer(ft);
         }
       } else {
         return;
       }
 
-      String playerInfo = target.getDisplayName().getFormattedText();
       double health = target.getHealth() / target.getMaxHealth();
       if (target.isDead) {
         health = 0;
       }
 
-      if (health != lastHealth) {
-        healthBarTimer = new TimerUtil();
-        healthBarTimer.reset();
+      if (health != raven.getLastHealth()) {
+        TimerUtil ht = new TimerUtil();
+        ht.reset();
+        raven.setHealthBarTimer(ht);
       }
-      lastHealth = health;
+      raven.setLastHealth(health);
 
+<<<<<<< HEAD
       String healthStr =
           " "
               + (target.getHealth() == (int) target.getHealth()
@@ -331,6 +237,9 @@ public class TargetHUD extends Module {
       }
 
       drawTargetHUD(playerInfo, health, 2, true);
+=======
+      raven.render(target, 0, 0);
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
     }
   }
 
@@ -371,6 +280,7 @@ public class TargetHUD extends Module {
       }
     }
   }
+<<<<<<< HEAD
 
   // ============================================================
   //  PORTED RAVENB TARGETHUD (Modern / Legacy)
@@ -1629,4 +1539,6 @@ public class TargetHUD extends Module {
         (color & 255) / 255.0F,
         (color >> 24 & 255) / 255.0F);
   }
+=======
+>>>>>>> c5b379497bf77fb128062e7b70077db4c79e836b
 }

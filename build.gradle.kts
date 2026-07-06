@@ -163,6 +163,15 @@ tasks.shadowJar {
     // Exclude multi-release JAR entries (META-INF/versions/) which contain
     // Java 9+ class files that break Forge's ASM 5.0.3 mod discovery
     exclude("META-INF/versions/**")
+    
+    exclude("plugin.yml")
+    exclude("bungee.yml")
+    exclude("velocity-plugin.json")
+    exclude("META-INF/sponge_plugins.json")
+    exclude("com/viaversion/viaversion/*Plugin.class")
+    exclude("com/viaversion/viabackwards/*Plugin.class")
+    exclude("com/viaversion/viarewind/*Plugin.class")
+
     doLast {
         configurations.forEach {
             println("Copying dependencies into mod: ${it.files}")
@@ -176,6 +185,7 @@ tasks.assemble.get().dependsOn(tasks.remapJar)
 spotless {
     java {
         googleJavaFormat()
+        lineEndings = com.diffplug.spotless.LineEnding.UNIX
         target("src/*/java/**/*.java")
         targetExclude("src/*/java/me/accountmanager/**/*.java", "src/*/java/de/viaversion/**/*.java")
     }

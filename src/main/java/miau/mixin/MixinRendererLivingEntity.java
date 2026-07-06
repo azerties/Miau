@@ -29,7 +29,8 @@ public abstract class MixinRendererLivingEntity<T extends EntityLivingBase> exte
 
   @Inject(
       method = {"doRender(Lnet/minecraft/entity/EntityLivingBase;DDDFF)V"},
-      at = {@At("HEAD")})
+      at = {@At("HEAD")},
+      cancellable = true)
   private void doRender(
       T entityLivingBase,
       double double2,
@@ -38,7 +39,11 @@ public abstract class MixinRendererLivingEntity<T extends EntityLivingBase> exte
       float float5,
       float float6,
       CallbackInfo callbackInfo) {
-    EventManager.call(new RenderLivingEvent(EventType.PRE, entityLivingBase));
+    RenderLivingEvent event = new RenderLivingEvent(EventType.PRE, entityLivingBase);
+    EventManager.call(event);
+    if (event.isCancelled()) {
+      callbackInfo.cancel();
+    }
   }
 
   @Inject(

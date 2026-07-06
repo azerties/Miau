@@ -240,8 +240,9 @@ public final class MicrosoftAuth {
               throw new Exception("No cookies were provided.");
             }
 
+            org.apache.http.client.methods.HttpRequestBase request = new HttpGet(url);
+
             for (int hop = 0; hop < 15; hop++) {
-              HttpGet request = new HttpGet(url);
               request.setConfig(REQUEST_CONFIG);
               request.setHeader(
                   "User-Agent",
@@ -268,7 +269,7 @@ public final class MicrosoftAuth {
                 }
 
                 // Resolve relative locations against the current url.
-                URI resolved = URI.create(url).resolve(location.getValue().trim());
+                URI resolved = request.getURI().resolve(location.getValue().trim());
                 if (resolved.toString().startsWith(redirectUri)) {
                   // Reached the OAuth callback — pull out the code (or error).
                   String rawQuery = resolved.getRawQuery();
@@ -292,7 +293,7 @@ public final class MicrosoftAuth {
                   throw new Exception("The callback did not contain an auth code.");
                 }
 
-                url = resolved.toString();
+                request = new HttpGet(resolved.toString());
                 continue;
               }
 
@@ -331,6 +332,39 @@ public final class MicrosoftAuth {
                   //
                 }
               }
+
+              java.util.regex.Matcher actionMatcher =
+                  java.util.regex.Pattern.compile("action=[\"']([^\"']+)[\"']").matcher(body);
+              if (actionMatcher.find()) {
+                String action = actionMatcher.group(1).replace("&amp;", "&");
+                HttpPost post = new HttpPost(request.getURI().resolve(action).toString());
+                java.util.List<NameValuePair> params = new java.util.ArrayList<>();
+                java.util.regex.Matcher inputMatcher =
+                    java.util.regex.Pattern.compile("<input[^>]+>").matcher(body);
+                while (inputMatcher.find()) {
+                  String input = inputMatcher.group();
+                  if (input.contains("type=\"hidden\"")
+                      || input.contains("type=hidden")
+                      || input.contains("type='hidden'")) {
+                    java.util.regex.Matcher nameMatcher =
+                        java.util.regex.Pattern.compile("name=[\"']([^\"']+)[\"']").matcher(input);
+                    java.util.regex.Matcher valueMatcher =
+                        java.util.regex.Pattern.compile("value=[\"']([^\"']*)[\"']").matcher(input);
+                    if (nameMatcher.find() && valueMatcher.find()) {
+                      params.add(
+                          new BasicNameValuePair(
+                              nameMatcher.group(1), valueMatcher.group(1).replace("&amp;", "&")));
+                    }
+                  }
+                }
+                if (!params.isEmpty()) {
+                  post.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+                  post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+                  request = post;
+                  continue;
+                }
+              }
+
               throw new Exception(
                   String.format(
                       "Cookies are invalid or expired (interaction required, HTTP %d).", status));

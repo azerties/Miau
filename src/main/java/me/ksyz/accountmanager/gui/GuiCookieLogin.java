@@ -16,7 +16,6 @@ import me.ksyz.accountmanager.AccountManager;
 import me.ksyz.accountmanager.auth.Account;
 import me.ksyz.accountmanager.auth.MicrosoftAuth;
 import me.ksyz.accountmanager.auth.SessionManager;
-import me.ksyz.accountmanager.utils.CookieUtils;
 import me.ksyz.accountmanager.utils.Notification;
 import me.ksyz.accountmanager.utils.TextFormatting;
 import net.minecraft.client.gui.Gui;
@@ -213,15 +212,15 @@ public class GuiCookieLogin extends GuiScreen {
       return;
     }
 
-    Map<String, String> jar;
+    String[] cookieLines;
     try {
       String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-      jar = CookieUtils.parse(content);
+      cookieLines = content.split("\\r?\\n");
     } catch (Exception e) {
       status = String.format("&cCould not read file: %s&r", e.getMessage());
       return;
     }
-    if (jar.isEmpty()) {
+    if (cookieLines.length == 0) {
       status = "&cNo cookies were found in that file.&r";
       return;
     }
@@ -233,26 +232,106 @@ public class GuiCookieLogin extends GuiScreen {
     AtomicReference<String> refreshToken = new AtomicReference<>("");
     AtomicReference<String> accessToken = new AtomicReference<>("");
 
-    status = "&fAuthenticating with cookies&r";
+    status = "&fAuthenticating with cookies (Sisu)&r";
     task =
-        MicrosoftAuth.acquireMSAuthCodeFromCookies(jar, executor)
-            .thenComposeAsync(
-                msAuthCode -> {
-                  status = "&fAcquiring Microsoft access tokens&r";
-                  return MicrosoftAuth.acquireMSAccessTokens(msAuthCode, executor);
-                })
-            .thenComposeAsync(
-                msAccessTokens -> {
-                  status = "&fAcquiring Xbox access token&r";
-                  refreshToken.set(msAccessTokens.get("refresh_token"));
-                  return MicrosoftAuth.acquireXboxAccessToken(
-                      msAccessTokens.get("access_token"), executor);
-                })
-            .thenComposeAsync(
-                xboxAccessToken -> {
-                  status = "&fAcquiring Xbox XSTS token&r";
-                  return MicrosoftAuth.acquireXboxXstsToken(xboxAccessToken, executor);
-                })
+        CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    StringBuilder cookies = new StringBuilder();
+                    java.util.List<String> cooki = new java.util.ArrayList<>();
+                    for (String cookie : cookieLines) {
+                      String[] parts = cookie.split("\t");
+                      if (parts.length >= 7
+                          && parts[0].endsWith("login.live.com")
+                          && !cooki.contains(parts[5])) {
+                        cookies.append(parts[5]).append("=").append(parts[6]).append("; ");
+                        cooki.add(parts[5]);
+                      }
+                    }
+                    if (cookies.length() > 2) {
+                      cookies = new StringBuilder(cookies.substring(0, cookies.length() - 2));
+                    } else {
+                      throw new Exception("No login.live.com cookies found!");
+                    }
+
+                    status = "&fAcquiring Xbox token (Sisu)&r";
+                    javax.net.ssl.HttpsURLConnection connection =
+                        (javax.net.ssl.HttpsURLConnection)
+                            new java.net.URL(
+                                    "https://sisu.xboxlive.com/connect/XboxLive/?state=login&cobrandId=8058f65d-ce06-4c30-9559-473c9275a65d&tid=896928775&ru=https%3A%2F%2Fwww.minecraft.net%2Fen-us%2Flogin&aid=1142970254")
+                                .openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty(
+                        "Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+                    connection.setInstanceFollowRedirects(false);
+                    connection.connect();
+
+                    String location = connection.getHeaderField("Location");
+                    if (location == null)
+                      throw new Exception("No Location header in first redirect");
+                    location = location.replaceAll(" ", "%20");
+
+                    connection =
+                        (javax.net.ssl.HttpsURLConnection)
+                            new java.net.URL(location).openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty(
+                        "Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                    connection.setRequestProperty("Cookie", cookies.toString());
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+                    connection.setInstanceFollowRedirects(false);
+                    connection.connect();
+
+                    String location2 = connection.getHeaderField("Location");
+                    if (location2 == null)
+                      throw new Exception("No Location header in second redirect");
+
+                    connection =
+                        (javax.net.ssl.HttpsURLConnection)
+                            new java.net.URL(location2).openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty(
+                        "Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                    connection.setRequestProperty("Cookie", cookies.toString());
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+                    connection.setInstanceFollowRedirects(false);
+                    connection.connect();
+
+                    String location3 = connection.getHeaderField("Location");
+                    if (location3 == null)
+                      throw new Exception(
+                          "No Location header in third redirect (Cookie invalid or expired)");
+
+                    String accTokenStr = location3.split("accessToken=")[1];
+                    if (accTokenStr.contains("&")) accTokenStr = accTokenStr.split("&")[0];
+
+                    String decoded =
+                        new String(
+                                java.util.Base64.getDecoder().decode(accTokenStr),
+                                StandardCharsets.UTF_8)
+                            .split("\"rp://api.minecraftservices.com/\",")[1];
+                    String token = decoded.split("\"Token\":\"")[1].split("\"")[0];
+                    String uhs =
+                        decoded
+                            .split(
+                                java.util.regex.Pattern.quote(
+                                    "{\"DisplayClaims\":{\"xui\":[{\"uhs\":\""))[1]
+                            .split("\"")[0];
+
+                    Map<String, String> result = new java.util.HashMap<>();
+                    result.put("Token", token);
+                    result.put("uhs", uhs);
+                    return result;
+                  } catch (Exception e) {
+                    throw new java.util.concurrent.CompletionException(
+                        "Failed Sisu Xbox authentication! " + e.getMessage(), e);
+                  }
+                },
+                executor)
             .thenComposeAsync(
                 xboxXstsData -> {
                   status = "&fAcquiring Minecraft access token&r";

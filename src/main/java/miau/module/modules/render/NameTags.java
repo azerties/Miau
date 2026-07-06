@@ -74,7 +74,8 @@ public class NameTags extends Module {
       return player.getValue() && mc.gameSettings.thirdPersonView != 0 && !showTargets.getValue();
     }
 
-    if (mc.getRenderViewEntity().getDistanceToEntity(entity) > 512.0F) {
+    if (mc.getRenderViewEntity() == null
+        || mc.getRenderViewEntity().getDistanceToEntity(entity) > 512.0F) {
       return false;
     }
 

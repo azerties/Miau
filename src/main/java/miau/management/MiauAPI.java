@@ -14,7 +14,7 @@ import java.util.Map;
 public class MiauAPI {
 
   public static final String APIBASE = "https://api.rinbounce.wtf/";
-  public static final String BRANCH = "miau";
+  public static final String BRANCH = "myau";
 
   private static final String API_V1 = APIBASE + "api/v1";
   private static final int TIMEOUT_MS = 10000;
@@ -41,6 +41,27 @@ public class MiauAPI {
 
   public static String getClientVersion() throws Exception {
     return get(API_V1 + "/client/version", "Miau/Version");
+  }
+
+  public static boolean isOutdated(String current, String latest) {
+    if (current == null || latest == null) return false;
+    if (current.equals(latest)) return false;
+
+    String[] currParts = current.replaceAll("[^0-9.]", "").split("\\.");
+    String[] latestParts = latest.replaceAll("[^0-9.]", "").split("\\.");
+
+    int length = Math.max(currParts.length, latestParts.length);
+    for (int i = 0; i < length; i++) {
+      int curr =
+          i < currParts.length && !currParts[i].isEmpty() ? Integer.parseInt(currParts[i]) : 0;
+      int lat =
+          i < latestParts.length && !latestParts[i].isEmpty()
+              ? Integer.parseInt(latestParts[i])
+              : 0;
+      if (curr < lat) return true;
+      if (curr > lat) return false;
+    }
+    return false;
   }
 
   public static String encode(String value) throws Exception {

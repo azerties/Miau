@@ -12,12 +12,12 @@ import net.minecraft.util.MovingObjectPosition;
  * <p>Core mechanic: when KillAura has a valid target + sword held, press right-click (C08) to
  * block, unless looking at an interactable block or currently breaking a block.
  */
-public class OpalWatchdogAutoBlock extends AutoBlockMode {
+public class TestAutoBlock extends AutoBlockMode {
 
   private static final Minecraft mc = Minecraft.getMinecraft();
   private boolean hasBlocked = false;
 
-  public OpalWatchdogAutoBlock(KillAura parent) {
+  public TestAutoBlock(KillAura parent) {
     super("Test", parent);
   }
 

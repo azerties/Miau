@@ -113,6 +113,7 @@ public class AutoLadderClutch extends Module {
 
   @EventTarget
   public void onPacket(PacketEvent event) {
+    if (!this.isEnabled()) return;
     if (event.getType() == EventType.SEND && event.getPacket() instanceof C03PacketPlayer) {
       C03PacketPlayer packet = (C03PacketPlayer) event.getPacket();
       if (packet.getRotating()) {
@@ -124,6 +125,7 @@ public class AutoLadderClutch extends Module {
 
   @EventTarget
   public void onUpdate(UpdateEvent event) {
+    if (!this.isEnabled()) return;
     if (event.getType() != EventType.PRE) return;
 
     if (mc.thePlayer == null || mc.theWorld == null) {
@@ -718,6 +720,7 @@ public class AutoLadderClutch extends Module {
 
   @EventTarget
   public void onRender3D(Render3DEvent event) {
+    if (!this.isEnabled()) return;
     if (!esp.getValue()) return;
 
     if (baseEsp != null) {

@@ -34,7 +34,7 @@ public class MixinGuiMainMenu {
                     String latestVersion = response.get("version").getAsString();
                     String updateUrl = response.get("updateUrl").getAsString();
 
-                    if (!ClientInfo.VERSION.equals(latestVersion)) {
+                    if (MiauAPI.isOutdated(ClientInfo.VERSION, latestVersion)) {
                       Minecraft.getMinecraft()
                           .addScheduledTask(
                               () -> {

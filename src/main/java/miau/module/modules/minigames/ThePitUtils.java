@@ -6,6 +6,7 @@ import miau.event.impl.UpdateEvent;
 import miau.event.types.EventType;
 import miau.module.Module;
 import miau.property.properties.BooleanProperty;
+import miau.property.properties.FloatProperty;
 import miau.util.client.ChatUtil;
 import miau.util.network.PacketUtil;
 import miau.util.time.TimerUtil;
@@ -20,8 +21,8 @@ import net.minecraft.util.BlockPos;
 public class ThePitUtils extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final BooleanProperty autoFlashQuestion = new BooleanProperty("autoflashquestion", true);
-  public final BooleanProperty safe =
-      new BooleanProperty("safe", false, autoFlashQuestion::getValue);
+  public final FloatProperty delay =
+      new FloatProperty("delay", 0f, 0f, 0f, 10f, autoFlashQuestion::getValue);
   public final BooleanProperty autoEgg = new BooleanProperty("autoegg", true);
   public final BooleanProperty debug = new BooleanProperty("debug", false);
 
@@ -95,9 +96,14 @@ public class ThePitUtils extends Module {
           String answerStr =
               (result == (long) result) ? String.valueOf((long) result) : String.valueOf(result);
 
-          if (safe.getValue()) {
+          float minDelay = delay.getValue();
+          float maxDelay = delay.getSecondValue();
+          float delaySecs = minDelay + (float) Math.random() * (maxDelay - minDelay);
+          long delayMs = (long) (delaySecs * 1000);
+
+          if (delayMs > 0) {
             pendingAnswer = answerStr;
-            answerTime = System.currentTimeMillis() + 3500 + (long) (Math.random() * 500);
+            answerTime = System.currentTimeMillis() + delayMs;
           } else {
             mc.thePlayer.sendChatMessage(answerStr);
             if (debug.getValue()) {
