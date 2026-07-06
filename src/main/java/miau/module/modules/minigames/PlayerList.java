@@ -9,7 +9,9 @@ import miau.event.EventTarget;
 import miau.event.impl.Render2DEvent;
 import miau.event.impl.TickEvent;
 import miau.module.Module;
+import miau.module.modules.misc.AntiBot;
 import miau.module.modules.render.HUD;
+import miau.property.properties.BooleanProperty;
 import miau.property.properties.DragProperty;
 import miau.property.properties.FloatProperty;
 import miau.util.font.FontRepository;
@@ -23,13 +25,35 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
+import net.minecraft.scoreboard.Scoreboard;
 
 public class PlayerList extends Module {
   private static final Minecraft mc = Minecraft.getMinecraft();
   public final FloatProperty scale = new FloatProperty("Scale", 1.0f, 0.5f, 2.0f);
   public final DragProperty pos = new DragProperty("playerList", new Vector2d(4, 30));
   private final List<EntityPlayer> cachedPlayers = new ArrayList<>();
+
+  public final BooleanProperty showTeam = new BooleanProperty("ShowTeam", true);
+
+  private boolean shouldShowTeam() {
+    if (!this.showTeam.getValue()) return false;
+    if (mc.theWorld == null) return true;
+    Scoreboard scoreboard = mc.theWorld.getScoreboard();
+    if (scoreboard != null) {
+      ScoreObjective objective = scoreboard.getObjectiveInDisplaySlot(1);
+      if (objective != null) {
+        String title =
+            net.minecraft.util.EnumChatFormatting.getTextWithoutFormattingCodes(
+                objective.getDisplayName());
+        if (title != null && title.toUpperCase().contains("SKYWARS")) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   public PlayerList() {
     super("PlayerList", false, false);
@@ -70,11 +94,11 @@ public class PlayerList extends Module {
     cachedPlayers.clear();
     for (EntityPlayer p : mc.theWorld.playerEntities) {
       if (p != null && !p.isDead) {
+        if (AntiBot.isBot(p)) continue;
         cachedPlayers.add(p);
       }
     }
 
-    // Sort players by team name
     cachedPlayers.sort(Comparator.comparing(this::getTeamName));
   }
 
@@ -109,19 +133,18 @@ public class PlayerList extends Module {
 
     ShapeUtil.drawRect(ix, iy, ix + width, iy + height, new Color(0, 0, 0, 100).getRGB());
     ShapeUtil.drawRect(ix, iy, ix + width, iy + 1, clientColor.getRGB());
-    ShapeUtil.drawRect(
-        ix + 4, iy + headerHeight, ix + width - 4, iy + headerHeight + 0.5f, 0x50AAAAAA);
 
+    boolean showTeamCol = shouldShowTeam();
     font18.draw("Players \u00A77" + cachedPlayers.size(), ix + 16, iy + 3, -1, true);
-    font18.draw("Dist.", ix + 105, iy + 3, -1, true);
+    font18.draw("Dist", ix + 105, iy + 3, -1, true);
     font18.draw("HP", ix + 140, iy + 3, -1, true);
-    font18.draw("Team", ix + 175, iy + 3, -1, true);
+    if (showTeamCol) font18.draw("Team", ix + 175, iy + 3, -1, true);
 
     float currentY = iy + headerHeight;
 
     for (int i = 0; i < cachedPlayers.size(); i++) {
       EntityPlayer player = cachedPlayers.get(i);
-      renderPlayer(player, ix, (int) currentY, font16, font18, clientColor);
+      renderPlayer(player, ix, (int) currentY, font16, font18, clientColor, showTeamCol);
       currentY += rowHeight;
     }
 
@@ -134,7 +157,8 @@ public class PlayerList extends Module {
       int y,
       miau.util.font.Font font16,
       miau.util.font.Font font18,
-      Color clientColor) {
+      Color clientColor,
+      boolean showTeamCol) {
     float rowHeight = font16.getFontHeight() + 3;
 
     int headWH = 10;
@@ -167,7 +191,9 @@ public class PlayerList extends Module {
 
     font16.drawWithShadow(hp + "%", x + 140, textY, healthColor.getRGB());
 
-    String teamName = getTeamName(player);
-    font16.drawWithShadow(teamName, x + 175, textY, nameColor.getRGB());
+    if (showTeamCol) {
+      String teamName = getTeamName(player);
+      font16.drawWithShadow(teamName, x + 175, textY, nameColor.getRGB());
+    }
   }
 }
