@@ -25,5 +25,5 @@ public abstract class AutoBlockMode {
 
   public void onAttack() {}
 
-  public abstract boolean processBlock(boolean attack, boolean block);
+  public abstract void processBlock(boolean attack, boolean block);
 }

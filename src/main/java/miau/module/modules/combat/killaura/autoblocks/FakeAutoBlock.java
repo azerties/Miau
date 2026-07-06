@@ -7,12 +7,11 @@ import miau.util.player.PlayerUtil;
 
 public class FakeAutoBlock extends AutoBlockMode {
   public FakeAutoBlock(KillAura parent) {
-    super("FAKE", parent);
+    super("Fake", parent);
   }
 
   @Override
-  public boolean processBlock(boolean attack, boolean block) {
-    boolean swap = false;
+  public void processBlock(boolean attack, boolean block) {
     Miau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
     parent.isBlocking = false;
     parent.fakeBlockState = parent.hasValidTarget();
@@ -20,8 +19,7 @@ public class FakeAutoBlock extends AutoBlockMode {
         && !parent.isPlayerBlocking()
         && !Miau.playerStateManager.digging
         && !Miau.playerStateManager.placing) {
-      swap = true;
+      parent.swapFlag = true;
     }
-    return swap;
   }
 }

@@ -6,17 +6,16 @@ import miau.module.modules.combat.KillAura;
 
 public class VanillaAutoBlock extends AutoBlockMode {
   public VanillaAutoBlock(KillAura parent) {
-    super("VANILLA", parent);
+    super("Vanilla", parent);
   }
 
   @Override
-  public boolean processBlock(boolean attack, boolean block) {
-    boolean swap = false;
+  public void processBlock(boolean attack, boolean block) {
     if (parent.hasValidTarget()) {
       if (!parent.isPlayerBlocking()
           && !Miau.playerStateManager.digging
           && !Miau.playerStateManager.placing) {
-        swap = true;
+        parent.swapFlag = true;
       }
       Miau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
       parent.isBlocking = true;
@@ -26,6 +25,5 @@ public class VanillaAutoBlock extends AutoBlockMode {
       parent.isBlocking = false;
       parent.fakeBlockState = false;
     }
-    return swap;
   }
 }

@@ -17,6 +17,7 @@ import miau.module.Module;
 import miau.module.modules.movement.LongJump;
 import miau.module.modules.player.scaffold.ScaffoldComponent;
 import miau.module.modules.player.scaffold.features.EagleFeature;
+import miau.module.modules.player.scaffold.features.GodbridgeFeature;
 import miau.module.modules.player.scaffold.features.KeepYFeature;
 import miau.module.modules.player.scaffold.features.MultiPlaceFeature;
 import miau.module.modules.player.scaffold.features.SafeWalkFeature;
@@ -79,6 +80,7 @@ public class Scaffold extends Module {
 
   public float lastSnapPlaceYaw = Float.NaN;
   public float lastSnapPlacePitch = Float.NaN;
+
   public static class ScaffoldOptions {
     public final ModeProperty moveFix =
         new ModeProperty("move-fix", 1, new String[] {"NONE", "SILENT"});
@@ -91,6 +93,7 @@ public class Scaffold extends Module {
     public final BooleanProperty itemSpoof = new BooleanProperty("item-spoof", false);
     public final BooleanProperty blockCounter = new BooleanProperty("block-counter", true);
   }
+
   public final ScaffoldOptions options = new ScaffoldOptions();
 
   private boolean shouldStopSprint() {
@@ -208,6 +211,7 @@ public class Scaffold extends Module {
         this.highlight.put(blockPos.offset(enumFacing), System.currentTimeMillis());
 
         this.eagleFeature.onBlockPlaced();
+        this.godbridgeFeature.onBlockPlaced();
         if (this.options.swing.getValue()) {
           mc.thePlayer.swingItem();
         } else {
@@ -331,6 +335,7 @@ public class Scaffold extends Module {
   public final KeepYFeature keepYFeature;
   public final MultiPlaceFeature multiPlaceFeature;
   public final SafeWalkFeature safeWalkFeature;
+  public final GodbridgeFeature godbridgeFeature;
   public final TowerFeature towerFeature;
   public final RotationHandler rotationHandler;
 
@@ -340,6 +345,7 @@ public class Scaffold extends Module {
     this.keepYFeature = new KeepYFeature(this);
     this.multiPlaceFeature = new MultiPlaceFeature(this);
     this.safeWalkFeature = new SafeWalkFeature(this);
+    this.godbridgeFeature = new GodbridgeFeature(this);
     this.towerFeature = new TowerFeature(this);
     this.rotationHandler = new RotationHandler(this);
 
@@ -347,6 +353,7 @@ public class Scaffold extends Module {
     this.components.add(this.keepYFeature);
     this.components.add(this.multiPlaceFeature);
     this.components.add(this.safeWalkFeature);
+    this.components.add(this.godbridgeFeature);
     this.components.add(this.towerFeature);
   }
 
@@ -372,11 +379,18 @@ public class Scaffold extends Module {
         options.swing,
         options.itemSpoof,
         options.blockCounter,
+        godbridgeFeature.godBridge,
+        godbridgeFeature.godBridgeLedgeMode,
+        godbridgeFeature.godBridgeForceSneakBelowCount,
+        godbridgeFeature.godBridgeEdgeDistance,
+        godbridgeFeature.godBridgeSneakDelay,
+        godbridgeFeature.jumpAutomatically,
+        godbridgeFeature.jumpPerBlockMin,
+        godbridgeFeature.jumpPerBlockMax,
         eagleFeature.eagle,
         eagleFeature.edgeDistance,
         eagleFeature.sneakDelay,
-        eagleFeature.blocksPerSneak
-    );
+        eagleFeature.blocksPerSneak);
   }
 
   public int getSlot() {

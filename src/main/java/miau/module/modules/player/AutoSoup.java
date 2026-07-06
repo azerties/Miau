@@ -181,4 +181,8 @@ public class AutoSoup extends Module {
     EATING,
     DROPPING
   }
+
+  public boolean isHealing() {
+    return state != State.WAITINGTOSWITCH && state != State.NONE;
+  }
 }

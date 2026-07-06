@@ -8,11 +8,11 @@ import miau.util.network.PacketUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.play.client.C09PacketHeldItemChange;
 
-public class HypixelAutoBlock extends AutoBlockMode {
+public class HypixelTestAutoBlock extends AutoBlockMode {
   private static final Minecraft mc = Minecraft.getMinecraft();
 
-  public HypixelAutoBlock(KillAura parent) {
-    super("Hypixel", parent);
+  public HypixelTestAutoBlock(KillAura parent) {
+    super("Test", parent);
   }
 
   @Override
@@ -21,30 +21,28 @@ public class HypixelAutoBlock extends AutoBlockMode {
       if (!Miau.playerStateManager.digging && !Miau.playerStateManager.placing) {
         switch (parent.blockTick) {
           case 0:
+            parent.blockedFlag = true;
             if (!parent.isPlayerBlocking()) {
               parent.swapFlag = true;
             }
-            parent.blockedFlag = true;
             parent.blockTick = 1;
             break;
           case 1:
+            if (parent.isPlayerBlocking()) {
+              int randomSlot = new Random().nextInt(9);
+              while (randomSlot == mc.thePlayer.inventory.currentItem) {
+                randomSlot = new Random().nextInt(9);
+              }
+              PacketUtil.sendPacket(new C09PacketHeldItemChange(randomSlot));
+              PacketUtil.sendPacket(
+                  new C09PacketHeldItemChange(mc.thePlayer.inventory.currentItem));
+            }
             parent.attackFlag = false;
             parent.blockTick = 2;
             break;
           case 2:
-            if (parent.isPlayerBlocking()) {
-              if (!parent.noSwap.getValue()) {
-                int randomSlot = new Random().nextInt(9);
-                while (randomSlot == mc.thePlayer.inventory.currentItem) {
-                  randomSlot = new Random().nextInt(9);
-                }
-                PacketUtil.sendPacket(new C09PacketHeldItemChange(randomSlot));
-                PacketUtil.sendPacket(
-                    new C09PacketHeldItemChange(mc.thePlayer.inventory.currentItem));
-              }
-              parent.stopBlock();
-            }
             parent.attackFlag = false;
+            parent.stopBlock();
             if (parent.attackDelayMS <= 50L) {
               parent.blockTick = 0;
             }
@@ -62,10 +60,7 @@ public class HypixelAutoBlock extends AutoBlockMode {
         randomSlot = new Random().nextInt(9);
       }
       PacketUtil.sendPacket(new C09PacketHeldItemChange(randomSlot));
-      PacketUtil.sendPacket(
-          new C09PacketHeldItemChange(
-              net.minecraft.client.Minecraft.getMinecraft().thePlayer.inventory.currentItem));
-      parent.stopBlock();
+      PacketUtil.sendPacket(new C09PacketHeldItemChange(mc.thePlayer.inventory.currentItem));
       parent.isBlocking = false;
       parent.fakeBlockState = false;
     }

@@ -7,18 +7,17 @@ import miau.util.player.PlayerUtil;
 
 public class NoneAutoBlock extends AutoBlockMode {
   public NoneAutoBlock(KillAura parent) {
-    super("NONE", parent);
+    super("None", parent);
   }
 
   @Override
-  public boolean processBlock(boolean attack, boolean block) {
-    boolean swap = false;
+  public void processBlock(boolean attack, boolean block) {
     if (PlayerUtil.isUsingItem()) {
       parent.isBlocking = true;
       if (!parent.isPlayerBlocking()
           && !Miau.playerStateManager.digging
           && !Miau.playerStateManager.placing) {
-        swap = true;
+        parent.swapFlag = true;
       }
     } else {
       parent.isBlocking = false;
@@ -30,6 +29,5 @@ public class NoneAutoBlock extends AutoBlockMode {
     }
     Miau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
     parent.fakeBlockState = false;
-    return swap;
   }
 }
