@@ -17,7 +17,7 @@ public class RotationHandler {
   private final Map<Integer, IRotationLogic> rotationLogics = new HashMap<>();
 
   public final ModeProperty rotationMode =
-      new ModeProperty("rotations", 2, new String[] {"NONE", "DEFAULT", "BACKWARDS", "GODBIRGDE"});
+      new ModeProperty("rotations", 2, new String[] {"NONE", "DEFAULT", "BACKWARDS", "GODBIRGDE", "BETA"});
 
   public List<Property<?>> getProperties() {
     return Arrays.asList(rotationMode);
@@ -29,6 +29,7 @@ public class RotationHandler {
     rotationLogics.put(1, new DefaultRotation());
     rotationLogics.put(2, new BackwardsRotation());
     rotationLogics.put(3, new GodbridgeRotation());
+    rotationLogics.put(4, new BetaRotation());
   }
 
   public void handleInitialRotation(
@@ -74,8 +75,41 @@ public class RotationHandler {
         scaffold.rotationTick = 3;
         scaffold.towering = true;
       }
-      placeYaw = targetYaw;
-      placePitch = targetPitch;
+      if (rotationMode.getValue() == 4) {
+        if (!Float.isNaN(scaffold.betaFeature.lastBetaSentYaw)) {
+          boolean clampE = scaffold.betaFeature.betaPlaceTicks < 3;
+          float[] corrected =
+              RotationUtil.antiDetectionRotation(
+                  targetYaw,
+                  targetPitch,
+                  scaffold.betaFeature.lastBetaSentYaw,
+                  scaffold.betaFeature.lastBetaSentPitch,
+                  scaffold.betaFeature.lastBetaPitchQuotient,
+                  clampE);
+          targetYaw = corrected[0];
+          targetPitch = corrected[1];
+          placeYaw = corrected[0];
+          placePitch = corrected[1];
+
+          float mcpSens =
+              (float)
+                  (Scaffold.mc.gameSettings.mouseSensitivity
+                          * (1.0 + Math.random() / 10000000.0)
+                          * 0.6F
+                      + 0.2F);
+          double m = mcpSens * mcpSens * mcpSens * 8.0F * 0.15D;
+          scaffold.betaFeature.lastBetaPitchQuotient =
+              Math.round((corrected[1] - scaffold.betaFeature.lastBetaSentPitch) / m);
+          if (scaffold.betaFeature.lastBetaPitchQuotient == 0L) {
+            scaffold.betaFeature.lastBetaPitchQuotient =
+                corrected[1] > scaffold.betaFeature.lastBetaSentPitch ? 1L : -1L;
+          }
+        }
+        scaffold.betaFeature.lastBetaSentYaw = targetYaw;
+        scaffold.betaFeature.lastBetaSentPitch = targetPitch;
+        scaffold.betaFeature.betaPlaceTicks++;
+      }
+      
       event.setRotation(targetYaw, targetPitch, 3);
       if (scaffold.options.moveFix.getValue() == 1) {
         event.setPervRotation(targetYaw, 3);

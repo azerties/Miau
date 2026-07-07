@@ -16,6 +16,7 @@ import miau.management.RotationState;
 import miau.module.Module;
 import miau.module.modules.movement.LongJump;
 import miau.module.modules.player.scaffold.ScaffoldComponent;
+import miau.module.modules.player.scaffold.features.BetaFeature;
 import miau.module.modules.player.scaffold.features.EagleFeature;
 import miau.module.modules.player.scaffold.features.GodbridgeFeature;
 import miau.module.modules.player.scaffold.features.KeepYFeature;
@@ -196,7 +197,7 @@ public class Scaffold extends Module {
 
   public void place(BlockPos blockPos, EnumFacing enumFacing, Vec3 vec3) {
 
-    if (ItemUtil.isHoldingBlock() && this.blockCount > 0) {
+    if (ItemUtil.isHoldingBlock() && this.blockCount > 0 && this.betaFeature.canBetaPlaceNow()) {
       if (mc.playerController.onPlayerRightClick(
           mc.thePlayer,
           mc.theWorld,
@@ -337,6 +338,7 @@ public class Scaffold extends Module {
   public final SafeWalkFeature safeWalkFeature;
   public final GodbridgeFeature godbridgeFeature;
   public final TowerFeature towerFeature;
+  public final BetaFeature betaFeature;
   public final RotationHandler rotationHandler;
 
   public Scaffold() {
@@ -347,6 +349,7 @@ public class Scaffold extends Module {
     this.safeWalkFeature = new SafeWalkFeature(this);
     this.godbridgeFeature = new GodbridgeFeature(this);
     this.towerFeature = new TowerFeature(this);
+    this.betaFeature = new BetaFeature(this);
     this.rotationHandler = new RotationHandler(this);
 
     this.components.add(this.eagleFeature);
@@ -355,6 +358,7 @@ public class Scaffold extends Module {
     this.components.add(this.safeWalkFeature);
     this.components.add(this.godbridgeFeature);
     this.components.add(this.towerFeature);
+    this.components.add(this.betaFeature);
   }
 
   @Override

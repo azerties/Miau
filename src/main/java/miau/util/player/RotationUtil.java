@@ -344,6 +344,70 @@ public class RotationUtil {
     return new float[] {yaw, MathHelper.clamp_float(pitch, -90.0F, 90.0F)};
   }
 
+  public static float[] antiDetectionRotation(
+      float targetYaw,
+      float targetPitch,
+      float baseYaw,
+      float basePitch,
+      long lastPitchQuotient,
+      boolean clampPitchForScaffoldE) {
+    float mcpSensitivity =
+        (float)
+            (mc.gameSettings.mouseSensitivity * (1.0 + Math.random() / 10000000.0) * 0.6F + 0.2F);
+    double multiplier = mcpSensitivity * mcpSensitivity * mcpSensitivity * 8.0F * 0.15D;
+    if (multiplier < 0.01) multiplier = 0.01;
+
+    float rawYawDelta = MathHelper.wrapAngleTo180_float(targetYaw - baseYaw);
+    long yawK = Math.round(rawYawDelta / multiplier);
+    if (yawK == 0L) {
+      yawK = rawYawDelta > 0.0f ? 1L : -1L;
+    }
+    float yaw = baseYaw + (float) ((double) yawK * multiplier);
+
+    float rawPitchDelta = targetPitch - basePitch;
+    long pitchK = Math.round(rawPitchDelta / multiplier);
+
+    if (pitchK == 0L) {
+      pitchK = rawPitchDelta > 0.0f ? 1L : -1L;
+    }
+
+    long absPitchK = Math.abs(pitchK);
+    long absLastPitchK = Math.abs(lastPitchQuotient);
+    if (absLastPitchK > 0L && absPitchK > 0L && gcd(absPitchK, absLastPitchK) > 1L) {
+      long alt1 = pitchK > 0L ? pitchK + 1L : pitchK - 1L;
+      long alt2 = pitchK > 0L ? pitchK - 1L : pitchK + 1L;
+      if (alt2 == 0L) alt2 = pitchK > 0L ? 1L : -1L;
+
+      long absAlt1 = Math.abs(alt1);
+      long absAlt2 = Math.abs(alt2);
+      if (absAlt1 > 0L && gcd(absAlt1, absLastPitchK) == 1L) {
+        pitchK = alt1;
+      } else if (absAlt2 > 0L && gcd(absAlt2, absLastPitchK) == 1L) {
+        pitchK = alt2;
+      }
+    }
+
+    double estimatedYawDelta = (double) yawK * multiplier;
+    double estimatedPitchDelta = (double) pitchK * multiplier;
+    if (clampPitchForScaffoldE
+        && Math.abs(estimatedYawDelta) > 95.0
+        && Math.abs(estimatedPitchDelta) > 8.0) {
+      int sign = pitchK > 0L ? 1 : -1;
+      pitchK = (long) ((double) sign * Math.floor(7.5 / multiplier));
+      if (pitchK == 0L) pitchK = (long) sign;
+    }
+
+    float pitch = basePitch + (float) ((double) pitchK * multiplier);
+    pitch = MathHelper.clamp_float(pitch, -90.0F, 90.0F);
+
+    return new float[] {yaw, pitch};
+  }
+
+  private static long gcd(long a, long b) {
+    if (b == 0L) return a;
+    return gcd(b, a % b);
+  }
+
   public static float[] getRotationsFromEye(Vec3 eye, double tx, double ty, double tz) {
     double dx = tx - eye.xCoord;
     double dy = ty - eye.yCoord;
