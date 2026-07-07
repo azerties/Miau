@@ -229,8 +229,6 @@ public class DragManager {
           new Vector2d(
               Math.min(width - positionValue.scale.x - padding, positionValue.targetPosition.x),
               Math.min(height - positionValue.scale.y - padding, positionValue.targetPosition.y));
-
-      // Removed white border and text per user request
     }
   }
 }
