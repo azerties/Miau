@@ -30,7 +30,7 @@ public class UpgradeHUDFeature implements BedwarsComponent {
   public final BooleanProperty shortNames =
       new BooleanProperty("Short names", false, this.upgradeHud::getValue);
   public final FloatProperty scale =
-      new FloatProperty("Scale", 0.65f, 0.5f, 1.5f, this.upgradeHud::getValue);
+      new FloatProperty("Scale", 1.0f, 0.5f, 1.5f, this.upgradeHud::getValue);
   public final BooleanProperty showSharpness =
       new BooleanProperty("Show Sharpness", true, this.upgradeHud::getValue);
   public final BooleanProperty showProtection =

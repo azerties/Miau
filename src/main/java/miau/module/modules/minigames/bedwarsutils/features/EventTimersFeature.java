@@ -29,7 +29,7 @@ public class EventTimersFeature implements BedwarsComponent {
   public final DragProperty eventDrag =
       new DragProperty("Event Timers", new miau.util.vector.Vector2d(10, 60), true);
   public final FloatProperty eventScale =
-      new FloatProperty("Event Scale", 0.65f, 0.5f, 1.5f, this.eventTimers::getValue);
+      new FloatProperty("Event Scale", 1.0f, 0.5f, 1.5f, this.eventTimers::getValue);
   public final BooleanProperty eventTime =
       new BooleanProperty("Events Enabled", true, this.eventTimers::getValue);
   public final BooleanProperty onlyNext =
