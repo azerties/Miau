@@ -94,6 +94,7 @@ public class Displace extends Module {
   private Float lastRenderedDisplaceYaw = null;
   private EntityPlayer lastRenderedTarget = null;
   private long lastRenderedArrowMs = 0L;
+  private EntityPlayer currentTarget = null;
   private int tickCounter;
   private final Map<Integer, Integer> targetWindowStartTicks = new HashMap<>();
   private static final Minecraft mc = Minecraft.getMinecraft();
@@ -215,7 +216,7 @@ public class Displace extends Module {
       return null;
     }
 
-    double aimRadius = Math.min(dist, Math.max(0.35D, (double) target.width * 0.5D + 0.15D));
+    double aimRadius = Math.min(dist, (double) target.width * 0.5D + 0.05D);
     double aimX = target.posX + dx / dist * aimRadius;
     double aimZ = target.posZ + dz / dist * aimRadius;
     Vec3 eyes = mc.thePlayer.getPositionEyes(1.0F);
@@ -381,9 +382,25 @@ public class Displace extends Module {
   }
 
   private float getFixedDisplaceYaw() {
-    float baseYaw = RotationUtil.customRots ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
+    if (currentTarget == null) {
+      float baseYaw = RotationUtil.customRots ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
+      float offset = yawOffset.getValue();
+      return displaceLeft ? baseYaw - offset : baseYaw + offset;
+    }
+    Vec3 eyes = mc.thePlayer.getPositionEyes(1.0F);
+    double dx = currentTarget.posX - eyes.xCoord;
+    double dz = currentTarget.posZ - eyes.zCoord;
+    float toTargetYaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F;
     float offset = yawOffset.getValue();
-    return displaceLeft ? baseYaw - offset : baseYaw + offset;
+    return displaceLeft ? toTargetYaw - offset : toTargetYaw + offset;
+  }
+
+  private float applyGCD(float targetYaw, float baseYaw) {
+    float sensitivity = (float) (mc.gameSettings.mouseSensitivity * 0.6F + 0.2F);
+    float multiplier = sensitivity * sensitivity * sensitivity * 8.0F * 0.15F;
+    if (multiplier < 0.001F) return targetYaw;
+    float delta = MathHelper.wrapAngleTo180_float(targetYaw - baseYaw);
+    return baseYaw + (float) (Math.round(delta / multiplier) * multiplier);
   }
 
   private void clearActiveState() {
@@ -649,13 +666,10 @@ public class Displace extends Module {
   @EventTarget(Priority.HIGH)
   public void onClientRotation(UpdateEvent e) {
     if (e.getType() != EventType.PRE) return;
-    if (this.isEnabled() && this.renderDisplaceYaw != null) {
-      e.setRotation(this.renderDisplaceYaw, mc.thePlayer.rotationPitch, 100);
-      MoveUtil.fixMovement(this.renderDisplaceYaw);
-      if (this.wasDisplacingLastTick) {
-        e.setRotation(this.renderDisplaceYaw, mc.thePlayer.rotationPitch, 100);
-        MoveUtil.fixMovement(this.renderDisplaceYaw);
-      }
+    if (this.isEnabled() && this.renderDisplaceYaw != null && this.wasDisplacingLastTick && !this.displaceThisTick) {
+      float gcdYaw = applyGCD(this.renderDisplaceYaw, RotationUtil.customRots ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw);
+      e.setRotation(gcdYaw, mc.thePlayer.rotationPitch, 100);
+      MoveUtil.fixMovement(gcdYaw);
     }
   }
 
@@ -703,6 +717,7 @@ public class Displace extends Module {
                   3.0,
                   CombatTargeting.SortMode.DISTANCE);
     }
+    currentTarget = target;
 
     boolean hasKBEnchant =
         EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0
@@ -753,7 +768,9 @@ public class Displace extends Module {
 
     if (!displaceThisTick || renderDisplaceYaw == null) return;
 
-    e.setRotation(renderDisplaceYaw, e.getPitch(), Integer.MAX_VALUE);
-    MoveUtil.fixMovement(renderDisplaceYaw);
+    float baseYaw = RotationUtil.customRots ? RotationUtil.serverYaw : mc.thePlayer.rotationYaw;
+    float gcdYaw = applyGCD(renderDisplaceYaw, baseYaw);
+    e.setRotation(gcdYaw, e.getPitch(), Integer.MAX_VALUE);
+    MoveUtil.fixMovement(gcdYaw);
   }
 }

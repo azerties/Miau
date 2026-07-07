@@ -11,6 +11,7 @@ import miau.property.Property;
 import miau.property.properties.BooleanProperty;
 import miau.property.properties.FloatProperty;
 import miau.property.properties.IntProperty;
+import miau.property.properties.DragProperty;
 import miau.util.font.Font;
 import miau.util.font.FontRepository;
 import net.minecraft.client.Minecraft;
@@ -26,10 +27,7 @@ public class EventTimersFeature implements BedwarsComponent {
   private final BedwarsUtils parent;
 
   public final BooleanProperty eventTimers = new BooleanProperty("Event Timers", false);
-  public final IntProperty eventPosX =
-      new IntProperty("Event Pos X", 10, 0, 1000, this.eventTimers::getValue);
-  public final IntProperty eventPosY =
-      new IntProperty("Event Pos Y", 60, 0, 1000, this.eventTimers::getValue);
+  public final DragProperty eventDrag = new DragProperty("Event Timers", new miau.util.vector.Vector2d(10, 60), true);
   public final FloatProperty eventScale =
       new FloatProperty("Event Scale", 0.65f, 0.5f, 1.5f, this.eventTimers::getValue);
   public final BooleanProperty eventTime =
@@ -52,10 +50,7 @@ public class EventTimersFeature implements BedwarsComponent {
       new BooleanProperty("Game End Timer", true, this.eventTimers::getValue);
   public final BooleanProperty emeraldTime =
       new BooleanProperty("Emeralds Enabled", true, this.eventTimers::getValue);
-  public final IntProperty emeraldPosX =
-      new IntProperty("Emerald Pos X", 10, 0, 1000, this.eventTimers::getValue);
-  public final IntProperty emeraldPosY =
-      new IntProperty("Emerald Pos Y", 110, 0, 1000, this.eventTimers::getValue);
+  public final DragProperty emeraldDrag = new DragProperty("Emerald Timers", new miau.util.vector.Vector2d(10, 110), true);
   public final BooleanProperty emeraldDynamicColor =
       new BooleanProperty("Emerald Dynamic color", true, this.eventTimers::getValue);
 
@@ -74,8 +69,7 @@ public class EventTimersFeature implements BedwarsComponent {
   public List<Property<?>> getProperties() {
     List<Property<?>> props = new ArrayList<>();
     props.add(eventTimers);
-    props.add(eventPosX);
-    props.add(eventPosY);
+    props.add(eventDrag);
     props.add(eventScale);
     props.add(eventTime);
     props.add(onlyNext);
@@ -87,8 +81,7 @@ public class EventTimersFeature implements BedwarsComponent {
     props.add(suddenDeathTimer);
     props.add(gameEndTimer);
     props.add(emeraldTime);
-    props.add(emeraldPosX);
-    props.add(emeraldPosY);
+    props.add(emeraldDrag);
     props.add(emeraldDynamicColor);
     return props;
   }
@@ -165,9 +158,11 @@ public class EventTimersFeature implements BedwarsComponent {
       Font font = FontRepository.getHudFont(18);
 
       if (this.eventTime.getValue()) {
-        int x = this.eventPosX.getValue();
-        int y = this.eventPosY.getValue();
+        float x = (float) this.eventDrag.position.x;
+        float y = (float) this.eventDrag.position.y;
         float sc = this.eventScale.getValue();
+        float maxWidth = 0;
+        float startY = y;
         boolean diamondShown = false;
         boolean emeraldShown = false;
         int shown = 0;
@@ -244,10 +239,16 @@ public class EventTimersFeature implements BedwarsComponent {
               Math.max((int) ((font.getFontHeight() * 2 + 4) * sc), (int) (16.0F * sc))
                   + (int) (4.0F * sc);
 
+          float w1 = font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes(entry.title)) * sc + 18.0F * sc;
+          float w2 = font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes(EnumChatFormatting.GRAY + formatTime(remainingSeconds))) * sc + 18.0F * sc;
+          if (w1 > maxWidth) maxWidth = w1;
+          if (w2 > maxWidth) maxWidth = w2;
+
           if (this.onlyNext.getValue() && ++shown >= 2) {
             break;
           }
         }
+        this.eventDrag.setScale(new miau.util.vector.Vector2d(maxWidth, y - startY));
       }
 
       if (this.emeraldTime.getValue()) {
@@ -266,8 +267,8 @@ public class EventTimersFeature implements BedwarsComponent {
 
         int nextEmeraldSpawn = Math.max(0, nextSpawnTime - elapsedSeconds);
 
-        int x = this.emeraldPosX.getValue();
-        int y = this.emeraldPosY.getValue();
+        float x = (float) this.emeraldDrag.position.x;
+        float y = (float) this.emeraldDrag.position.y;
         float sc = this.eventScale.getValue();
 
         EnumChatFormatting timeColor =
@@ -295,6 +296,10 @@ public class EventTimersFeature implements BedwarsComponent {
         renderItemIcon(mc, EMERALD_ICON, x, iconY, sc);
         font.drawWithShadow(mainText, x + 18.0F * sc, y, -1);
         font.drawWithShadow(secondText, x + 18.0F * sc, y + (font.getFontHeight() + 2) * sc, -1);
+
+        float w1 = font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes(mainText)) * sc + 18.0F * sc;
+        float w2 = font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes(secondText)) * sc + 18.0F * sc;
+        this.emeraldDrag.setScale(new miau.util.vector.Vector2d(Math.max(w1, w2), (font.getFontHeight() * 2 + 4) * sc));
       }
     }
   }

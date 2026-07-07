@@ -55,7 +55,6 @@ public class DragManager {
         for (Property<?> value : module.getValues()) {
           if (value instanceof DragProperty) {
             DragProperty dp = (DragProperty) value;
-            // Skip structure-only drags (e.g. scoreboard which uses autofit, not manual drag)
             if (!dp.structure) {
               draggables.add(dp);
               draggableNames.add(module.getName());
@@ -66,7 +65,6 @@ public class DragManager {
     }
 
     if (Miau.notificationManager != null) {
-      // NotificationManager is now Opal-style (no drag property)
     }
 
     int mouseX = Mouse.getX() * width / mc.displayWidth;
@@ -234,18 +232,7 @@ public class DragManager {
               Math.min(width - positionValue.scale.x - padding, positionValue.targetPosition.x),
               Math.min(height - positionValue.scale.y - padding, positionValue.targetPosition.y));
 
-      RenderUtil.enableRenderState();
-      ShapeUtil.drawOutlineRect(
-          (float) positionValue.position.x,
-          (float) positionValue.position.y,
-          (float) (positionValue.position.x + positionValue.scale.x),
-          (float) (positionValue.position.y + positionValue.scale.y),
-          1.5f,
-          new Color(0, 0, 0, 80).getRGB(),
-          new Color(255, 255, 255, 180).getRGB());
-      RenderUtil.disableRenderState();
-      mc.fontRendererObj.drawStringWithShadow(
-          name, (float) positionValue.position.x + 2, (float) positionValue.position.y + 2, -1);
+    // Removed white border and text per user request
     }
   }
 }

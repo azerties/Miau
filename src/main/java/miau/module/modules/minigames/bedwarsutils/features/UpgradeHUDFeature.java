@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Queue;
+import miau.property.properties.DragProperty;
 import miau.event.impl.PacketEvent;
 import miau.event.impl.Render2DEvent;
 import miau.event.types.EventType;
@@ -25,10 +26,7 @@ public class UpgradeHUDFeature implements BedwarsComponent {
   private final BedwarsUtils parent;
 
   public final BooleanProperty upgradeHud = new BooleanProperty("Upgrade HUD", false);
-  public final IntProperty posX =
-      new IntProperty("Position X", 10, 0, 1000, this.upgradeHud::getValue);
-  public final IntProperty posY =
-      new IntProperty("Position Y", 10, 0, 1000, this.upgradeHud::getValue);
+  public final DragProperty drag = new DragProperty("Upgrade HUD", new miau.util.vector.Vector2d(10, 10), true);
   public final BooleanProperty shortNames =
       new BooleanProperty("Short names", false, this.upgradeHud::getValue);
   public final FloatProperty scale =
@@ -69,8 +67,7 @@ public class UpgradeHUDFeature implements BedwarsComponent {
   public List<Property<?>> getProperties() {
     List<Property<?>> props = new ArrayList<>();
     props.add(upgradeHud);
-    props.add(posX);
-    props.add(posY);
+    props.add(drag);
     props.add(shortNames);
     props.add(scale);
     props.add(showSharpness);
@@ -85,11 +82,17 @@ public class UpgradeHUDFeature implements BedwarsComponent {
   @Override
   public void onReset() {
     sharpnessLevel = 0;
+    sharpnessLevelCached = 0;
     protectionLevel = 0;
+    protectionLevelCached = 0;
     trapName = "";
+    trapNameCached = "";
     featherFallingLevel = 0;
+    featherFallingLevelCached = 0;
     healPoolEnabled = false;
+    healPoolEnabledCached = false;
     forgeLevel = "";
+    forgeLevelCached = "";
     TRAP_QUEUE.clear();
   }
 
@@ -263,17 +266,23 @@ public class UpgradeHUDFeature implements BedwarsComponent {
                 font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes((String) s))));
     java.util.Collections.reverse(lines);
 
-    float x = this.posX.getValue();
-    float y = this.posY.getValue();
+    float x = (float) this.drag.position.x;
+    float y = (float) this.drag.position.y;
     float sc = this.scale.getValue();
 
     GlStateManager.pushMatrix();
     GlStateManager.scale(sc, sc, sc);
 
+    float maxWidth = 0;
+    float startY = y;
+
     for (String line : lines) {
       font.drawWithShadow(line, x / sc, y / sc, -1);
+      float w = font.getStringWidth(EnumChatFormatting.getTextWithoutFormattingCodes(line)) * sc;
+      if (w > maxWidth) maxWidth = w;
       y += font.getFontHeight() * sc + 2 * sc;
     }
+    this.drag.setScale(new miau.util.vector.Vector2d(maxWidth, y - startY));
     GlStateManager.popMatrix();
   }
 }

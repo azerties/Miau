@@ -3,13 +3,15 @@ package miau.module.modules.minigames;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import miau.Miau;
 import miau.event.EventTarget;
 import miau.event.impl.Render2DEvent;
 import miau.event.impl.TickEvent;
 import miau.module.Module;
-import miau.module.modules.misc.AntiBot;
+import miau.module.modules.misc.CheatDetector;
 import miau.module.modules.render.HUD;
 import miau.property.properties.BooleanProperty;
 import miau.property.properties.DragProperty;
@@ -34,6 +36,7 @@ public class PlayerList extends Module {
   public final FloatProperty scale = new FloatProperty("Scale", 1.0f, 0.5f, 2.0f);
   public final DragProperty pos = new DragProperty("playerList", new Vector2d(4, 30));
   private final List<EntityPlayer> cachedPlayers = new ArrayList<>();
+  private final Map<String, String> teamCache = new HashMap<>();
 
   public final BooleanProperty showTeam = new BooleanProperty("ShowTeam", true);
 
@@ -61,40 +64,48 @@ public class PlayerList extends Module {
 
   private String getTeamName(EntityPlayer player) {
     ScorePlayerTeam team = (ScorePlayerTeam) player.getTeam();
+    String teamName = "None";
     if (team != null) {
       String prefix = FontRenderer.getFormatFromString(team.getColorPrefix());
       if (prefix.length() >= 2) {
         char colorChar = prefix.charAt(1);
         switch (colorChar) {
-          case '7':
-            return "Gray";
-          case '9':
-            return "Blue";
-          case 'a':
-            return "Green";
-          case 'b':
-            return "Aqua";
-          case 'c':
-            return "Red";
-          case 'd':
-            return "Pink";
-          case 'e':
-            return "Yellow";
-          case 'f':
-            return "White";
+          case '7': teamName = "Gray"; break;
+          case '9': teamName = "Blue"; break;
+          case 'a': teamName = "Green"; break;
+          case 'b': teamName = "Aqua"; break;
+          case 'c': teamName = "Red"; break;
+          case 'd': teamName = "Pink"; break;
+          case 'e': teamName = "Yellow"; break;
+          case 'f': teamName = "White"; break;
         }
       }
     }
-    return "None";
+    
+    String name = player.getName();
+    if (!teamName.equals("Gray") && !teamName.equals("None")) {
+        teamCache.put(name, teamName);
+    } else if (teamCache.containsKey(name)) {
+        return teamCache.get(name);
+    }
+    
+    return teamName;
   }
 
   @EventTarget
   public void onTickEvent(TickEvent event) {
-    if (mc.thePlayer == null || mc.theWorld == null) return;
+    if (mc.thePlayer == null || mc.theWorld == null) {
+      teamCache.clear();
+      return;
+    }
+    if (mc.thePlayer.ticksExisted < 5) {
+      teamCache.clear();
+    }
+    
     cachedPlayers.clear();
     for (EntityPlayer p : mc.theWorld.playerEntities) {
       if (p != null && !p.isDead) {
-        if (AntiBot.isBot(p)) continue;
+        if (isBot(p)) continue;
         cachedPlayers.add(p);
       }
     }
@@ -161,6 +172,11 @@ public class PlayerList extends Module {
       boolean showTeamCol) {
     float rowHeight = font16.getFontHeight() + 3;
 
+    CheatDetector cheatDetector = (CheatDetector) Miau.moduleManager.modules.get(CheatDetector.class);
+    if (cheatDetector != null && cheatDetector.isEnabled() && cheatDetector.isCheater(player)) {
+      ShapeUtil.drawRect(x, y, x + 220, y + rowHeight, new Color(255, 0, 0, 60).getRGB());
+    }
+
     int headWH = 10;
     int headX = x + 3;
     int headY = y + (int) (rowHeight / 2f - headWH / 2f);
@@ -195,5 +211,20 @@ public class PlayerList extends Module {
       String teamName = getTeamName(player);
       font16.drawWithShadow(teamName, x + 175, textY, nameColor.getRGB());
     }
+  }
+
+  private boolean isBot(EntityPlayer player) {
+    if (player.getName().isEmpty() || player.getName().equals(mc.thePlayer.getName())) return true;
+
+    net.minecraft.item.ItemStack helmet = player.inventory.armorInventory[3];
+    net.minecraft.item.ItemStack chestplate = player.inventory.armorInventory[2];
+    if (helmet == null || chestplate == null) return true;
+    if (!(helmet.getItem() instanceof net.minecraft.item.ItemArmor) || !(chestplate.getItem() instanceof net.minecraft.item.ItemArmor)) return true;
+
+    int helmetColor = ((net.minecraft.item.ItemArmor) helmet.getItem()).getColor(helmet);
+    int chestplateColor = ((net.minecraft.item.ItemArmor) chestplate.getItem()).getColor(chestplate);
+    if (!(chestplateColor > 0 && helmetColor > 0 && chestplateColor == helmetColor)) return true;
+
+    return false;
   }
 }

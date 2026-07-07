@@ -100,13 +100,12 @@ public class Scaffold extends Module {
   private boolean shouldStopSprint() {
     if (this.isTowering()) {
       return false;
-    } else {
-      boolean stage =
-          this.keepYFeature.keepY.getValue() == 1
-              || this.keepYFeature.keepY.getValue() == 3
-              || this.keepYFeature.keepY.getValue() == 4;
-      return (!stage || this.stage <= 0) && this.options.sprintMode.getValue() == 0;
     }
+    boolean keepYActive = this.keepYFeature.keepY.getValue() != 0;
+    if (this.options.sprintMode.getValue() == 0 && (!keepYActive || this.stage <= 0)) {
+      return true;
+    }
+    return this.options.sprintMode.getValue() == 1 && !mc.gameSettings.keyBindForward.isKeyDown();
   }
 
   private boolean canPlace() {
