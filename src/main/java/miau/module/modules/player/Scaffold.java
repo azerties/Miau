@@ -105,7 +105,7 @@ public class Scaffold extends Module {
     if (this.options.sprintMode.getValue() == 0 && (!keepYActive || this.stage <= 0)) {
       return true;
     }
-    return this.options.sprintMode.getValue() == 1 && !mc.gameSettings.keyBindForward.isKeyDown();
+    return this.options.sprintMode.getValue() == 1 && !MoveUtil.isMoving();
   }
 
   private boolean canPlace() {
@@ -713,6 +713,9 @@ public class Scaffold extends Module {
       }
       if (this.shouldStopSprint()) {
         mc.thePlayer.setSprinting(false);
+      } else if (this.options.sprintMode.getValue() == 1
+          || (this.keepYFeature.keepY.getValue() != 0 && this.stage > 0)) {
+        mc.thePlayer.setSprinting(true);
       }
 
       if (this.towerFeature.safe.getValue()

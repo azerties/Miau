@@ -68,7 +68,7 @@ public final class FontRepository {
     "ubuntusans-semibold"
   };
 
-  private static int currentHudFace = 1;
+  private static int currentHudFace = 0;
 
   // ── Opal-style: get / cache a font by name ────────────────────────────────
 
