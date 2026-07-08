@@ -20,51 +20,24 @@ public class GodbridgeFeature implements ScaffoldComponent {
   public final BooleanProperty godBridge = new BooleanProperty("godbridge", false);
 
   public final ModeProperty godBridgeLedgeMode =
-      new ModeProperty(
-          "godbridge-ledge",
-          0,
-          new String[] {"JUMP", "SNEAK", "STOP", "BACKWARDS"});
+      new ModeProperty("godbridge-ledge", 0, new String[] {"JUMP", "SNEAK", "STOP", "BACKWARDS"});
   public final IntProperty godBridgeForceSneakBelowCount =
-      new IntProperty(
-          "godbridge-force-sneak",
-          3,
-          0,
-          10);
+      new IntProperty("godbridge-force-sneak", 3, 0, 10);
   public final FloatProperty godBridgeEdgeDistance =
-      new FloatProperty(
-          "godbridge-edge-dist",
-          0.13F,
-          0.0F,
-          0.5F);
-  public final IntProperty godBridgeSneakDelay =
-      new IntProperty(
-          "godbridge-sneak-ticks",
-          1,
-          1,
-          10);
+      new FloatProperty("godbridge-edge-dist", 0.13F, 0.0F, 0.5F);
+  public final IntProperty godBridgeSneakDelay = new IntProperty("godbridge-sneak-ticks", 1, 1, 10);
 
   // ─── Jump settings ────
-  public final BooleanProperty jumpAutomatically =
-      new BooleanProperty(
-          "jump-automatically",
-          true);
-  public final IntProperty jumpPerBlockMin =
-      new IntProperty(
-          "jump-per-block-min",
-          6,
-          1,
-          10);
-  public final IntProperty jumpPerBlockMax =
-      new IntProperty(
-          "jump-per-block-max",
-          8,
-          1,
-          10);
+  public final BooleanProperty jumpAutomatically = new BooleanProperty("jump-automatically", true);
+  public final IntProperty jumpPerBlockMin = new IntProperty("jump-per-block-min", 6, 1, 10);
+  public final IntProperty jumpPerBlockMax = new IntProperty("jump-per-block-max", 8, 1, 10);
 
   // ─── LiquidBounce-ported GodBridge settings ────
   public final BooleanProperty waitForRotations = new BooleanProperty("wait-for-rotations", false);
-  public final BooleanProperty useOptimizedPitch = new BooleanProperty("use-optimized-pitch", false);
-  public final FloatProperty godbridgePitch = new FloatProperty("godbridge-pitch", 73.5F, 0.0F, 90.0F);
+  public final BooleanProperty useOptimizedPitch =
+      new BooleanProperty("use-optimized-pitch", false);
+  public final FloatProperty godbridgePitch =
+      new FloatProperty("godbridge-pitch", 73.5F, 0.0F, 90.0F);
   public final BooleanProperty jumpAutoSimulate = new BooleanProperty("jump-auto-simulate", true);
 
   private boolean sneaking = false;
@@ -105,15 +78,18 @@ public class GodbridgeFeature implements ScaffoldComponent {
     BooleanSupplier godbridgeOrRotationMode =
         () -> this.godBridge.getValue() || isRotationGodbridge();
     BooleanSupplier ledgeMode1 =
-        () -> (this.godBridge.getValue() || isRotationGodbridge())
-            && this.godBridgeLedgeMode.getValue() == 1;
+        () ->
+            (this.godBridge.getValue() || isRotationGodbridge())
+                && this.godBridgeLedgeMode.getValue() == 1;
     BooleanSupplier ledgeMode0 =
-        () -> (this.godBridge.getValue() || isRotationGodbridge())
-            && this.godBridgeLedgeMode.getValue() == 0;
+        () ->
+            (this.godBridge.getValue() || isRotationGodbridge())
+                && this.godBridgeLedgeMode.getValue() == 0;
     BooleanSupplier ledgeMode0NoAuto =
-        () -> (this.godBridge.getValue() || isRotationGodbridge())
-            && this.godBridgeLedgeMode.getValue() == 0
-            && !this.jumpAutomatically.getValue();
+        () ->
+            (this.godBridge.getValue() || isRotationGodbridge())
+                && this.godBridgeLedgeMode.getValue() == 0
+                && !this.jumpAutomatically.getValue();
 
     godBridgeLedgeMode.setVisibleChecker(godbridgeOrRotationMode);
     godBridgeForceSneakBelowCount.setVisibleChecker(ledgeMode1);
@@ -125,11 +101,13 @@ public class GodbridgeFeature implements ScaffoldComponent {
     waitForRotations.setVisibleChecker(godbridgeOrRotationMode);
     useOptimizedPitch.setVisibleChecker(godbridgeOrRotationMode);
     godbridgePitch.setVisibleChecker(
-        () -> (this.godBridge.getValue() || isRotationGodbridge())
-            && !this.useOptimizedPitch.getValue());
+        () ->
+            (this.godBridge.getValue() || isRotationGodbridge())
+                && !this.useOptimizedPitch.getValue());
     jumpAutoSimulate.setVisibleChecker(
-        () -> (this.godBridge.getValue() || isRotationGodbridge())
-            && this.godBridgeLedgeMode.getValue() == 0);
+        () ->
+            (this.godBridge.getValue() || isRotationGodbridge())
+                && this.godBridgeLedgeMode.getValue() == 0);
   }
 
   private boolean isRotationGodbridge() {
@@ -154,19 +132,18 @@ public class GodbridgeFeature implements ScaffoldComponent {
   }
 
   /**
-   * Called from Scaffold.onMoveInput.
-   * Handles:
-   * - WaitForRotations: hold sneak until rotation difference is acceptable
-   * - SimulatedPlayer jump prediction: if sim player would fall off edge, force jump
-   * - Ledge modes: JUMP, SNEAK, STOP, BACKWARDS
+   * Called from Scaffold.onMoveInput. Handles: - WaitForRotations: hold sneak until rotation
+   * difference is acceptable - SimulatedPlayer jump prediction: if sim player would fall off edge,
+   * force jump - Ledge modes: JUMP, SNEAK, STOP, BACKWARDS
    */
   public void onMoveInput() {
     if (!scaffold.isEnabled() || !this.godBridge.getValue()) return;
 
     // ─── WaitForRotations: hold sneak while rotation is still changing ────
     if (waitForRotations.getValue() && Scaffold.mc.thePlayer != null) {
-      float yawDiff = Math.abs(MathHelper.wrapAngleTo180_float(
-          scaffold.yaw - Scaffold.mc.thePlayer.rotationYaw));
+      float yawDiff =
+          Math.abs(
+              MathHelper.wrapAngleTo180_float(scaffold.yaw - Scaffold.mc.thePlayer.rotationYaw));
       float pitchDiff = Math.abs(scaffold.pitch - Scaffold.mc.thePlayer.rotationPitch);
       float rotationDiff = (float) Math.hypot(yawDiff, pitchDiff);
       float fixedDelta = getFixedAngleDelta();
@@ -180,7 +157,8 @@ public class GodbridgeFeature implements ScaffoldComponent {
         && godBridgeLedgeMode.getValue() == 0
         && Scaffold.mc.thePlayer != null
         && Scaffold.mc.thePlayer.onGround) {
-      SimulatedPlayer simPlayer = SimulatedPlayer.fromClientPlayer(Scaffold.mc.thePlayer.movementInput);
+      SimulatedPlayer simPlayer =
+          SimulatedPlayer.fromClientPlayer(Scaffold.mc.thePlayer.movementInput);
       simPlayer.tick();
       if (!simPlayer.onGround) {
         mc.thePlayer.movementInput.jump = true;
@@ -252,17 +230,13 @@ public class GodbridgeFeature implements ScaffoldComponent {
     return minDist <= threshold;
   }
 
-  /**
-   * Computes the smallest angle possible with the current mouse sensitivity (GCD fix).
-   */
+  /** Computes the smallest angle possible with the current mouse sensitivity (GCD fix). */
   private static float getFixedAngleDelta() {
     float sensitivity = Minecraft.getMinecraft().gameSettings.mouseSensitivity;
     return (float) (Math.pow(sensitivity * 0.6f + 0.2f, 3) * 1.2f);
   }
 
-  /**
-   * Minecraft's MathHelper.wrapAngleTo180_float (duplicated here to avoid import).
-   */
+  /** Minecraft's MathHelper.wrapAngleTo180_float (duplicated here to avoid import). */
   private static class MathHelper {
     static float wrapAngleTo180_float(float value) {
       value %= 360.0f;
@@ -272,4 +246,3 @@ public class GodbridgeFeature implements ScaffoldComponent {
     }
   }
 }
-

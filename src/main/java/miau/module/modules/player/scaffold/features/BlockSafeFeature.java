@@ -33,17 +33,16 @@ public class BlockSafeFeature implements ScaffoldComponent {
     if (Scaffold.mc.thePlayer == null || Scaffold.mc.theWorld == null) return;
     if (!blockSafe.getValue()) return;
 
-    SimulatedPlayer simPlayer = SimulatedPlayer.fromClientPlayer(Scaffold.mc.thePlayer.movementInput);
+    SimulatedPlayer simPlayer =
+        SimulatedPlayer.fromClientPlayer(Scaffold.mc.thePlayer.movementInput);
     simPlayer.rotationYaw = Scaffold.mc.thePlayer.rotationYaw;
     simPlayer.tick();
 
     this.lastSimFallDistance = simPlayer.fallDistance;
 
-    // When simulated player would take more fall damage than real player,
-    // the player is about to walk off an edge - allow instant placement
     if (simPlayer.fallDistance > Scaffold.mc.thePlayer.fallDistance + 0.05
         && scaffold.rotationTick > 0) {
-      scaffold.rotationTick = 1; // Reduce to 1 so next tick placement happens
+      scaffold.rotationTick = 1;
     }
   }
 

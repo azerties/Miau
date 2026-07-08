@@ -471,19 +471,28 @@ public class BedNuker extends Module {
       aabb = new AxisAlignedBB(target, target.add(1, 1, 1));
     }
     ArrayList<Vec3> candidates = this.buildRaytraceSamplePoints(aabb);
+    BlockPos bestObstruction = null;
+    double bestScore = Double.MAX_VALUE;
     for (Vec3 candidate : candidates) {
       if (eyes.squareDistanceTo(candidate) > maxRangeSq) continue;
       MovingObjectPosition mop = mc.theWorld.rayTraceBlocks(eyes, candidate);
-      if (mop == null || mop.typeOfHit != MovingObjectType.BLOCK) return null;
-      BlockPos hitPos = mop.getBlockPos();
-      if (hitPos.equals(target)) return null;
-      Block hitBlock = mc.theWorld.getBlockState(hitPos).getBlock();
-      if (hitBlock instanceof BlockAir
-          || hitBlock instanceof BlockBed
-          || hitBlock.getBlockHardness(mc.theWorld, hitPos) < 0) return null;
-      return hitPos;
+      if (mop != null && mop.typeOfHit == MovingObjectType.BLOCK) {
+        BlockPos hitPos = mop.getBlockPos();
+        if (!hitPos.equals(target)) {
+          Block hitBlock = mc.theWorld.getBlockState(hitPos).getBlock();
+          if (!(hitBlock instanceof BlockAir)
+              && !(hitBlock instanceof BlockBed)
+              && hitBlock.getBlockHardness(mc.theWorld, hitPos) >= 0) {
+            double score = this.scoreBlockTarget(hitPos, false, 0);
+            if (score < bestScore) {
+              bestScore = score;
+              bestObstruction = hitPos;
+            }
+          }
+        }
+      }
     }
-    return null;
+    return bestObstruction;
   }
 
   private boolean tryClearObstruction() {
@@ -896,7 +905,7 @@ public class BedNuker extends Module {
             }));
     for (BlockPos[] pair : bedPairs) {
       // CRITICAL: If the bed is VISIBLE on client-side (raytrace hits bed directly), target the bed
-      // itself — but ONLY if we have a direct hit point (good angle), else enter waiting state
+      // itself — but ONLY if we have a direct hit point (good angle), else try to clear obstruction or wait
       if (this.isBedVisible(pair)) {
         // Try direct hit on each bed block
         for (BlockPos bp : pair) {
@@ -908,19 +917,45 @@ public class BedNuker extends Module {
             return bp;
           }
         }
-        // Bed is visible but NO hit point from current angle → enter waiting state
-        // Return the nearest bed block so isBed=true, but don't mine until player finds angle
-        BlockPos nearest =
-            pair[0].distanceSqToCenter(x, y, z) <= pair[1].distanceSqToCenter(x, y, z)
-                ? pair[0]
-                : pair[1];
-        if (PlayerUtil.isBlockWithinReach(nearest, x, y, z, this.range.getValue().doubleValue())) {
+      }
+
+      // If the bed is visible but we have no direct hit, OR if it's exposed (partially uncovered),
+      // we should intelligently clear the blocks that are blocking our line of sight to the bed
+      if (this.isBedVisible(pair) || this.isBedExposed(pair)) {
+        BlockPos obstruction = null;
+        double bestObsScore = Double.MAX_VALUE;
+        for (BlockPos bp : pair) {
+          BlockPos obs = this.findRaytraceObstruction(bp);
+          if (obs != null && PlayerUtil.isBlockWithinReach(obs, x, y, z, this.range.getValue().doubleValue())) {
+            double s = this.scoreBlockTarget(obs, false, 0);
+            if (s < bestObsScore) {
+              bestObsScore = s;
+              obstruction = obs;
+            }
+          }
+        }
+        if (obstruction != null) {
           this.currentBedPair = pair;
-          this.bypassState = 1; // waiting for player to find direct hit angle
-          this.bypassStateSince = System.currentTimeMillis();
-          return nearest;
+          this.bypassState = 0;
+          return obstruction;
+        }
+
+        if (this.isBedVisible(pair)) {
+          // Bed is visible but NO hit point from current angle → enter waiting state
+          // Return the nearest bed block so isBed=true, but don't mine until player finds angle
+          BlockPos nearest =
+              pair[0].distanceSqToCenter(x, y, z) <= pair[1].distanceSqToCenter(x, y, z)
+                  ? pair[0]
+                  : pair[1];
+          if (PlayerUtil.isBlockWithinReach(nearest, x, y, z, this.range.getValue().doubleValue())) {
+            this.currentBedPair = pair;
+            this.bypassState = 1; // waiting for player to find direct hit angle
+            this.bypassStateSince = System.currentTimeMillis();
+            return nearest;
+          }
         }
       }
+      
       // If covered, use BFS layer-by-layer to find the outermost defense block
       BlockPos target = this.bfsFindOutermostDefenseBlock(pair);
       if (target != null) {
