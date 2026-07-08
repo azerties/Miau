@@ -2,13 +2,29 @@
 set -euo pipefail
 
 LOG="${CI_BUILD_LOG:-build.log}"
+
+print_failure_digest() {
+  echo "::error::Gradle build failed (exit $1)."
+  echo ""
+  echo "--- Failure digest (no stack traces) ---"
+  grep -E '^FAILURE:|^> Task :[^ ]+ FAILED|^BUILD FAILED|What went wrong:|Execution failed for task|^\* Try:|format violations:|Run .gradlew|spotlessJavaCheck|had format violations' "$LOG" || true
+  if grep -q 'format violations' "$LOG" 2>/dev/null; then
+    echo ""
+    echo "--- Spotless diff (if any) ---"
+    awk '/The following files had format violations:/{f=1} f{print} /^Run .gradlew/{exit}' "$LOG" | head -80
+  fi
+  echo ""
+  echo "--- Last tasks / notes (filtered) ---"
+  grep -E '^> Task |^Note: |^BUILD |warning: |error: |FAILURE:|What went wrong|Execution failed|violations' "$LOG" \
+    | grep -v 'IllegalArgumentException' \
+    | tail -35
+  echo ""
+  echo "Full log (incl. Mixin AP noise): artifact gradle-build-log / $LOG"
+}
+
 ./gradlew build --no-daemon >"$LOG" 2>&1 || {
   code=$?
-  echo "::error::Gradle build failed (exit $code). Summary:"
-  grep -E '^FAILURE:|^> Task .*FAILED|What went wrong:|Execution failed for task|BUILD FAILED|format violations:|Run .gradlew' "$LOG" | tail -40 || true
-  echo ""
-  echo "Last 80 lines (full log: artifact gradle-build-log / $LOG):"
-  tail -80 "$LOG"
+  print_failure_digest "$code"
   exit "$code"
 }
 
