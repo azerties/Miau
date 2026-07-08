@@ -117,7 +117,7 @@ public class ProjectileAimBot extends Module {
       if (moveFix.getValue() != 0) {
         event.setPervRotation(yaw, 3);
       }
-      Miau.rotationManager.setSilentRotation(yaw, pitch, 3);
+
     } else {
       event.setPervRotation(yaw, 3);
       Miau.rotationManager.setRotation(yaw, pitch, 3, true);
