@@ -7,11 +7,11 @@ import miau.module.modules.player.Scaffold;
 import miau.module.modules.player.scaffold.ScaffoldComponent;
 import miau.property.Property;
 import miau.property.properties.BooleanProperty;
+import miau.module.modules.player.scaffold.ScaffoldPlacementUtil;
 import miau.util.player.RotationUtil;
 import miau.util.world.BlockUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.MovingObjectPosition;
-import net.minecraft.util.MovingObjectPosition.MovingObjectType;
 import net.minecraft.util.Vec3;
 
 public class MultiPlaceFeature implements ScaffoldComponent {
@@ -38,12 +38,8 @@ public class MultiPlaceFeature implements ScaffoldComponent {
           break;
         }
         MovingObjectPosition mop =
-            RotationUtil.rayTrace(
-                scaffold.yaw, scaffold.pitch, mc.playerController.getBlockReachDistance(), 1.0F);
-        if (mop != null
-            && mop.typeOfHit == MovingObjectType.BLOCK
-            && mop.getBlockPos().equals(blockData.blockPos)
-            && mop.sideHit == blockData.facing) {
+            ScaffoldPlacementUtil.verifyPlacement(blockData, scaffold.yaw, scaffold.pitch);
+        if (mop != null) {
           scaffold.place(blockData.blockPos, blockData.facing, mop.hitVec);
         } else {
           Vec3 hitVec = BlockUtil.getClickVec(blockData.blockPos, blockData.facing);
@@ -56,13 +52,8 @@ public class MultiPlaceFeature implements ScaffoldComponent {
               || !(Math.abs(rotations[1] - scaffold.pitch) < 60.0F)) {
             break;
           }
-          mop =
-              RotationUtil.rayTrace(
-                  rotations[0], rotations[1], mc.playerController.getBlockReachDistance(), 1.0F);
-          if (mop == null
-              || mop.typeOfHit != MovingObjectType.BLOCK
-              || !mop.getBlockPos().equals(blockData.blockPos)
-              || mop.sideHit != blockData.facing) {
+          mop = ScaffoldPlacementUtil.verifyPlacement(blockData, rotations[0], rotations[1]);
+          if (mop == null) {
             break;
           }
           scaffold.place(blockData.blockPos, blockData.facing, mop.hitVec);
