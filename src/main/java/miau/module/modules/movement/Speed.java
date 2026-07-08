@@ -147,9 +147,6 @@ public class Speed extends Module {
 
     if (this.canBoost()) {
       if (this.mode.getValue() == 1) {
-        if (mc.thePlayer.onGround && MoveUtil.isForwardPressed()) {
-          mc.thePlayer.jump();
-        }
         return;
       }
       mc.thePlayer.movementInput.jump = false;

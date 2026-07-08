@@ -26,7 +26,6 @@ import miau.util.player.RotationUtil;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.play.client.C03PacketPlayer;
@@ -219,8 +218,6 @@ public class Displace extends Module {
     double aimX = target.posX + dx / dist * aimRadius;
     double aimZ = target.posZ + dz / dist * aimRadius;
     Vec3 eyes = mc.thePlayer.getPositionEyes(1.0F);
-    // same as ravenbS's RotationUtils.getRotationsFromEye(eyes, aimX, target.posY + eyeHeight*0.5,
-    // aimZ)[0]
     double adx = aimX - eyes.xCoord;
     double ady = (target.posY + (double) target.getEyeHeight() * 0.5D) - eyes.yCoord;
     double adz = aimZ - eyes.zCoord;
@@ -672,8 +669,7 @@ public class Displace extends Module {
     if (hasKnockback.getValue() || itemWhitelistToggle.getValue()) {
       boolean kbPass =
           !hasKnockback.getValue()
-              || (EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0
-                  && mc.thePlayer.getHeldItem() != null
+              || (mc.thePlayer.getHeldItem() != null
                   && mc.thePlayer.getHeldItem().getItem() == net.minecraft.init.Items.stick);
       boolean wlPass =
           !itemWhitelistToggle.getValue() || itemWhitelist.matches(mc.thePlayer.getHeldItem());
@@ -705,8 +701,7 @@ public class Displace extends Module {
     }
 
     boolean hasKBEnchant =
-        EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0
-            && mc.thePlayer.getHeldItem() != null
+        mc.thePlayer.getHeldItem() != null
             && mc.thePlayer.getHeldItem().getItem() == net.minecraft.init.Items.stick;
     active = target != null && (hasKBEnchant || anyMovementKey());
     if (!active) {

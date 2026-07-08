@@ -4,7 +4,6 @@ import java.awt.*;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.stream.Collectors;
 import miau.Miau;
 import miau.enums.ChatColors;
 import miau.event.EventTarget;
@@ -62,10 +61,7 @@ public class BedTracker extends Module {
   public final TextProperty marcoText;
   public final IntProperty marcoDelay;
   public final BooleanProperty hud;
-  public final ModeProperty hudPosX;
-  public final ModeProperty hudPosY;
-  public final IntProperty hudOffX;
-  public final IntProperty hudOffY;
+  public final DragProperty hudDrag;
   public final FloatProperty hudScale;
   public final BooleanProperty hudShadow;
 
@@ -138,14 +134,7 @@ public class BedTracker extends Module {
         new IntProperty(
             "macro-delay", 1, 1, 10, () -> this.marco.getValue() || this.marcoOnPreal.getValue());
     this.hud = new BooleanProperty("hud", true);
-    this.hudPosX =
-        new ModeProperty(
-            "hud-position-x", 0, new String[] {"LEFT", "MIDDLE", "RIGHT"}, this.hud::getValue);
-    this.hudPosY =
-        new ModeProperty(
-            "hud-position-y", 0, new String[] {"TOP", "MIDDLE", "BOTTOM"}, this.hud::getValue);
-    this.hudOffX = new IntProperty("hud-offset-x", 2, 0, 255, this.hud::getValue);
-    this.hudOffY = new IntProperty("hud-offset-y", 2, 0, 255, this.hud::getValue);
+    this.hudDrag = new DragProperty("BedTracker HUD", new miau.util.vector.Vector2d(10, 50), true);
     this.hudScale = new FloatProperty("hud-scale", 1.0F, 0.5F, 1.5F, this.hud::getValue);
     this.hudShadow = new BooleanProperty("hud-shadow", true, this.hud::getValue);
   }
@@ -242,15 +231,8 @@ public class BedTracker extends Module {
           }
         }
       }
-      for (EntityPlayer player :
-          mc.theWorld.loadedEntityList.stream()
-              .filter(entity -> entity instanceof EntityPlayer)
-              .map(entity -> (EntityPlayer) entity)
-              .filter(
-                  entityPlayer ->
-                      !TeamUtil.isBot(entityPlayer)
-                          && !this.whitelistedPlayers.contains(entityPlayer.getName()))
-              .collect(Collectors.toList())) {
+      for (EntityPlayer player : mc.theWorld.playerEntities) {
+        if (TeamUtil.isBot(player) || this.whitelistedPlayers.contains(player.getName())) continue;
         if (TeamUtil.isSameTeam(player)) {
           this.whitelistedPlayers.add(player.getName());
         } else {
@@ -336,38 +318,14 @@ public class BedTracker extends Module {
           ScaledResolution scaledResolution = new ScaledResolution(mc);
           float width = (float) mc.fontRendererObj.getStringWidth(text);
           float height = (float) mc.fontRendererObj.FONT_HEIGHT - 1.0F;
-          float scale = (float) this.hudOffX.getValue() / this.hudScale.getValue();
-          switch (this.hudPosX.getValue()) {
-            case 0:
-              scale++;
-              break;
-            case 1:
-              scale +=
-                  (float) scaledResolution.getScaledWidth() / this.hudScale.getValue() / 2.0F
-                      - width / 2.0F;
-              break;
-            case 2:
-              scale = (scale + 1.0F) * -1.0F;
-              scale += (float) scaledResolution.getScaledWidth() / this.hudScale.getValue() - width;
-          }
-          float offset = (float) this.hudOffY.getValue() / this.hudScale.getValue();
-          switch (this.hudPosY.getValue()) {
-            case 0:
-              offset++;
-              break;
-            case 1:
-              offset +=
-                  (float) scaledResolution.getScaledHeight() / this.hudScale.getValue() / 2.0F
-                      - height / 2.0F;
-              break;
-            case 2:
-              offset = (offset + 1.0F) * -1.0F;
-              offset +=
-                  (float) scaledResolution.getScaledHeight() / this.hudScale.getValue() - height;
-          }
+
+          float x = (float) this.hudDrag.position.x;
+          float y = (float) this.hudDrag.position.y;
+          float sc = this.hudScale.getValue();
+
           GlStateManager.pushMatrix();
-          GlStateManager.scale(this.hudScale.getValue(), this.hudScale.getValue(), 1.0F);
-          GlStateManager.translate(scale, offset, 0.0F);
+          GlStateManager.scale(sc, sc, 1.0F);
+          GlStateManager.translate(x / sc, y / sc, 0.0F);
           GlStateManager.disableDepth();
           GlStateManager.enableBlend();
           GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -376,6 +334,8 @@ public class BedTracker extends Module {
           GlStateManager.disableBlend();
           GlStateManager.enableDepth();
           GlStateManager.popMatrix();
+
+          this.hudDrag.setScale(new miau.util.vector.Vector2d(width * sc, height * sc));
         }
       }
     }
