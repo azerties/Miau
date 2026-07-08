@@ -14,10 +14,10 @@ print_failure_digest() {
     awk '/The following files had format violations:/{f=1} f{print} /^Run .gradlew/{exit}' "$LOG" | head -80
   fi
   echo ""
-  echo "--- Last tasks / notes (filtered) ---"
-  grep -E '^> Task |^Note: |^BUILD |warning: |error: |FAILURE:|What went wrong|Execution failed|violations' "$LOG" \
+  echo "--- Last tasks (filtered) ---"
+  grep -E '^> Task |^BUILD SUCCESSFUL|^BUILD FAILED$|warning: .*\.java:|error: .*\.java:' "$LOG" \
     | grep -v 'IllegalArgumentException' \
-    | tail -35
+    | tail -20
   echo ""
   echo "Full log (incl. Mixin AP noise): artifact gradle-build-log / $LOG"
 }
