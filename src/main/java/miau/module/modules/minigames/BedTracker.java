@@ -4,7 +4,6 @@ import java.awt.*;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.stream.Collectors;
 import miau.Miau;
 import miau.enums.ChatColors;
 import miau.event.EventTarget;
@@ -232,15 +231,8 @@ public class BedTracker extends Module {
           }
         }
       }
-      for (EntityPlayer player :
-          mc.theWorld.loadedEntityList.stream()
-              .filter(entity -> entity instanceof EntityPlayer)
-              .map(entity -> (EntityPlayer) entity)
-              .filter(
-                  entityPlayer ->
-                      !TeamUtil.isBot(entityPlayer)
-                          && !this.whitelistedPlayers.contains(entityPlayer.getName()))
-              .collect(Collectors.toList())) {
+      for (EntityPlayer player : mc.theWorld.playerEntities) {
+        if (TeamUtil.isBot(player) || this.whitelistedPlayers.contains(player.getName())) continue;
         if (TeamUtil.isSameTeam(player)) {
           this.whitelistedPlayers.add(player.getName());
         } else {

@@ -50,4 +50,9 @@ public class BedwarsUtils extends Module {
   public void onRender2D(Render2DEvent event) {
     components.forEach(c -> c.onRender2D(event));
   }
+
+  @EventTarget
+  public void onLoadWorld(miau.event.impl.LoadWorldEvent event) {
+    components.forEach(BedwarsComponent::onReset);
+  }
 }

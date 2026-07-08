@@ -121,7 +121,7 @@ public class PlayerList extends Module {
     cachedPlayers.clear();
     for (EntityPlayer p : mc.theWorld.playerEntities) {
       if (p != null && !p.isDead) {
-        if (isBot(p)) continue;
+        if (miau.module.modules.misc.AntiBot.isBot(p)) continue;
         cachedPlayers.add(p);
       }
     }
@@ -228,22 +228,5 @@ public class PlayerList extends Module {
       String teamName = getTeamName(player);
       font16.drawWithShadow(teamName, x + 175, textY, nameColor.getRGB());
     }
-  }
-
-  private boolean isBot(EntityPlayer player) {
-    if (player.getName().isEmpty() || player.getName().equals(mc.thePlayer.getName())) return true;
-
-    net.minecraft.item.ItemStack helmet = player.inventory.armorInventory[3];
-    net.minecraft.item.ItemStack chestplate = player.inventory.armorInventory[2];
-    if (helmet == null || chestplate == null) return true;
-    if (!(helmet.getItem() instanceof net.minecraft.item.ItemArmor)
-        || !(chestplate.getItem() instanceof net.minecraft.item.ItemArmor)) return true;
-
-    int helmetColor = ((net.minecraft.item.ItemArmor) helmet.getItem()).getColor(helmet);
-    int chestplateColor =
-        ((net.minecraft.item.ItemArmor) chestplate.getItem()).getColor(chestplate);
-    if (!(chestplateColor > 0 && helmetColor > 0 && chestplateColor == helmetColor)) return true;
-
-    return false;
   }
 }

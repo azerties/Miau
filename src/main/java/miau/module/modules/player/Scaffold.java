@@ -224,10 +224,17 @@ public class Scaffold extends Module {
   private MovingObjectPosition getPlacementMop(BlockData blockData, float yaw, float pitch) {
     MovingObjectPosition mop =
         RotationUtil.rayTrace(yaw, pitch, mc.playerController.getBlockReachDistance(), 1.0F);
-    if (mop == null
-        || mop.typeOfHit != MovingObjectType.BLOCK
-        || !mop.getBlockPos().equals(blockData.blockPos())
-        || mop.sideHit != blockData.facing()) {
+    boolean valid =
+        mop != null
+            && mop.typeOfHit == MovingObjectType.BLOCK
+            && mop.getBlockPos().equals(blockData.blockPos())
+            && mop.sideHit == blockData.facing();
+
+    if (!valid) {
+      if (this.betaFeature.isBetaMode()) {
+        Vec3 hitVec = BlockUtil.getHitVec(blockData.blockPos(), blockData.facing(), yaw, pitch);
+        return new MovingObjectPosition(hitVec, blockData.facing(), blockData.blockPos());
+      }
       return null;
     }
     return mop;
@@ -535,17 +542,27 @@ public class Scaffold extends Module {
                         rotations[1],
                         mc.playerController.getBlockReachDistance(),
                         1.0F);
-                if (mop != null
-                    && mop.typeOfHit == MovingObjectType.BLOCK
-                    && mop.getBlockPos().equals(blockData.blockPos())
-                    && mop.sideHit == blockData.facing()) {
+                boolean validMop =
+                    mop != null
+                        && mop.typeOfHit == MovingObjectType.BLOCK
+                        && mop.getBlockPos().equals(blockData.blockPos())
+                        && mop.sideHit == blockData.facing();
+
+                if (validMop || this.betaFeature.isBetaMode()) {
                   float totalDiff =
                       Math.abs(rotations[0] - baseYaw) + Math.abs(rotations[1] - this.pitch);
                   if (bestYaw == -180.0F && bestPitch == 0.0F || totalDiff < bestDiff) {
                     bestYaw = rotations[0];
                     bestPitch = rotations[1];
                     bestDiff = totalDiff;
-                    hitVec = mop.hitVec;
+                    hitVec =
+                        validMop
+                            ? mop.hitVec
+                            : BlockUtil.getHitVec(
+                                blockData.blockPos(),
+                                blockData.facing(),
+                                rotations[0],
+                                rotations[1]);
                   }
                 }
               }

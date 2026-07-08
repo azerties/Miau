@@ -326,6 +326,9 @@ public class AntiBot extends Module {
     if (matrixBot.getValue() && isInvalidMatrixBotArmor(player)) return true;
     if (!basic.getValue()) return false;
 
+    if (player.getUniqueID().version() == 2) return true;
+    if (player.getDisplayName().getUnformattedText().contains("[NPC]")) return true;
+
     if (experimentalNPCDetection.getValue()) {
       String display = strip(player.getDisplayName().getUnformattedText()).toLowerCase(Locale.ROOT);
       if (display.contains("npc") || display.contains("cit-")) return true;

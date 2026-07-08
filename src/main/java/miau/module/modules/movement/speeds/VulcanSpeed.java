@@ -17,6 +17,7 @@ public class VulcanSpeed extends SpeedMode {
 
   private boolean jumped;
   private int jumpTicks;
+  private int jump;
 
   public VulcanSpeed(String name, Speed parent) {
     super(name, parent);
@@ -26,52 +27,91 @@ public class VulcanSpeed extends SpeedMode {
   public void onEnable() {
     jumped = false;
     jumpTicks = 0;
+    jump = 0;
+  }
+
+  private double predictedMotion(double motion, int ticks) {
+    if (ticks == 0) return motion;
+    double predicted = motion;
+    for (int i = 0; i < ticks; i++) {
+      predicted = (predicted - 0.08) * 0.9800000190734863D;
+    }
+    return predicted;
   }
 
   @Override
   public void onLivingUpdate(LivingUpdateEvent event) {
     if (!parent.canBoost()) return;
 
+    if (MoveUtil.getSpeedLevel() < 0.22) {
+      MoveUtil.setSpeed(0.22, MoveUtil.getMoveYaw());
+    }
+
     if (mc.thePlayer.onGround) {
+      jumpTicks = 0;
       if (MoveUtil.isMoving()) {
         mc.thePlayer.jump();
+        jump++;
         jumped = true;
-        jumpTicks = 0;
+
+        if (mc.thePlayer.isPotionActive(net.minecraft.potion.Potion.moveSpeed)
+            && mc.thePlayer.ticksExisted > 11) {
+          MoveUtil.setSpeed(
+              (.06
+                      * (1
+                          + (mc.thePlayer
+                              .getActivePotionEffect(net.minecraft.potion.Potion.moveSpeed)
+                              .getAmplifier()))
+                  + 0.485),
+              MoveUtil.getMoveYaw());
+        } else if (mc.thePlayer.ticksExisted > 11) {
+          MoveUtil.setSpeed(0.485, MoveUtil.getMoveYaw());
+        } else {
+          MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
+        }
       }
       mc.thePlayer.movementInput.jump = false;
       return;
     }
 
     if (!jumped) return;
-
     jumpTicks++;
-    boolean hasSpeed = MoveUtil.getSpeedLevel() > 0;
 
     switch (jumpTicks) {
       case 1:
-        MoveUtil.setSpeed(hasSpeed ? 0.771 : 0.5, MoveUtil.getMoveYaw());
+        MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
         break;
       case 2:
-        MoveUtil.setSpeed(hasSpeed ? 0.605 : 0.31, MoveUtil.getMoveYaw());
-        break;
-      case 3:
-        MoveUtil.setSpeed(hasSpeed ? 0.57 : 0.29, MoveUtil.getMoveYaw());
-        mc.thePlayer.motionY = hasSpeed ? -0.5 : -0.37;
+        if (jump % 4 != 1 && !mc.thePlayer.isCollidedVertically) {
+          mc.thePlayer.motionY = predictedMotion(mc.thePlayer.motionY, 2);
+        }
         break;
       case 4:
-        MoveUtil.setSpeed(hasSpeed ? 0.595 : 0.27, MoveUtil.getMoveYaw());
+        if (jump % 4 == 1 || mc.thePlayer.isCollidedVertically) {
+          mc.thePlayer.motionY = predictedMotion(mc.thePlayer.motionY, 4);
+        }
         break;
       case 5:
-        MoveUtil.setSpeed(hasSpeed ? 0.595 : 0.28, MoveUtil.getMoveYaw());
-        jumped = false;
+        if (jump % 4 == 1) {
+          MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
+        }
         break;
-    }
-
-    if (!mc.thePlayer.onGround && hasSpeed && mc.thePlayer.fallDistance > 0) {
-      double motionX = mc.thePlayer.motionX * 1.055;
-      double motionZ = mc.thePlayer.motionZ * 1.055;
-      mc.thePlayer.motionX = motionX;
-      mc.thePlayer.motionZ = motionZ;
+      case 8:
+        MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
+        break;
+      case 9:
+        if (!(mc.theWorld
+                .getBlockState(
+                    new net.minecraft.util.BlockPos(
+                        mc.thePlayer.posX,
+                        mc.thePlayer.posY + mc.thePlayer.motionY,
+                        mc.thePlayer.posZ))
+                .getBlock()
+            instanceof net.minecraft.block.BlockAir)) {
+          MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
+        }
+        MoveUtil.setSpeed(MoveUtil.getSpeedLevel(), MoveUtil.getMoveYaw());
+        break;
     }
   }
 
