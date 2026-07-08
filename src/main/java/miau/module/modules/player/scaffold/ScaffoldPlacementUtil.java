@@ -77,8 +77,7 @@ public final class ScaffoldPlacementUtil {
       for (double dy : y) {
         for (double dz : z) {
           double relX = data.blockPos.getX() + dx - MC.thePlayer.posX;
-          double relY =
-              data.blockPos.getY() + dy - MC.thePlayer.posY - MC.thePlayer.getEyeHeight();
+          double relY = data.blockPos.getY() + dy - MC.thePlayer.posY - MC.thePlayer.getEyeHeight();
           double relZ = data.blockPos.getZ() + dz - MC.thePlayer.posZ;
           float[] rots = RotationUtil.getRotationsTo(relX, relY, relZ, baseYaw, basePitch);
           MovingObjectPosition mop = RotationUtil.rayCastBlock(reach, rots[0], rots[1]);
