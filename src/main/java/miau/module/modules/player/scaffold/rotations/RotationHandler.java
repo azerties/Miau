@@ -154,6 +154,21 @@ public class RotationHandler {
         scaffold.betaFeature.betaPlaceTicks++;
       }
 
+      if (willPlaceThisTick) {
+        float deltaX = Math.abs(MathHelper.wrapAngleTo180_float(targetYaw - event.getYaw()));
+        if (deltaX > 2.0F
+            && !Float.isNaN(scaffold.lastPlacedAbsPacketYawDelta)
+            && Math.abs(deltaX - scaffold.lastPlacedAbsPacketYawDelta) < 0.0001F) {
+          double gcdStep = RotationUtil.mouseGcdStepMultiplier();
+          if (gcdStep >= 0.01) {
+            targetYaw += (float) (scaffold.duplicatePlaceRotNudgeSign * gcdStep);
+            scaffold.duplicatePlaceRotNudgeSign = -scaffold.duplicatePlaceRotNudgeSign;
+            deltaX = Math.abs(MathHelper.wrapAngleTo180_float(targetYaw - event.getYaw()));
+          }
+        }
+        scaffold.lastPlacedAbsPacketYawDelta = deltaX;
+      }
+
       event.setRotation(targetYaw, targetPitch, 3);
       scaffold.lastMoveFixPacketYaw = targetYaw;
       if (moveFix) {

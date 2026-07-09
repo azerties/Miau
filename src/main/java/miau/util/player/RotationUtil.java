@@ -636,6 +636,11 @@ public class RotationUtil {
     return new float[] {yaw, clampPitch(pitch)};
   }
 
+  public static double mouseGcdStepMultiplier() {
+    float sensitivity = (float) (mc.gameSettings.mouseSensitivity * 0.6F + 0.2F);
+    return sensitivity * sensitivity * sensitivity * 8.0F * 0.15D;
+  }
+
   public static float[] flexRotation(
       float targetYaw, float targetPitch, float baseYaw, float basePitch) {
     float sensitivity =

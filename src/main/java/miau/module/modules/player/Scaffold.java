@@ -163,6 +163,8 @@ public class Scaffold extends Module {
   public float placeYaw, placePitch;
   public float bridgeYaw = Float.NaN;
   public float lastMoveFixPacketYaw = Float.NaN;
+  public float lastPlacedAbsPacketYawDelta = Float.NaN;
+  public int duplicatePlaceRotNudgeSign = 1;
 
   public Scaffold() {
     super("Scaffold", false);
@@ -866,6 +868,8 @@ public class Scaffold extends Module {
     this.betaFeature.betaPlaceCooldown = 0;
     this.lastSnapPlaceYaw = Float.NaN;
     this.lastSnapPlacePitch = Float.NaN;
+    this.lastPlacedAbsPacketYawDelta = Float.NaN;
+    this.duplicatePlaceRotNudgeSign = 1;
     this.betaFeature.lastBetaSentYaw = Float.NaN;
     this.betaFeature.lastBetaSentPitch = Float.NaN;
     this.betaFeature.lastBetaPitchQuotient = 0L;
@@ -900,6 +904,8 @@ public class Scaffold extends Module {
     this.betaFeature.lastBetaSentPitch = Float.NaN;
     this.betaFeature.lastBetaPitchQuotient = 0L;
     this.betaFeature.betaPlaceTicks = 999;
+    this.lastPlacedAbsPacketYawDelta = Float.NaN;
+    this.duplicatePlaceRotNudgeSign = 1;
     for (ScaffoldComponent comp : components) comp.onDisable();
 
     // Reset sneak key state when disabling
