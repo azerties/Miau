@@ -4,19 +4,36 @@ import java.awt.Color;
 import java.util.Comparator;
 import miau.Miau;
 import miau.event.EventTarget;
+import miau.event.impl.MoveInputEvent;
 import miau.event.impl.Render3DEvent;
 import miau.event.impl.UpdateEvent;
 import miau.event.types.EventType;
+import miau.management.RotationState;
 import miau.module.Module;
+import miau.module.modules.misc.AntiBot;
+import miau.module.modules.render.HUD;
 import miau.property.properties.BooleanProperty;
 import miau.property.properties.FloatProperty;
 import miau.property.properties.ModeProperty;
+import miau.util.player.MoveUtil;
 import miau.util.player.RotationUtil;
+import miau.util.player.TeamUtil;
 import miau.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.EntityOtherPlayerMP;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.boss.EntityDragon;
+import net.minecraft.entity.boss.EntityWither;
+import net.minecraft.entity.monster.EntityIronGolem;
+import net.minecraft.entity.monster.EntityMob;
+import net.minecraft.entity.monster.EntitySilverfish;
+import net.minecraft.entity.monster.EntitySlime;
+import net.minecraft.entity.passive.EntityAnimal;
+import net.minecraft.entity.passive.EntityBat;
+import net.minecraft.entity.passive.EntitySquid;
+import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.*;
 import net.minecraft.util.AxisAlignedBB;
@@ -49,6 +66,22 @@ public class ProjectileAimBot extends Module {
           5.0F,
           () -> predict.getValue() && gravityType.getValue() == 1);
   public final BooleanProperty mark = new BooleanProperty("mark", true);
+  public final BooleanProperty silentAim = new BooleanProperty("silent-aim", true);
+  public final ModeProperty moveFix =
+      new ModeProperty(
+          "move-fix", 1, new String[] {"NONE", "SILENT", "STRICT"}, () -> silentAim.getValue());
+  public final ModeProperty showTarget =
+      new ModeProperty("show-target", 0, new String[] {"NONE", "DEFAULT", "HUD"});
+
+  public final BooleanProperty targetPlayers = new BooleanProperty("target-players", true);
+  public final BooleanProperty targetInvisibles =
+      new BooleanProperty("target-invisibles", false, this.targetPlayers::getValue);
+  public final BooleanProperty targetBosses = new BooleanProperty("target-bosses", false);
+  public final BooleanProperty targetMobs = new BooleanProperty("target-mobs", false);
+  public final BooleanProperty targetAnimals = new BooleanProperty("target-animals", false);
+  public final BooleanProperty targetGolems = new BooleanProperty("target-golems", false);
+  public final BooleanProperty targetSilverfish = new BooleanProperty("target-silverfish", false);
+  public final BooleanProperty targetTeams = new BooleanProperty("target-teams", true);
 
   private EntityLivingBase target;
 
@@ -77,14 +110,44 @@ public class ProjectileAimBot extends Module {
             : getDirectRotations(target);
     if (rotations == null) return;
 
-    event.setRotation(rotations[0], rotations[1], 3);
-    Miau.rotationManager.setRotation(rotations[0], rotations[1], 3, true);
+    float yaw = rotations[0];
+    float pitch = rotations[1];
+    event.setRotation(yaw, pitch, 3);
+    if (silentAim.getValue()) {
+      if (moveFix.getValue() != 0) {
+        event.setPervRotation(yaw, 3);
+      }
+
+    } else {
+      event.setPervRotation(yaw, 3);
+      Miau.rotationManager.setRotation(yaw, pitch, 3, true);
+    }
+  }
+
+  @EventTarget
+  public void onMoveInput(MoveInputEvent event) {
+    if (!isEnabled() || !silentAim.getValue()) return;
+    if (moveFix.getValue() == 1
+        && RotationState.isActived()
+        && RotationState.getPriority() == 3.0F
+        && MoveUtil.isForwardPressed()) {
+      MoveUtil.fixStrafe(RotationState.getSmoothedYaw());
+    }
   }
 
   @EventTarget
   public void onRender3D(Render3DEvent event) {
-    if (!this.isEnabled() || target == null || !mark.getValue()) return;
-    drawPlatform(target, new Color(37, 126, 255, 70), event.getPartialTicks());
+    if (!this.isEnabled() || target == null || !TeamUtil.isEntityLoaded(target)) return;
+    if (mark.getValue()) {
+      drawPlatform(target, new Color(37, 126, 255, 70), event.getPartialTicks());
+    }
+    if (showTarget.getValue() != 0) {
+      Color color =
+          showTarget.getValue() == 2
+              ? ((HUD) Miau.moduleManager.modules.get(HUD.class)).getColor(System.currentTimeMillis())
+              : new Color(255, 0, 0);
+      RenderUtil.drawEntityBox(target, color.getRed(), color.getGreen(), color.getBlue());
+    }
   }
 
   private boolean isValidHeldItem(ItemStack stack) {
@@ -106,21 +169,74 @@ public class ProjectileAimBot extends Module {
   }
 
   private boolean isValidTarget(EntityLivingBase entity) {
-    if (entity == mc.thePlayer || entity.isDead || entity.getHealth() <= 0.0F) return false;
-    if (entity instanceof EntityPlayer && ((EntityPlayer) entity).isPlayerSleeping()) return false;
-    if (mc.thePlayer.getDistanceToEntity(entity) > range.getValue()) return false;
-    if (throughWalls.getValue())
-      return mc.thePlayer.getDistanceToEntity(entity) <= throughWallsRange.getValue()
-          || mc.thePlayer.canEntityBeSeen(entity);
-    return mc.thePlayer.canEntityBeSeen(entity);
+    if (!isValid(entity)) return false;
+    if (RotationUtil.distanceToEntity(entity) > range.getValue()) return false;
+    if (throughWalls.getValue()) {
+      return RotationUtil.distanceToEntity(entity) <= throughWallsRange.getValue()
+          || RotationUtil.rayTrace(entity) == null;
+    }
+    return RotationUtil.rayTrace(entity) == null;
+  }
+
+  private boolean isValid(EntityLivingBase entityLivingBase) {
+    if (entityLivingBase == null || mc.theWorld == null || mc.thePlayer == null) return false;
+    if (!mc.theWorld.loadedEntityList.contains(entityLivingBase)) return false;
+    if (entityLivingBase == mc.thePlayer || entityLivingBase == mc.thePlayer.ridingEntity) {
+      return false;
+    }
+    if (entityLivingBase == mc.getRenderViewEntity()
+        || entityLivingBase == mc.getRenderViewEntity().ridingEntity) {
+      return false;
+    }
+    if (entityLivingBase.deathTime > 0) return false;
+    if (entityLivingBase instanceof EntityOtherPlayerMP) {
+      return isValidPlayer((EntityPlayer) entityLivingBase);
+    }
+    if (entityLivingBase instanceof EntityDragon || entityLivingBase instanceof EntityWither) {
+      return targetBosses.getValue();
+    }
+    if (entityLivingBase instanceof EntityMob || entityLivingBase instanceof EntitySlime) {
+      if (entityLivingBase instanceof EntitySilverfish) {
+        return targetSilverfish.getValue() && allowTeamColor(entityLivingBase);
+      }
+      return targetMobs.getValue();
+    }
+    if (entityLivingBase instanceof EntityAnimal
+        || entityLivingBase instanceof EntityBat
+        || entityLivingBase instanceof EntitySquid
+        || entityLivingBase instanceof EntityVillager) {
+      return targetAnimals.getValue();
+    }
+    if (entityLivingBase instanceof EntityIronGolem) {
+      return targetGolems.getValue() && allowTeamColor(entityLivingBase);
+    }
+    return false;
+  }
+
+  private boolean isValidPlayer(EntityPlayer player) {
+    if (!targetPlayers.getValue()) return false;
+    if (player.isPlayerSleeping()) return false;
+    boolean isInvisible = player.isInvisible();
+    if (isInvisible && !targetInvisibles.getValue()) return false;
+    if (TeamUtil.isFriend(player)) return false;
+    if (!TeamUtil.isTarget(player)) return false;
+    return allowSameTeam(player) && (isInvisible || !AntiBot.isBot(player));
+  }
+
+  private boolean allowTeamColor(EntityLivingBase entityLivingBase) {
+    return targetTeams.getValue() || !TeamUtil.hasTeamColor(entityLivingBase);
+  }
+
+  private boolean allowSameTeam(EntityPlayer player) {
+    return targetTeams.getValue() || !TeamUtil.isSameTeam(player);
   }
 
   private double priorityValue(EntityLivingBase entity) {
     switch (priority.getValue()) {
       case 0:
-        return entity.getHealth();
+        return TeamUtil.getHealthScore(entity);
       case 1:
-        return mc.thePlayer.getDistanceToEntity(entity);
+        return RotationUtil.distanceToEntity(entity);
       case 2:
       default:
         return Math.abs(
@@ -221,11 +337,12 @@ public class ProjectileAimBot extends Module {
   }
 
   public boolean hasTarget() {
-    return target != null && mc.thePlayer != null && mc.thePlayer.canEntityBeSeen(target);
+    return target != null && mc.thePlayer != null && RotationUtil.rayTrace(target) == null;
   }
 
   @Override
   public void onDisabled() {
     target = null;
+    RotationState.applyState(false, 0.0F, 0.0F, 0.0F, Integer.MIN_VALUE);
   }
 }
