@@ -307,6 +307,14 @@ public class FaithsCharacterRenderer {
   }
 
   public static void renderCharacter(float delta) {
+    try {
+      ClickGUI clickGuiMod = (ClickGUI) miau.Miau.moduleManager.getModule(ClickGUI.class);
+      if (clickGuiMod != null && !clickGuiMod.showCharacter.getValue()) {
+        return;
+      }
+    } catch (Exception ignored) {
+    }
+
     String charName = "character";
     try {
       ClickGUI clickGuiMod = (ClickGUI) miau.Miau.moduleManager.getModule(ClickGUI.class);

@@ -28,6 +28,7 @@ public class ClickGUI extends Module {
           "Character", 0, miau.ui.clickgui.faiths.FaithsCharacterRenderer.getCharacterArray());
 
   public final BooleanProperty blur = new BooleanProperty("Blur", true);
+  public final BooleanProperty showCharacter = new BooleanProperty("show-character", true);
 
   public ClickGUI() {
     super("ClickGUI", false);

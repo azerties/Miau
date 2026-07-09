@@ -411,7 +411,9 @@ public class ModuleComponent extends Component {
       if (activeDropdown.onClick(x, y, mouse)) {
         return true;
       }
-      activeDropdown.collapseModeDropdown();
+      if (!activeDropdown.isMouseOverModeDropdown(x, y)) {
+        activeDropdown.collapseModeDropdown();
+      }
       return true;
     }
 

@@ -570,22 +570,18 @@ public class SliderComponent extends Component {
       return true;
     }
 
-    if (isModeDropdownActive()) {
+    if (isModeDropdownActive() && isMouseOverModeDropdown(mouseX, mouseY)) {
       String[] options = getOptions();
       if (options != null) {
-        float left = this.x + 4 + (xOffset / 2);
+        float cx = this.moduleComponent.categoryComponent.getX();
         float top = this.y + 1 + MODE_HEADER_HEIGHT + MODE_DROPDOWN_GAP;
-        float right = this.x + cw - 4 + (xOffset / 2);
-        float bottom = top + options.length * MODE_OPTION_HEIGHT + 6f;
-        if (mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom) {
-          int optionIndex = (int) ((mouseY - top - 3f) / MODE_OPTION_HEIGHT);
-          if (optionIndex >= 0 && optionIndex < options.length) {
-            property.setValue(optionIndex);
-            setExpanded(false);
-            moduleComponent.reloadSettings();
-          }
-          return true;
+        int optionIndex = (int) ((mouseY - top - 3f) / MODE_OPTION_HEIGHT);
+        if (optionIndex >= 0 && optionIndex < options.length) {
+          property.setValue(optionIndex);
+          setExpanded(false);
+          moduleComponent.reloadSettings();
         }
+        return true;
       }
     }
 

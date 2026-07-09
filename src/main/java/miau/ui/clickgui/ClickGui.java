@@ -250,6 +250,12 @@ public class ClickGui extends GuiScreen {
 
     List<CategoryComponent> inputOrder = new ArrayList<>(categories);
     inputOrder.sort((a, b) -> Long.compare(b.lastInteractedTime, a.lastInteractedTime));
+
+    // Mode dropdown can draw outside the category panel — route those clicks first.
+    if (handleActiveModeDropdownClick(inputOrder, scaledX, scaledY, mouseButton)) {
+      return;
+    }
+
     CategoryComponent topmostCategory = null;
     for (CategoryComponent category : inputOrder) {
       if (category.overRect(scaledX, scaledY)) {
@@ -284,6 +290,28 @@ public class ClickGui extends GuiScreen {
         if (component.onClick(scaledX, scaledY, mouseButton)) break;
       }
     }
+  }
+
+  private boolean handleActiveModeDropdownClick(
+      List<CategoryComponent> inputOrder, int scaledX, int scaledY, int mouseButton) {
+    for (CategoryComponent category : inputOrder) {
+      if (!category.isOpened()) {
+        continue;
+      }
+      for (Component component : category.getModules()) {
+        if (!(component instanceof ModuleComponent)) {
+          continue;
+        }
+        ModuleComponent module = (ModuleComponent) component;
+        SliderComponent dropdown = module.getActiveModeDropdown();
+        if (dropdown != null && dropdown.isMouseOverModeDropdown(scaledX, scaledY)) {
+          category.markInteracted();
+          module.onClick(scaledX, scaledY, mouseButton);
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override
