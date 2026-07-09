@@ -510,7 +510,6 @@ public class Scaffold extends Module {
                 blockData, event.getYaw(), event.getPitch(), placeOffsets);
       }
       if (styled != null) {
-        this.placeYaw = styled.yaw;
         this.placePitch = styled.pitch;
         hitVec = styled.hitVec;
       } else {
@@ -542,7 +541,11 @@ public class Scaffold extends Module {
     rotationHandler.handleUpdateRotation(event, yawDiffTo180, diagonalYaw, snapMode, towerRotating);
 
     if (betaMode && blockData != null && hitVec != null) {
-      MovingObjectPosition verifiedMop = getPlacementMop(blockData, this.placeYaw, this.placePitch);
+      MovingObjectPosition verifiedMop =
+          getPlacementMop(
+              blockData,
+              Float.isNaN(this.bridgeYaw) ? this.yaw : this.bridgeYaw,
+              this.placePitch);
       if (verifiedMop == null) {
         verifiedMop = getPlacementMop(blockData, this.yaw, this.pitch);
       }

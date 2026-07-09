@@ -98,12 +98,8 @@ public class RotationHandler {
         if (!Float.isNaN(scaffold.bridgeYaw)) {
           targetYaw = scaffold.bridgeYaw;
         }
-        if (!Float.isNaN(scaffold.placeYaw) && !Float.isNaN(scaffold.placePitch)) {
-          event.setRotation(scaffold.placeYaw, scaffold.placePitch, 3);
-          if (scaffold.options.movementCorrection.getValue()) {
-            event.setPervRotation(targetYaw, 3);
-          }
-          return;
+        if (!Float.isNaN(scaffold.placePitch)) {
+          targetPitch = scaffold.placePitch;
         }
       }
 
