@@ -52,7 +52,8 @@ public class RotationHandler {
       float yawDiffTo180,
       float diagonalYaw,
       boolean snapMode,
-      boolean towerRotating) {
+      boolean towerRotating,
+      boolean willPlaceThisTick) {
     int mode = rotationMode.getValue();
     boolean betaMode = mode == 7;
     boolean betaTelly = scaffold.betaFeature.isBetaTellyMode();
@@ -94,16 +95,30 @@ public class RotationHandler {
         scaffold.towering = true;
       }
 
-      scaffold.placeYaw = targetYaw;
-      scaffold.placePitch = targetPitch;
+      float[] placeGcd =
+          RotationUtil.flexRotation(targetYaw, targetPitch, event.getYaw(), event.getPitch());
+      scaffold.placeYaw = placeGcd[0];
+      scaffold.placePitch = placeGcd[1];
 
-      float[] gcd =
-          RotationUtil.flexRotation(
-              targetYaw, targetPitch, event.getYaw(), event.getPitch());
-      targetYaw = gcd[0];
-      targetPitch = gcd[1];
-      scaffold.placeYaw = targetYaw;
-      scaffold.placePitch = targetPitch;
+      boolean moveFix =
+          scaffold.options.moveFix.getValue() == 1
+              || scaffold.options.movementCorrection.getValue();
+      float packetYaw = placeGcd[0];
+      float packetPitch = placeGcd[1];
+      if (moveFix
+          && (mode == 2 || mode == 3)
+          && !Float.isNaN(scaffold.bridgeYaw)
+          && !willPlaceThisTick) {
+        float bridgePitch = !Float.isNaN(scaffold.placePitch) ? scaffold.placePitch : targetPitch;
+        float[] bridgeGcd =
+            RotationUtil.flexRotation(
+                scaffold.bridgeYaw, bridgePitch, event.getYaw(), event.getPitch());
+        packetYaw = bridgeGcd[0];
+        packetPitch = bridgeGcd[1];
+      }
+
+      targetYaw = packetYaw;
+      targetPitch = packetPitch;
 
       if (betaMode) {
         if (!Float.isNaN(scaffold.betaFeature.lastBetaSentYaw)) {
@@ -140,10 +155,8 @@ public class RotationHandler {
       }
 
       event.setRotation(targetYaw, targetPitch, 3);
-      boolean moveFixSilent = scaffold.options.moveFix.getValue() == 1;
-      if (moveFixSilent) {
-        event.setPervRotation(scaffold.getCurrentYaw(), 3);
-      } else if (scaffold.options.movementCorrection.getValue()) {
+      scaffold.lastMoveFixPacketYaw = targetYaw;
+      if (moveFix) {
         event.setPervRotation(targetYaw, 3);
       }
     }

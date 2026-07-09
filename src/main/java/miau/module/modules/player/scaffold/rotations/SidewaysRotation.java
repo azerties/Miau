@@ -14,8 +14,7 @@ public class SidewaysRotation implements IRotationLogic {
       float diagonalYaw) {
     float seedPitch = scaffold.pitch == 0.0F ? 85.0F : scaffold.pitch;
     float[] gcd =
-        RotationUtil.flexRotation(
-            diagonalYaw, seedPitch, event.getYaw(), event.getPitch());
+        RotationUtil.flexRotation(diagonalYaw, seedPitch, event.getYaw(), event.getPitch());
     scaffold.yaw = gcd[0];
     scaffold.pitch = gcd[1];
     scaffold.bridgeYaw = gcd[0];
