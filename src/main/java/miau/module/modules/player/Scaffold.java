@@ -161,6 +161,7 @@ public class Scaffold extends Module {
   public double savedMotionX, savedMotionY, savedMotionZ;
   public double safePrevMotionY = 0.0;
   public float placeYaw, placePitch;
+  public float bridgeYaw = Float.NaN;
 
   public Scaffold() {
     super("Scaffold", false);
@@ -493,33 +494,27 @@ public class Scaffold extends Module {
     if (this.canRotate
         && MoveUtil.isForwardPressed()
         && Math.abs(MathHelper.wrapAngleTo180_float(yawDiffTo180 - this.yaw)) < 90.0F
-        && blockData != null) {
+        && blockData != null
+        && (rotMode == 2 || rotMode == 3)) {
       float styleYaw =
           rotMode == 2
               ? RotationUtil.quantizeAngle(yawDiffTo180)
-              : rotMode == 3 ? RotationUtil.quantizeAngle(diagonalYaw) : this.yaw;
-      if (rotMode == 2 || rotMode == 3) {
-        PlacementAim styled =
-            ScaffoldPlacementUtil.resolveAim(blockData, styleYaw, this.pitch, placeOffsets);
-        if (styled != null) {
-          this.yaw = styled.yaw;
-          this.pitch = styled.pitch;
-          hitVec = styled.hitVec;
-        }
+              : RotationUtil.quantizeAngle(diagonalYaw);
+      this.bridgeYaw = styleYaw;
+      this.yaw = styleYaw;
+      PlacementAim styled =
+          ScaffoldPlacementUtil.resolveAim(blockData, styleYaw, this.pitch, placeOffsets);
+      if (styled == null) {
+        styled =
+            ScaffoldPlacementUtil.resolveAim(
+                blockData, event.getYaw(), event.getPitch(), placeOffsets);
       }
-    }
-
-    if (blockData != null
-        && this.canRotate
-        && (rotMode == 2 || rotMode == 3)
-        && getPlacementMop(blockData, this.yaw, this.pitch) == null) {
-      PlacementAim grimAim =
-          ScaffoldPlacementUtil.resolveAim(
-              blockData, event.getYaw(), event.getPitch(), placeOffsets);
-      if (grimAim != null) {
-        this.yaw = grimAim.yaw;
-        this.pitch = grimAim.pitch;
-        hitVec = grimAim.hitVec;
+      if (styled != null) {
+        this.placeYaw = styled.yaw;
+        this.placePitch = styled.pitch;
+        hitVec = styled.hitVec;
+      } else {
+        hitVec = null;
       }
     }
 

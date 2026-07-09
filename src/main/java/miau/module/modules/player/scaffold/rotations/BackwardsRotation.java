@@ -13,7 +13,11 @@ public class BackwardsRotation implements IRotationLogic {
       float yawDiffTo180,
       float diagonalYaw) {
     if (scaffold.yaw == -180.0F && scaffold.pitch == 0.0F) {
+      scaffold.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
       scaffold.pitch = RotationUtil.quantizeAngle(85.0F);
+    } else {
+      scaffold.yaw = RotationUtil.quantizeAngle(yawDiffTo180);
     }
+    scaffold.bridgeYaw = scaffold.yaw;
   }
 }

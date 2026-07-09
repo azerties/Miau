@@ -94,15 +94,21 @@ public class RotationHandler {
         scaffold.towering = true;
       }
 
+      if (mode == 2 || mode == 3) {
+        if (!Float.isNaN(scaffold.bridgeYaw)) {
+          targetYaw = scaffold.bridgeYaw;
+        }
+        if (!Float.isNaN(scaffold.placeYaw) && !Float.isNaN(scaffold.placePitch)) {
+          event.setRotation(scaffold.placeYaw, scaffold.placePitch, 3);
+          if (scaffold.options.movementCorrection.getValue()) {
+            event.setPervRotation(targetYaw, 3);
+          }
+          return;
+        }
+      }
+
       scaffold.placeYaw = targetYaw;
       scaffold.placePitch = targetPitch;
-
-      if (mode == 2 || mode == 3) {
-        targetYaw = RotationUtil.quantizeAngle(targetYaw);
-        targetPitch = RotationUtil.quantizeAngle(targetPitch);
-        scaffold.placeYaw = targetYaw;
-        scaffold.placePitch = targetPitch;
-      }
 
       if (betaMode) {
         if (!Float.isNaN(scaffold.betaFeature.lastBetaSentYaw)) {
